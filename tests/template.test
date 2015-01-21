@@ -7,6 +7,7 @@ package require rl_json
 
 test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
 	set bar	"Bar"
+	unset -nocomplain a
 	array set a {
 		x		str
 		y		123
