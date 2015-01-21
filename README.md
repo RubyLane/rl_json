@@ -70,10 +70,12 @@ Examples
 Produce a JSON value from a template:
 ~~~tcl
 json template {
-    "thing1": "~S:val1",
-    "thing2": ["a", "~N:val2", "~S:val2", "~B:val2", "~S:val3", "~L:~S:val1"],
-    "subdoc1": "~J:subdoc",
-    "subdoc2": "~T:subdoc"
+    {
+        "thing1": "~S:val1",
+        "thing2": ["a", "~N:val2", "~S:val2", "~B:val2", "~S:val3", "~L:~S:val1"],
+        "subdoc1": "~J:subdoc",
+        "subdoc2": "~T:subdoc"
+    }
 } {
     val1   hello
     val2   1e6
