@@ -5,7 +5,7 @@ if {"::tcltest" ni [namespace children]} {
 
 package require rl_json
 
-test from_template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
+test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
 	set bar	"Bar"
 	array set a {
 		x		str
@@ -16,7 +16,7 @@ test from_template-1.1 {Produce a JSON doc with interpolated values, no dict} -s
 		subdoc2	{{"inner2": "~S:bar"}}
 	}
 } -body {
-	json from_template {
+	json template {
 		{
 			"foo": "~S:bar",
 			"baz":  [
@@ -36,8 +36,8 @@ test from_template-1.1 {Produce a JSON doc with interpolated values, no dict} -s
 	unset -nocomplain bar a
 } -result {{"foo":"Bar","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:bar"},{"inner2":"Bar"}]}}
 #>>>
-test from_template-1.2 {Produce a JSON doc with interpolated values, using dict} -body { #<<<
-	json from_template {
+test template-1.2 {Produce a JSON doc with interpolated values, using dict} -body { #<<<
+	json template {
 		{
 			"foo": "~S:bar",
 			"baz":  [

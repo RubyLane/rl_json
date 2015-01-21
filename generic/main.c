@@ -1338,7 +1338,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 		"new",
 		"fmt",
 		"isnull",
-		"from_template",
+		"template",
 		"foreach",
 		"lmap",
 
@@ -1358,7 +1358,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 		M_NEW,
 		M_FMT,
 		M_ISNULL,
-		M_FROM_TEMPLATE,
+		M_TEMPLATE,
 		M_FOREACH,
 		M_LMAP,
 
@@ -1550,14 +1550,14 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			}
 			break;
 			//}}}
-		case M_FROM_TEMPLATE: //{{{
+		case M_TEMPLATE: //{{{
 			{
 				int		res;
 				struct serialize_context	scx;
 				Tcl_DString					ds;
 
 				if (objc < 3 || objc > 4)
-					CHECK_ARGS(2, "from_template json_template ?source_dict?");
+					CHECK_ARGS(2, "template json_template ?source_dict?");
 
 				Tcl_DStringInit(&ds);
 

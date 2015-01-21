@@ -108,13 +108,13 @@ proc our_simple_template_vars {} {
 
 	set bar	"Bar"
 
-	json from_template $simple_tmpl
+	json template $simple_tmpl
 }
 
 proc our_simple_template_dict {} {
 	global simple_tmpl
 
-	json from_template $simple_tmpl {
+	json template $simple_tmpl {
 		foo		"Foo"
 		bar		"Bar"
 		baz		"Baz"
@@ -133,13 +133,13 @@ proc our_template_vars {} {
 
 	set bar	"Bar"
 
-	json from_template $tmpl
+	json template $tmpl
 }
 
 proc our_template_dict {} {
 	global tmpl
 
-	json from_template $tmpl {
+	json template $tmpl {
 		foo		"Foo"
 		bar		"Bar"
 		baz		"Baz"
@@ -254,7 +254,7 @@ proc main {} {
 
 	benchmark::test 600 200 usec our_simple_template_vars
 	benchmark::test 600 200 usec our_simple_template_dict
-	benchmark::test 600 200 usec json from_template $simple_tmpl {
+	benchmark::test 600 200 usec json template $simple_tmpl {
 		foo		"Foo"
 		bar		"Bar"
 		baz		"Baz"
@@ -267,7 +267,7 @@ proc main {} {
 	}
 	benchmark::test 600 200 usec our_template_vars
 	benchmark::test 600 200 usec our_template_dict
-	benchmark::test 600 200 usec json from_template $tmpl {
+	benchmark::test 600 200 usec json template $tmpl {
 		foo		"Foo"
 		bar		"Bar"
 		baz		"Baz"

@@ -84,5 +84,5 @@ json template {
 ~~~
 Result:
 ~~~json
-{"thing1":"hello","thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],"subdoc1":{"thing3":"~S:val1"},{"thing3":"hello"}}
+{"thing1":"hello","thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],"subdoc1":{"thing3":"~S:val1"},"subdoc2":{"thing3":"hello"}}
 ~~~
