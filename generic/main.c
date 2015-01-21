@@ -222,7 +222,50 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 						first = 0;
 					}
 
-					append_json_string(scx, k);
+					// Have to do the template subst here rather than at
+					// parse time since the dict keys would be broken otherwise
+					if (scx->serialize_mode == SERIALIZE_TEMPLATE) {
+						int			l, stype;
+						const char*	s;
+
+						s = Tcl_GetStringFromObj(k, &l);
+
+						if (
+								l >= 3 &&
+								s[0] == '~' &&
+								s[2] == ':'
+						) {
+							switch (s[1]) {
+								case 'S': stype = JSON_DYN_STRING; break;
+								case 'L': stype = JSON_DYN_LITERAL; break;
+
+								case 'N':
+								case 'B':
+								case 'J':
+								case 'T':
+									Tcl_SetObjResult(interp, Tcl_NewStringObj(
+												"Only strings allowed as object keys", -1));
+									res = TCL_ERROR;
+									goto done;
+
+								default:  stype = JSON_UNDEF; break;
+							}
+
+							if (stype != JSON_UNDEF) {
+								if (serialize_json_val(interp, scx, stype, Tcl_GetRange(k, 3, l-1)) != TCL_OK) {
+									res = TCL_ERROR;
+									break;
+								}
+							} else {
+								append_json_string(scx, k);
+							}
+						} else {
+							append_json_string(scx, k);
+						}
+					} else {
+						append_json_string(scx, k);
+					}
+
 					Tcl_DStringAppend(ds, ":", 1);
 					JSON_GetJvalFromObj(NULL, v, &v_type, &iv);
 					if (serialize_json_val(interp, scx, v_type, iv) != TCL_OK) {
@@ -343,6 +386,7 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 			break; //}}}
 	}
 
+done:
 	return res;
 }
 
