@@ -58,8 +58,10 @@ A literal value that would match one of the above modifiers can be used as the l
 
 ~~~tcl
 json get {
-    "foo": {
-        "?size": "quite big"
+    {
+        "foo": {
+            "?size": "quite big"
+        }
     }
 } foo ??size
 ~~~
