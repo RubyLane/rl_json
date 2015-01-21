@@ -1,0 +1,73 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+test from_template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
+	set bar	"Bar"
+	array set a {
+		x		str
+		y		123
+		on		yes
+		off		0
+		subdoc	{{"inner": "~S:bar"}}
+		subdoc2	{{"inner2": "~S:bar"}}
+	}
+} -body {
+	json from_template {
+		{
+			"foo": "~S:bar",
+			"baz":  [
+				"~S:a(x)",
+				"~N:a(y)",
+				123.4,
+				"~B:a(on)",
+				"~B:a(off)",
+				"~S:a(not_defined)",
+				"~L:~S:not a subst",
+				"~J:a(subdoc)",
+				"~T:a(subdoc2)"
+			]
+		}
+	}
+} -cleanup {
+	unset -nocomplain bar a
+} -result {{"foo":"Bar","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:bar"},{"inner2":"Bar"}]}}
+#>>>
+test from_template-1.2 {Produce a JSON doc with interpolated values, using dict} -body { #<<<
+	json from_template {
+		{
+			"foo": "~S:bar",
+			"baz":  [
+				"~S:x",
+				"~N:y",
+				123.4,
+				"~B:on",
+				"~B:off",
+				"~S:not_defined",
+				"~L:~S:not a subst",
+				"~J:subdoc",
+				"~T:subdoc2",
+				"~S:baz"
+			]
+		}
+	} {
+		foo		"Foo"
+		bar		"Ba\"r"
+		baz		"Baz"
+		x		str
+		y		123
+		on		yes
+		off		0
+		subdoc	{{"inner" : "~S:foo"}}
+		subdoc2	{{"inner2" : "~S:foo"}}
+	}
+} -result {{"foo":"Ba\"r","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:foo"},{"inner2":"Foo"},"Baz"]}}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

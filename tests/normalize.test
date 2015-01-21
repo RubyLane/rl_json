@@ -1,0 +1,36 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+test normalize-1.1 {Normalize a JSON value} -body { #<<<
+	json normalize {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	}
+} -result {{"foo":"bar","baz":["str",123,123.4,true,false,null,{"inner":"obj"}]}}
+#>>>
+test normalize-2.1 {Ensure that shared values aren't normalized} -body { #<<<
+	set a {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	}
+	list [json normalize $a] $a
+} -result [list {{"foo":"bar","baz":["str",123,123.4,true,false,null,{"inner":"obj"}]}} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	}]
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

@@ -1,0 +1,25 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+test to_tcl-1.1 {Parse JSON and convert to closest Tcl value, object} -body { #<<<
+	set json	{
+		{
+			"foo": "bar",
+			"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	}
+	json parse $json
+} -result [dict create \
+	foo		bar \
+	baz		[list str 123 123.4 1 0 {} [list inner obj]] \
+]
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
