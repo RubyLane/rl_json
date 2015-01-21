@@ -66,6 +66,8 @@ json get {
 } foo ??size
 ~~~
 
+Returns "quite big"
+
 Examples
 --------
 
