@@ -92,3 +92,90 @@ Result:
 ~~~json
 {"thing1":"hello","thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],"subdoc1":{"thing3":"~S:val1"},"subdoc2":{"thing3":"hello"}}
 ~~~
+
+Performance
+-----------
+
+Good performance was a requirement for rl_json, because it is used to handle
+large volumes of data flowing to and from various JSON based REST apis.  It's
+generally the fastest option for working with JSON values in Tcl from the
+options I've tried, with the next closest being yajltcl.  These benchmarks
+report the median times in microseconds, and produce quite stable results
+between runs.  Benchmarking was done on a MacBook Air running Ubuntu
+14.04 64bit, Tcl 8.6.3 built with -O3 optimization turned on, and using
+an Intel i5 3427U CPU.
+
+This benchmark compares the relative performance of extracting the field
+containing the string "obj" from the JSON doc:
+
+```json
+{
+	"foo": "bar",
+	"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+}
+```
+
+The compared methods are:
+
+| Name | Notes | Code |
+|------|-------|------|
+| old_json_parse | Pure Tcl parser | `dict get [lindex [dict get [json_old parse [string trim $json]] baz] end] inner` |
+| rl_json_parse | | `dict get [lindex [dict get [json parse [string trim $json]] baz] end] inner` |
+| rl_json_get | Using the built-in accessor method | `json get [string trim $json] baz end inner` |
+| yajltcl | | `dict get [lindex [dict get [yajl::json2dict [string trim $json]] baz] end] inner` |
+| rl_json_get_native | | `json get $json baz end inner` |
+
+The use of [string trim $json] is to defeat the caching of the parsed
+representation, forcing it to reparse the string each time since we're
+measuring the parse performance here.  The exception is the rl_json_get_native
+test which demonstrates the performance of the cached case.
+
+```
+-- parse-1.1: "Parse a small JSON doc and extract a field" --------------------
+                   | This run
+    old_json_parse |  241.595
+     rl_json_parse |    5.540
+       rl_json_get |    4.950
+           yajltcl |    8.800
+rl_json_get_native |    0.800
+```
+
+This benchmark compares the relative performance of various ways of
+dynamically generating a JSON document.  Although all the methods produce the
+same string, only the "template" and "template_dict" variants handle nulls in
+the general case - the others manually test for null only for the one field
+that is known to be null, so the performance of these variants would be worse
+in a real-world scenario where all fields would need to be tested for null.
+
+The code for these variants are too long to include in this table, refer to
+bench/new.bench for the details.
+
+| Name | Notes |
+|------|-------|
+| old_json_fmt | Pure Tcl implementation, builds JSON from type-annotated Tcl values |
+| rl_json_new | rl_json's [json new], API compatible with the pure Tcl version used in old_json_fmt |
+| template | rl_json's [json template] |
+| yajltcl | yajltcl's type-annotated Tcl value approach |
+| template_dict | As for template, but using a dict containing the values to substitute |
+| yajltcl_dict | As for yajltcl, but extracting the values from the same dict used by template_dict |
+
+```
+-- new-1.1: "Various ways of dynamically assembling a JSON doc" ---------------
+                 | This run
+    old_json_fmt |   49.450
+     rl_json_new |   10.240
+        template |    4.520
+         yajltcl |    7.700
+   template_dict |    2.500
+    yajltcl_dict |    7.530
+```
+
+Under the Hood
+--------------
+
+The yajl c library is used to parse the JSON string, and to generate properly
+quoted strings when serializing JSON values.  JSON values are parsed to an
+internal format using Tcl_Objs and stored as the internal representation for
+a new type of Tcl_Obj.  Subsequent manipulation of that value use the internal
+representation directly.
+
