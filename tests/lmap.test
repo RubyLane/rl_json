@@ -85,6 +85,39 @@ test lmap-4.1 {Multiple iterators, multi vars, over array} -setup { #<<<
 	"4({\"x\":42})(x 42)(42.1)(42.1)/(42.1)(42.1)(null)()" \
 ]
 #>>>
+test lmap-5.1 {Single iterator, single var, over array, continue} -setup { #<<<
+	set i	0
+} -body {
+	json lmap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} continue
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i
+} -result [list \
+	"1(\"a\")(a)" \
+	"2(\"b\")(b)" \
+	"3(\"other var\")(other var)" \
+	"4(true)(1)" \
+	"5(false)(0)" \
+	"6({\"x\":42})(x 42)" \
+]
+#>>>
+test lmap-6.1 {Single iterator, single var, over array, break} -setup { #<<<
+	set i	0
+} -body {
+	json lmap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} break
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i
+} -result [list \
+	"1(\"a\")(a)" \
+	"2(\"b\")(b)" \
+	"3(\"other var\")(other var)" \
+]
+#>>>
 
 ::tcltest::cleanupTests
 return

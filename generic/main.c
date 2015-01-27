@@ -1343,6 +1343,8 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 				break;
 
 			case TCL_BREAK:
+				retcode = TCL_OK;
+				// falls through
 			default:
 				goto done;
 		}
