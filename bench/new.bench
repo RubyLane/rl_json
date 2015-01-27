@@ -4,7 +4,6 @@ if {"bench" ni [info commands bench]} {
 }
 
 package require rl_json
-package require benchmark
 package require yajltcl
 package require json_old
 
