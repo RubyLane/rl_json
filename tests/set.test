@@ -1,0 +1,92 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+# Compare two json docs, ignoring non-semantic elements (optional whitespace,
+# object key ordering, etc)
+proc compare {j1 j2} { #<<<
+	if {[json get $j1 ?type] ne [json get $j2 ?type]} {
+		return 0
+	}
+
+	switch -- [json get $j1 ?type] {
+		object {
+			# Two JSON objects are considered to match if they have the same
+			# keys (regardless of order), and the values stored in those keys
+			# match according to this function
+			if {[json get $j1 ?size] != [json get $j2 ?size]} {
+				return 0
+			}
+
+			lassign [intersect3 [json get $j1 ?keys] [json get $j2 ?keys]] \
+				j1_only both j2_only
+
+			if {[llength $j1_only] > 0 || [llength $j2_only] > 0} {
+				return 0
+			}
+
+			foreach key $both {
+				if {![compare [json extract $j1 $key] [json extract $j2 $key]]} {
+					return 0
+				}
+			}
+
+			return 1
+		}
+
+		array {
+			# Two JSON arrays are considered to match if they have the same
+			# number of elements, and each element (in order) is considered to
+			# match by this function
+			if {[json get $j1 ?length] != [json get $j2 ?length]} {
+				return 0
+			}
+			json foreach e1 $j1 e2 $j2 {
+				if {![compare $e1 $e2]} {
+					return 0
+				}
+			}
+			return 1
+		}
+
+		string    { expr {[json get $j1] eq [json get $j2]} }
+		number    { expr {[json get $j1] == [json get $j2]} }
+		boolean   { expr {[json get $j1] == [json get $j2]} }
+		null      { return 1 }
+
+		default {
+			error "Unsupported JSON type for compare: \"[json get $j1 ?type]\""
+		}
+	}
+}
+
+#>>>
+
+test set-1.1 {Update a key in an object} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json bar {"Bar"}
+	compare {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result 1
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

@@ -96,8 +96,7 @@ INSTALL_LIBRARY	= @INSTALL_LIBRARY@
 PACKAGE_NAME	= rl_json
 PACKAGE_VERSION	= 0.5
 CC		= gcc
-CFLAGS_DEFAULT	= -g -O3
-#CFLAGS_DEFAULT	= -g
+CFLAGS_DEFAULT	= -g
 CFLAGS_WARNING	= -Wall -Wno-implicit-int
 EXEEXT		= 
 LDFLAGS_DEFAULT	=  -Wl,--export-dynamic 
@@ -165,7 +164,7 @@ CLEANFILES	= scripts-stamp scripts/tclIndex
 CPPFLAGS	= 
 LIBS		=  -L/home/cyan/local/lib -lyajl 
 AR		= ar
-CFLAGS		=  -pipe ${CFLAGS_DEFAULT} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} 
+CFLAGS		= -O3 -pipe -m64 ${CFLAGS_DEFAULT} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} 
 COMPILE		= $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 
 .SUFFIXES: .c .$(OBJEXT)
@@ -243,9 +242,7 @@ test: binaries libraries
 			[list load `echo $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
 benchmark: binaries libraries
-	$(TCLSH) `echo $(srcdir)/perf/all.tcl` $(TESTFLAGS) \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `echo $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+	$(TCLSH) `echo $(srcdir)/bench/run.tcl` $(TESTFLAGS)
 
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)

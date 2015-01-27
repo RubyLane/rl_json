@@ -1,0 +1,56 @@
+if {"bench" ni [info commands bench]} {
+	package require bench
+	namespace import bench::*
+}
+
+package require rl_json
+
+bench template-1.1 {Basic templated document creation} -setup { #<<<
+	set tmpl {
+		{
+			"foo": "~S:foo",
+			"bar": "~S:a(bar)",
+			"baz": "~N:baz"
+		}
+	}
+	set foo	Foo
+	array set a {
+		foo		X
+		bar		Bar
+	}
+} -compare {
+	dict {
+		json template $tmpl {
+			foo		Foo
+			a(bar)	Bar
+		}
+	}
+
+	dict_lit {
+		json template {
+			{
+				"foo": "~S:foo",
+				"bar": "~S:a(bar)",
+				"baz": "~N:baz"
+			}
+		} {
+			foo		Foo
+			a(bar)	Bar
+		}
+	}
+
+	variables {
+		json template $tmpl
+	}
+} -cleanup {
+	unset -nocomplain tmpl a foo
+} -result [json normalize {
+	{
+		"foo": "Foo",
+		"bar": "Bar",
+		"baz": null
+	}
+}]
+#>>>
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

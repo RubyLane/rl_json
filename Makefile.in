@@ -242,9 +242,7 @@ test: binaries libraries
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
 benchmark: binaries libraries
-	$(TCLSH) `@CYGPATH@ $(srcdir)/perf/all.tcl` $(TESTFLAGS) \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+	$(TCLSH) `@CYGPATH@ $(srcdir)/bench/run.tcl` $(TESTFLAGS)
 
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)

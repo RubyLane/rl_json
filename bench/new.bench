@@ -1,0 +1,171 @@
+if {"bench" ni [info commands bench]} {
+	package require bench
+	namespace import bench::*
+}
+
+package require rl_json
+package require benchmark
+package require yajltcl
+package require json_old
+
+bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
+	array set a {
+		x		"str\"foo\nbar"
+		y		123
+		on		yes
+		off		0
+		subdoc	{{"inner": "~S:bar"}}
+		subdoc2	{{"inner2": "~S:bar"}}
+	}
+
+	set bar	"Bar"
+
+	dict set d bar $bar
+	foreach {k v} [array get a] {
+		dict set d a($k) $v
+	}
+	unset -nocomplain k v
+} -compare {
+	old_json_fmt {
+		json_old fmt obj [list \
+			"foo" [list s $bar] \
+			"baz" [list a \
+				[list s $a(x)] \
+				[list num $a(y)] \
+				[list num 123.4] \
+				[list bool $a(on)] \
+				[list bool $a(off)] \
+				[expr {[info exists a(not_defined)] ? [list s $a(not_defined)] : [list null]}] \
+				[list s "~S:not a subst"] \
+				[list o inner [list s $bar]] \
+				[list o inner2 [list s $bar]] \
+			] \
+		]
+	}
+
+	json_new {
+		json new obj [list \
+			"foo" [list s $bar] \
+			"baz" [list a \
+				[list s $a(x)] \
+				[list num $a(y)] \
+				[list num 123.4] \
+				[list bool $a(on)] \
+				[list bool $a(off)] \
+				[expr {[info exists a(not_defined)] ? [list s $a(not_defined)] : [list null]}] \
+				[list s "~S:not a subst"] \
+				[list o inner [list s $bar]] \
+				[list o inner2 [list s $bar]] \
+			] \
+		]
+	}
+
+	template {
+		json template {
+			{
+				"foo": "~S:bar",
+				"baz": [
+					"~S:a(x)",
+					"~N:a(y)",
+					123.4,
+					"~B:a(on)",
+					"~B:a(off)",
+					"~S:a(not_defined)",
+					"~L:~S:not a subst",
+					"~T:a(subdoc)",
+					"~T:a(subdoc2)"
+				]
+			}
+		}
+	}
+
+	yajl {
+		yajl create y
+		try {
+			y \
+				map_open \
+					string foo	string $bar \
+					string baz	array_open \
+						string $a(x) \
+						number $a(y) \
+						number 123.4 \
+						bool $a(on) \
+						bool $a(off) \
+						{*}[if {[info exists a(not_defined)]} {
+							list string $a(not_defined)
+						} else {
+							list null
+						}] \
+						string "~S:not a subst" \
+						map_open \
+							string inner	string $bar \
+						map_close \
+						map_open \
+							string inner2	string $bar \
+						map_close \
+					array_close \
+				map_close
+
+			y get
+		} finally {
+			y delete
+		}
+	}
+
+	template_dict {
+		json template {
+			{
+				"foo": "~S:bar",
+				"baz": [
+					"~S:a(x)",
+					"~N:a(y)",
+					123.4,
+					"~B:a(on)",
+					"~B:a(off)",
+					"~S:a(not_defined)",
+					"~L:~S:not a subst",
+					"~T:a(subdoc)",
+					"~T:a(subdoc2)"
+				]
+			}
+		} $d
+	}
+
+	yajl_dict {
+		yajl create y
+		try {
+			y \
+				map_open \
+					string foo	string [dict get $d bar] \
+					string baz	array_open \
+						string [dict get $d a(x)] \
+						number [dict get $d a(y)] \
+						number 123.4 \
+						bool [dict get $d a(on)] \
+						bool [dict get $d a(off)] \
+						{*}[if {[dict exists $d a(not_defined)]} {
+							list string [dict get $d a(not_defined)]
+						} else {
+							list null
+						}] \
+						string "~S:not a subst" \
+						map_open \
+							string inner	string [dict get $d bar] \
+						map_close \
+						map_open \
+							string inner2	string [dict get $d bar] \
+						map_close \
+					array_close \
+				map_close
+
+			y get
+		} finally {
+			y delete
+		}
+	}
+} -cleanup {
+	unset -nocomplain a d
+} -result {{"foo":"Bar","baz":["str\"foo\nbar",123,123.4,true,false,null,"~S:not a subst",{"inner":"Bar"},{"inner2":"Bar"}]}}
+#>>>
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

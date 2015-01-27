@@ -1367,6 +1367,84 @@ done:
 }
 
 //}}}
+static int merge(Tcl_Interp* interp, int deep, Tcl_Obj *const orig, Tcl_Obj *const patch, Tcl_Obj **const res) //{{{
+{
+	Tcl_Obj*		val;
+	Tcl_Obj*		pval;
+	int				type, ptype, done, retcode=TCL_OK;
+	Tcl_DictSearch	search;
+	Tcl_Obj*		k;
+	Tcl_Obj*		v;
+	Tcl_Obj*		orig_v;
+	Tcl_Obj*		new_v;
+
+	*res = orig;
+
+	if (*res == NULL) {
+		*res = patch;
+		return TCL_OK;
+	}
+
+	TEST_OK(JSON_GetJvalFromObj(interp, *res, &type, &val));
+	TEST_OK(JSON_GetJvalFromObj(interp, patch, &ptype, &pval));
+
+	// In all cases, if the types don't match the patch completely
+	// replaces the destination
+	if (type != ptype) {
+		*res = patch;
+		return TCL_OK;
+	}
+
+	switch (type) {
+		case JSON_UNDEF:
+			THROW_ERROR("Tried to merge into JSON_UNDEF");
+
+		case JSON_ARRAY:
+		case JSON_STRING:
+		case JSON_NUMBER:
+		case JSON_BOOL:
+		case JSON_NULL:
+		case JSON_DYN_STRING:
+		case JSON_DYN_NUMBER:
+		case JSON_DYN_BOOL:
+		case JSON_DYN_JSON:
+		case JSON_DYN_TEMPLATE:
+		case JSON_DYN_LITERAL:
+			// For all types other than object, the patch replaces the
+			// destination.
+			/* Probably not worth it:
+			if (type == ptype == JSON_NULL) return TCL_OK;
+			*/
+			*res = patch;
+			return TCL_OK;
+
+		case JSON_OBJECT:
+			if (Tcl_IsShared(*res)) {
+				*res = Tcl_DuplicateObj(*res);
+				TEST_OK(JSON_GetJvalFromObj(interp, *res, &type, &val));
+			}
+
+			TEST_OK(Tcl_DictObjFirst(interp, pval, &search, &k, &v, &done));
+			for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+				TEST_OK_LABEL(done, retcode,
+						Tcl_DictObjGet(interp, val, k, &orig_v));
+				TEST_OK_LABEL(done, retcode,
+						merge(interp, deep>0? deep-1:deep, orig_v, v, &new_v));
+
+				if (new_v != orig_v)
+					TEST_OK_LABEL(done, retcode,
+							Tcl_DictObjPut(interp, val, k, new_v));
+			}
+done:
+			Tcl_DictObjDone(&search);
+			return retcode;
+
+		default:
+			THROW_ERROR("Unsupported JSON type: ", Tcl_GetString(Tcl_NewIntObj(type)));
+	}
+}
+
+//}}}
 static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int method;
@@ -1385,6 +1463,8 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 		"template",
 		"foreach",
 		"lmap",
+		"pretty",
+		"merge",
 
 		// Debugging
 		"nop",
@@ -1405,6 +1485,8 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 		M_TEMPLATE,
 		M_FOREACH,
 		M_LMAP,
+		M_PRETTY,
+		M_MERGE,
 
 		// Debugging
 		M_NOP
@@ -1643,6 +1725,69 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			break;
 			//}}}
 		case M_NOP: //{{{
+			break;
+			//}}}
+		case M_PRETTY: //{{{
+			if (objc < 3) CHECK_ARGS(2, "pretty json_val");
+			// TODO
+			THROW_ERROR("Not implemented yet");
+			break;
+			//}}}
+		case M_MERGE: //{{{
+			{
+				int		i=2, deep=0, checking_flags=1, str_len;
+				const char*	str;
+				Tcl_Obj*	res = NULL;
+				Tcl_Obj*	patch;
+				Tcl_Obj*	new;
+				static const char* flags[] = {
+					"--",
+					"-deep",
+					(char*)NULL
+				};
+				enum {
+					FLAG_ENDARGS,
+					FLAG_DEEP
+				};
+				int	index;
+
+				if (objc < 2) CHECK_ARGS(1, "merge ?flag ...? ?json_val ...?");
+
+				while (i < objc) {
+					patch = objv[i++];
+
+					// Nasty optimization - prevent generating string rep of
+					// a pure JSON value to check if it is a flag (can never
+					// be: "-" isn't valid as the first char of a JSON value)
+					if (patch->typePtr == &json_type)
+						checking_flags = 0;
+
+					if (checking_flags) {
+						str = Tcl_GetStringFromObj(patch, &str_len);
+						if (str_len > 0 && str[0] == '-') {
+							TEST_OK(Tcl_GetIndexFromObj(interp, patch, flags,
+										"flag", TCL_EXACT, &index));
+							switch (index) {
+								case FLAG_ENDARGS: checking_flags = 0; break;
+								case FLAG_DEEP:    deep = 1;           break;
+								default: THROW_ERROR("Invalid flag");
+							}
+							continue;
+						}
+					}
+
+					if (res == NULL) {
+						res = patch;
+					} else {
+						TEST_OK(merge(interp, deep, res, patch, &new));
+						if (new != res)
+							res = new;
+					}
+				}
+
+				if (res != NULL)
+					Tcl_SetObjResult(interp, res);
+			}
 			break;
 			//}}}
 

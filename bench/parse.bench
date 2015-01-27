@@ -1,0 +1,48 @@
+if {"bench" ni [info commands bench]} {
+	package require bench
+	namespace import bench::*
+}
+
+package require rl_json
+package require benchmark
+package require yajltcl
+package require json_old
+
+bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
+	set json {
+		{
+			"foo": "bar",
+			"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	}
+	set pre	[json get [string trim $json]]
+} -compare {
+	old_json_parse {
+		dict get [lindex [dict get [json_old parse [string trim $json]] baz] end] inner
+	}
+
+	ours {
+		dict get [lindex [dict get [json parse [string trim $json]] baz] end] inner
+	}
+
+	ours_get {
+		json get [string trim $json] baz end inner
+	}
+
+	ours_pre {
+		dict get [lindex [dict get $pre baz] end] inner
+	}
+
+	ours_get_native {
+		json get $json baz end inner
+	}
+
+	yajltcl {
+		dict get [lindex [dict get [yajl::json2dict [string trim $json]] baz] end] inner
+	}
+} -cleanup {
+	unset -nocomplain json pre
+} -result obj
+#>>>
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
