@@ -150,6 +150,32 @@ the general case - the others manually test for null only for the one field
 that is known to be null, so the performance of these variants would be worse
 in a real-world scenario where all fields would need to be tested for null.
 
+The JSON doc generated in each case is the one produced by the following JSON
+template (where a(not_defined) does not exist and results in a null value in the produced document):
+
+```json
+{
+	"foo": "~S:bar",
+	"baz": [
+		"~S:a(x)",
+		"~N:a(y)",
+		123.4,
+		"~B:a(on)",
+		"~B:a(off)",
+		"~S:a(not_defined)",
+		"~L:~S:not a subst",
+		"~T:a(subdoc)",
+		"~T:a(subdoc2)"
+	]
+}
+```
+
+The produced JSON doc is:
+
+```json
+{"foo":"Bar","baz":["str\"foo\nbar",123,123.4,true,false,null,"~S:not a subst",{"inner":"Bar"},{"inner2":"Bar"}]}
+```
+
 The code for these variants are too long to include in this table, refer to
 bench/new.bench for the details.
 
