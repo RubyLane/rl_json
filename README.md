@@ -211,4 +211,4 @@ representation directly.
 License
 -------
 
-Licensed under the same terms as the Tcl core.
+Copyright 2015 Ruby Lane.  Licensed under the same terms as the Tcl core.
