@@ -113,6 +113,23 @@ test foreach-5.1 {Single iterator, single var, over array, continue} -setup { #<
 	"6({\"x\":42})(x 42)" \
 ]
 #>>>
+test foreach-5.2 {Single iterator, single var, over array, continue on final iteration} -setup { #<<<
+	set i	0
+	set res	{}
+} -body {
+	json foreach elem {["a", "b", "other var", null]} {
+		if {[json get $elem] eq ""} continue
+		lappend res	"[incr i]($elem)([json get $elem])"
+	}
+	set res
+} -cleanup {
+	unset -nocomplain i res
+} -result [list \
+	"1(\"a\")(a)" \
+	"2(\"b\")(b)" \
+	"3(\"other var\")(other var)" \
+]
+#>>>
 test foreach-6.1 {Single iterator, single var, over array, break} -setup { #<<<
 	set i	0
 	set res	{}
