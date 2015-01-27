@@ -93,8 +93,7 @@ Result:
 {"thing1":"hello","thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],"subdoc1":{"thing3":"~S:val1"},"subdoc2":{"thing3":"hello"}}
 ~~~
 
-Performance
------------
+## Performance
 
 Good performance was a requirement for rl_json, because it is used to handle
 large volumes of data flowing to and from various JSON based REST apis.  It's
@@ -104,6 +103,8 @@ report the median times in microseconds, and produce quite stable results
 between runs.  Benchmarking was done on a MacBook Air running Ubuntu
 14.04 64bit, Tcl 8.6.3 built with -O3 optimization turned on, and using
 an Intel i5 3427U CPU.
+
+### Parsing
 
 This benchmark compares the relative performance of extracting the field
 containing the string "obj" from the JSON doc:
@@ -139,6 +140,8 @@ test which demonstrates the performance of the cached case.
            yajltcl |    8.800
 rl_json_get_native |    0.800
 ```
+
+### Generating
 
 This benchmark compares the relative performance of various ways of
 dynamically generating a JSON document.  Although all the methods produce the
