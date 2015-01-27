@@ -208,3 +208,7 @@ internal format using Tcl_Objs and stored as the internal representation for
 a new type of Tcl_Obj.  Subsequent manipulation of that value use the internal
 representation directly.
 
+License
+-------
+
+Licensed under the same terms as the Tcl core.
