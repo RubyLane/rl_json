@@ -12,6 +12,13 @@ if {[lsearch [namespace children] ::tcltest] == -1} {
     namespace import ::tcltest::*
 }
 
+if {[llength [info commands memory]] == 1} {
+	memory init on
+	#memory onexit memdebug
+	#memory validate on
+	#memory trace on
+}
+
 set ::tcltest::testSingleFile false
 set ::tcltest::testsDirectory [file dir [info script]]
 

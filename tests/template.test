@@ -97,6 +97,17 @@ test template-1.3 {Produce a JSON doc with interpolated values, subst object key
 	}
 } -result {{"Foo":"Ba\"r","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:foo"},{"inner2":"Foo"},"Baz"]}}
 #>>>
+test template-2.1 {Test interpolated numeric validation} -body { #<<<
+	json template {
+		{
+			"Foo": "~N:num",
+			"Bar": "baz"
+		}
+	} {
+		num	""
+	}
+} -returnCodes error -result {Error substituting value from "num" into template, not a number: ""}
+#>>>
 
 ::tcltest::cleanupTests
 return

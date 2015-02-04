@@ -96,7 +96,7 @@ INSTALL_LIBRARY	= @INSTALL_LIBRARY@
 PACKAGE_NAME	= rl_json
 PACKAGE_VERSION	= 0.5
 CC		= gcc
-CFLAGS_DEFAULT	= -g
+CFLAGS_DEFAULT	= -O2 -fomit-frame-pointer
 CFLAGS_WARNING	= -Wall -Wno-implicit-int
 EXEEXT		= 
 LDFLAGS_DEFAULT	=  -Wl,--export-dynamic 
@@ -164,7 +164,7 @@ CLEANFILES	= scripts-stamp scripts/tclIndex
 CPPFLAGS	= 
 LIBS		=  -L/home/cyan/local/lib -lyajl 
 AR		= ar
-CFLAGS		= -O3 -pipe -m64 ${CFLAGS_DEFAULT} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} 
+CFLAGS		= -O3 -pipe ${CFLAGS_DEFAULT} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} 
 COMPILE		= $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 
 .SUFFIXES: .c .$(OBJEXT)
