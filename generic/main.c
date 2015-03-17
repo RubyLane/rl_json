@@ -1844,7 +1844,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			{
 				Tcl_Obj*		target = NULL;
 
-				if (objc < 3) CHECK_ARGS(2, "get_json json_val ?path ...?");
+				if (objc < 3) CHECK_ARGS(2, "extract json_val ?path ...?");
 
 				if (objc >= 4) {
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0));
