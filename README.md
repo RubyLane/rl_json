@@ -5,7 +5,7 @@ This package adds a command [json] to the interpreter, and defines a new
 Tcl_Obj type to store the parsed JSON document.  The [json] command directly
 manipulates values whose string representation is valid JSON, in a similar
 way to how the [dict] command directly manipulates values whose string
-representaion is a valid dictionary.  It is similar to [dict] in performance.
+representation is a valid dictionary.  It is similar to [dict] in performance.
 
 Also provided is a command [json template] which generates JSON documents
 by interpolating values into a template from a supplied dictionary or
