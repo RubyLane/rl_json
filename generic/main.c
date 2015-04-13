@@ -546,7 +546,7 @@ static int parse_start_map_callback(void* cd) //{{{
 	if (cx->container == JSON_UNDEF) {
 		new = cx;
 	} else {
-		new = ckalloc(sizeof(struct parse_context));
+		new = (struct parse_context*)ckalloc(sizeof(struct parse_context));
 		new->prev = cx->last;
 		cx->last = new;
 		new->hold_key = NULL;
@@ -580,7 +580,7 @@ static int parse_end_map_callback(void* cd) //{{{
 		append_to_cx(cx, tail->val);
 		Tcl_DecrRefCount(tail->val); tail->val = NULL;
 
-		ckfree(tail); tail = NULL;
+		ckfree((char*)tail); tail = NULL;
 	}
 	return 1;
 }
@@ -594,7 +594,7 @@ static int parse_start_array_callback(void* cd) //{{{
 	if (cx->container == JSON_UNDEF) {
 		new = cx;
 	} else {
-		new = ckalloc(sizeof(struct parse_context));
+		new = (struct parse_context*)ckalloc(sizeof(struct parse_context));
 		new->prev = cx->last;
 		new->hold_key = NULL;
 		cx->last = new;
@@ -618,7 +618,7 @@ static int parse_end_array_callback(void* cd) //{{{
 		append_to_cx(cx, tail->val);
 		Tcl_DecrRefCount(tail->val); tail->val = NULL;
 
-		ckfree(tail); tail = NULL;
+		ckfree((char*)tail); tail = NULL;
 	}
 	return 1;
 }
