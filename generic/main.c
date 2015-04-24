@@ -1984,6 +1984,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			break;
 			//}}}
 		case M_MERGE: //{{{
+			THROW_ERROR("merge method is not functional yet, sorry");
 			{
 				int		i=2, deep=0, checking_flags=1, str_len;
 				const char*	str;
