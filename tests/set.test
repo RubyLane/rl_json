@@ -377,6 +377,68 @@ test set-3.2 {Return value of set is the new variable's value} -setup { #<<<
 } -result {{"foo":"Bar","baz":"Baz"}}
 #>>>
 
+test set-4.1 {Create a variable if it didn't exist} -body { #<<<
+	json set newvar x y z {
+		{
+			"foo": "Foo",
+			"bar": [1, 2, 3]
+		}
+	}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {{"x":{"y":{"z":{"foo":"Foo","bar":[1,2,3]}}}}}
+#>>>
+test set-4.2 {Create a variable if it didn't exist with atomic type - string} -body { #<<<
+	json set newvar {"foo"}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {"foo"}
+#>>>
+test set-4.3 {Create a variable if it didn't exist with atomic type - number} -body { #<<<
+	json set newvar 42
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result 42
+#>>>
+test set-4.4 {Create a variable if it didn't exist with atomic type - null} -body { #<<<
+	json set newvar null
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result null
+#>>>
+test set-4.5 {Create a variable if it didn't exist with atomic type - boolean: true} -body { #<<<
+	json set newvar true
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result true
+#>>>
+test set-4.6 {Create a variable if it didn't exist with atomic type - boolean: false} -body { #<<<
+	json set newvar false
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result false
+#>>>
+test set-4.7 {Create a variable if it didn't exist with array} -body { #<<<
+	json set newvar {[1, 2, 3]}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {[1,2,3]}
+#>>>
+test set-4.8 {Create a variable if it didn't exist with object} -body { #<<<
+	json set newvar {{"foo": null}}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {{"foo":null}}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

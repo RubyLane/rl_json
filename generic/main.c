@@ -790,9 +790,10 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 
 	TEST_OK(JSON_GetJvalFromObj(interp, replacement, &newtype, &newval));
 
-	src = Tcl_ObjGetVar2(interp, srcvar, NULL, TCL_LEAVE_ERR_MSG);
-	if (src == NULL)
-		return TCL_ERROR;
+	src = Tcl_ObjGetVar2(interp, srcvar, NULL, 0);
+	if (src == NULL) {
+		src = Tcl_ObjSetVar2(interp, srcvar, NULL, JSON_NewJvalObj(JSON_OBJECT, NULL, 0), TCL_LEAVE_ERR_MSG);
+	}
 
 	if (Tcl_IsShared(src)) {
 		src = Tcl_ObjSetVar2(interp, srcvar, NULL, Tcl_DuplicateObj(src), TCL_LEAVE_ERR_MSG);
