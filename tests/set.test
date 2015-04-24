@@ -151,8 +151,8 @@ proc _compare_json {opts j1 j2 {path {}}} { #<<<
 		}
 
 		string    { if {[json get $j1] ne [json get $j2]} {apply $mismatch "Strings differ: left: \"[json get $j1]\" vs. right: \"[json get $j2]\""} }
-		number    { if {[json get $j1] == [json get $j2]} {apply $mismatch "Numbers differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
-		boolean   { if {[json get $j1] == [json get $j2]} {apply $mismatch "Booleans differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
+		number    { if {[json get $j1] != [json get $j2]} {apply $mismatch "Numbers differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
+		boolean   { if {[json get $j1] != [json get $j2]} {apply $mismatch "Booleans differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
 		null      { }
 
 		default {
@@ -259,6 +259,35 @@ test set-2.1 {Do Nothing Gracefully (sort of - don't blow up if an empty path is
 } -cleanup {
 	unset -nocomplain json
 } -result match
+#>>>
+
+test set-3.1 {Create missing objects in path} -body { #<<<
+	set jsonstr {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+
+	json set jsonstr bar Bar FooBar test {"x"}
+	json set jsonstr bar Bar FooBar test2 {"y"}
+	json set jsonstr bar Bar FooBar test3 {"z"}
+
+	json normalize $jsonstr
+} -result {{"foo":"Foo","baz":"Baz","bar":{"Bar":{"FooBar":{"test":"x","test2":"y","test3":"z"}}}}}
+
+#>>>
+test set-3.2 {} -body { #<<<
+	set jsonstr {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+
+	json set jsonstr foo {"Bar"}
+	json normalize $jsonstr
+} -result {{"foo":"Bar","baz":"Baz"}}
 #>>>
 
 ::tcltest::cleanupTests

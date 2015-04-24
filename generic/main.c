@@ -81,7 +81,6 @@ static const char* type_names[] = {
 	"string",		// JSON_DYN_TEMPLATE
 	"string"		// JSON_DYN_LITERAL
 };
-/*
 // These are just for debugging
 static const char* type_names_dbg[] = {
 	"JSON_UNDEF",
@@ -99,6 +98,7 @@ static const char* type_names_dbg[] = {
 	"JSON_DYN_TEMPLATE",
 	"JSON_DYN_LITERAL"
 };
+/*
 */
 
 struct parse_context {
@@ -807,7 +807,7 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 	target = src;
 
 	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-	if (Tcl_IsShared(val)) {
+	if (val != NULL && Tcl_IsShared(val)) {
 		Tcl_DecrRefCount(val);
 		val = Tcl_DuplicateObj(val);
 		Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));
@@ -817,7 +817,7 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 	//fprintf(stderr, "set, initial type %s\n", type_names[type]);
 	for (i=0; i<pathc; i++) {
 		step = pathv[i];
-		//fprintf(stderr, "looking at step %s\n", Tcl_GetString(step));
+		//fprintf(stderr, "looking at step %s, cx type: %s\n", Tcl_GetString(step), type_names_dbg[type]);
 
 		switch (type) {
 			case JSON_UNDEF: //{{{
@@ -826,12 +826,16 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 			case JSON_OBJECT: //{{{
 				TEST_OK(Tcl_DictObjGet(interp, val, step, &target));
 				if (target == NULL) {
+					//fprintf(stderr, "Path element %d: \"%s\" doesn't exist creating a new key for it and storing a null\n",
+					//		i, Tcl_GetString(step));
 					target = JSON_NewJvalObj(JSON_NULL, NULL, 0);
 					TEST_OK(Tcl_DictObjPut(interp, val, step, target));
 					i++;
 					goto followed_path;
 				}
 				if (Tcl_IsShared(target)) {
+					//fprintf(stderr, "Path element %d: \"%s\" exists but the TclObj is shared (%d), replacing it with an unshared duplicate\n",
+					//		i, Tcl_GetString(step), target->refCount);
 					target = Tcl_DuplicateObj(target);
 					TEST_OK(Tcl_DictObjPut(interp, val, step, target));
 				}
@@ -918,14 +922,18 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 			case JSON_DYN_JSON:
 			case JSON_DYN_TEMPLATE:
 			case JSON_DYN_LITERAL:
+				THROW_ERROR("Attempt to index into atomic type ", type_names[type], " at path key \"", Tcl_GetString(step), "\"");
+				/*
 				i++;
 				goto followed_path;
+				*/
 			default:
 				THROW_ERROR("Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
 		}
 
 		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-		if (Tcl_IsShared(val)) {
+		//fprintf(stderr, "Followed path element %d: \"%s\", type %s\n", i, Tcl_GetString(step), type_names_dbg[type]);
+		if (val != NULL && Tcl_IsShared(val)) {
 			Tcl_DecrRefCount(val);
 			val = Tcl_DuplicateObj(val);
 			Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));
@@ -933,14 +941,27 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 		//fprintf(stderr, "Walked on to new type %s\n", type_names[type]);
 	}
 
+	goto set_val;
+
 followed_path:
+	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+	//fprintf(stderr, "Followed path element %d: \"%s\", type %s\n", i, Tcl_GetString(step), type_names_dbg[type]);
+	if (val != NULL && Tcl_IsShared(val)) {
+		Tcl_DecrRefCount(val);
+		val = Tcl_DuplicateObj(val);
+		Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));
+	}
+
 	// target points at the (first) object to replace.  It and its internalRep
 	// are unshared
 
 	// If any path elements remain then they need to be created as object
 	// keys
-	for (i=0; i<pathc; i++) {
+	//fprintf(stderr, "After walking path, %d elements remain to be created\n", pathc-i);
+	for (; i<pathc; i++) {
+		//fprintf(stderr, "create walk %d: %s, cx type: %s\n", i, Tcl_GetString(pathv[i]), type_names_dbg[type]);
 		if (type != JSON_OBJECT) {
+			//fprintf(stderr, "Type isn't JSON_OBJECT: %s, replacing with a JSON_OBJECT\n", type_names_dbg[type]);
 			if (val != NULL)
 				Tcl_DecrRefCount((Tcl_Obj*)target->internalRep.ptrAndLongRep.ptr);
 			val = Tcl_NewDictObj();
@@ -948,11 +969,16 @@ followed_path:
 		}
 
 		target = JSON_NewJvalObj(JSON_OBJECT, NULL, 0);
+		//fprintf(stderr, "Adding key \"%s\"\n", Tcl_GetString(pathv[i]));
 		TEST_OK(Tcl_DictObjPut(interp, val, pathv[i], target));
 		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+		//fprintf(stderr, "Newly added key \"%s\" is of type %s\n", Tcl_GetString(pathv[i]), type_names_dbg[type]);
 		// This was just created - it can't be shared
 	}
 
+set_val:
+	//fprintf(stderr, "Reached end of path, calling JSON_SetIntRep for replacement value %s (%s), target is %s\n",
+	//		type_names_dbg[newtype], Tcl_GetString(replacement), type_names_dbg[type]);
 	TEST_OK(JSON_SetIntRep(interp, target, newtype, newval));
 
 	return TCL_OK;
