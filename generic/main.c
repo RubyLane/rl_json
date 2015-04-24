@@ -795,8 +795,8 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 		return TCL_ERROR;
 
 	if (Tcl_IsShared(src)) {
-		src = Tcl_DuplicateObj(src);
-		if (Tcl_ObjSetVar2(interp, srcvar, NULL, src, TCL_LEAVE_ERR_MSG) == NULL)
+		src = Tcl_ObjSetVar2(interp, srcvar, NULL, Tcl_DuplicateObj(src), TCL_LEAVE_ERR_MSG);
+		if (src == NULL)
 			return TCL_ERROR;
 	}
 
@@ -980,6 +980,11 @@ set_val:
 	//fprintf(stderr, "Reached end of path, calling JSON_SetIntRep for replacement value %s (%s), target is %s\n",
 	//		type_names_dbg[newtype], Tcl_GetString(replacement), type_names_dbg[type]);
 	TEST_OK(JSON_SetIntRep(interp, target, newtype, newval));
+
+	Tcl_InvalidateStringRep(src);
+
+	if (interp)
+		Tcl_SetObjResult(interp, src);
 
 	return TCL_OK;
 }
