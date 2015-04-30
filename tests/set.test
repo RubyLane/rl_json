@@ -439,6 +439,112 @@ test set-4.8 {Create a variable if it didn't exist with object} -body { #<<<
 } -result {{"foo":null}}
 #>>>
 
+test set-5.1 {Set an existing element in an array, numbered} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo 1 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","updated","c"]}}
+#>>>
+test set-5.2 {Prepend an element in an array, numbered} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo -1 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["updated","a","b","c"]}}
+#>>>
+test set-5.3 {Append an element in an array, numbered, just beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo 3 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c","updated"]}}
+#>>>
+test set-5.4 {Append an element in an array, numbered, 2 beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo 5 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c",null,null,"updated"]}}
+#>>>
+
+test set-6.1 {Set an existing element in an array, end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo end {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","updated"]}}
+#>>>
+test set-6.2 {Prepend an element in an array, end-relative} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo end-3 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["updated","a","b","c"]}}
+#>>>
+test set-6.3 {Append an element in an array, end-relative, just beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo end+1 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c","updated"]}}
+#>>>
+test set-6.4 {Append an element in an array, end-relative, 2 beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json set json foo end+3 {"updated"}
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c",null,null,"updated"]}}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

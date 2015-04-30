@@ -854,16 +854,15 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 					//fprintf(stderr, "descending into array of length %d\n", ac);
 
 					if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
-						// Index isn't an integer, check for end(-int)?
+						// Index isn't an integer, check for end(+/-int)?
 						index_str = Tcl_GetStringFromObj(step, &index_str_len);
-						if (index_str_len < 3 || strncmp("end", index_str, 3) != 0) {
+						if (index_str_len < 3 || strncmp("end", index_str, 3) != 0)
 							ok = 0;
-						}
 
 						if (ok) {
 							index = ac-1;
 							if (index_str_len >= 4) {
-								if (index_str[3] != '-' || index_str[3] != '+') {
+								if (index_str[3] != '-' && index_str[3] != '+') {
 									ok = 0;
 								} else {
 									// errno is magically thread-safe on POSIX
