@@ -3,10 +3,10 @@
 
 #include <tcl.h>
 #include "tclstuff.h"
-#include <yajl/yajl_version.h>
-#include <yajl/yajl_common.h>
-#include <yajl/yajl_gen.h>
-#include <yajl/yajl_parse.h>
+#include <yajl_version.h>
+#include <yajl_common.h>
+#include <yajl_gen.h>
+#include <yajl_parse.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>

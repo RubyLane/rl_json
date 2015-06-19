@@ -151,8 +151,8 @@ proc _compare_json {opts j1 j2 {path {}}} { #<<<
 		}
 
 		string    { if {[json get $j1] ne [json get $j2]} {apply $mismatch "Strings differ: left: \"[json get $j1]\" vs. right: \"[json get $j2]\""} }
-		number    { if {[json get $j1] == [json get $j2]} {apply $mismatch "Numbers differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
-		boolean   { if {[json get $j1] == [json get $j2]} {apply $mismatch "Booleans differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
+		number    { if {[json get $j1] != [json get $j2]} {apply $mismatch "Numbers differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
+		boolean   { if {[json get $j1] != [json get $j2]} {apply $mismatch "Booleans differ: left: [json extract $j1] vs. right: [json extract $j2]"} }
 		null      { }
 
 		default {
@@ -180,7 +180,7 @@ proc compare_json args { #<<<
 
 #>>>
 
-test set-1.1 {Update a key in an object} -setup { #<<<
+test set-1.1 {Update a key in an object with a string} -setup { #<<<
 	set json {
 		{
 			"foo": "Foo",
@@ -209,7 +209,7 @@ test set-1.2 {Update a key in an object with a number} -setup { #<<<
 		}
 	}
 } -body {
-	json set json bar {1.6}
+	json set json bar 1.6
 	compare_json {
 		{
 			"foo": "Foo",
@@ -244,6 +244,90 @@ test set-1.3 {Update a key in an object with an object} -setup { #<<<
 	unset -nocomplain json
 } -result match
 #>>>
+test set-1.4 {Update a key in an object with an array} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json bar {["x", 42, null, true, false]}
+	compare_json {
+		{
+			"foo": "Foo",
+			"bar": ["x", 42, null, true, false],
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result match
+#>>>
+test set-1.5 {Update a key in an object with a null} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json bar null
+	compare_json {
+		{
+			"foo": "Foo",
+			"bar": null,
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result match
+#>>>
+test set-1.6 {Update a key in an object with a boolean: true} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json bar true
+	compare_json {
+		{
+			"foo": "Foo",
+			"bar": true,
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result match
+#>>>
+test set-1.7 {Update a key in an object with a boolean: false} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json bar false
+	compare_json {
+		{
+			"foo": "Foo",
+			"bar": false,
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result match
+#>>>
 test set-2.1 {Do Nothing Gracefully (sort of - don't blow up if an empty path is supplied} -setup { #<<<
 	set json {
 		{
@@ -265,6 +349,100 @@ test set-3.1 {array append} -body { #<<<
 	json set jsobj end [json new string asdf]
 	set jsobj
 } -result {["asdf"]}
+#>>>
+
+test set-3.1 {Create missing objects in path} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json bar Bar FooBar test {"x"}
+	json set json bar Bar FooBar test2 {"y"}
+	json set json bar Bar FooBar test3 {"z"}
+
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":"Foo","baz":"Baz","bar":{"Bar":{"FooBar":{"test":"x","test2":"y","test3":"z"}}}}}
+
+#>>>
+test set-3.2 {Return value of set is the new variable's value} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json set json foo {"Bar"}
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":"Bar","baz":"Baz"}}
+#>>>
+
+test set-4.1 {Create a variable if it didn't exist} -body { #<<<
+	json set newvar x y z {
+		{
+			"foo": "Foo",
+			"bar": [1, 2, 3]
+		}
+	}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {{"x":{"y":{"z":{"foo":"Foo","bar":[1,2,3]}}}}}
+#>>>
+test set-4.2 {Create a variable if it didn't exist with atomic type - string} -body { #<<<
+	json set newvar {"foo"}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {"foo"}
+#>>>
+test set-4.3 {Create a variable if it didn't exist with atomic type - number} -body { #<<<
+	json set newvar 42
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result 42
+#>>>
+test set-4.4 {Create a variable if it didn't exist with atomic type - null} -body { #<<<
+	json set newvar null
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result null
+#>>>
+test set-4.5 {Create a variable if it didn't exist with atomic type - boolean: true} -body { #<<<
+	json set newvar true
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result true
+#>>>
+test set-4.6 {Create a variable if it didn't exist with atomic type - boolean: false} -body { #<<<
+	json set newvar false
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result false
+#>>>
+test set-4.7 {Create a variable if it didn't exist with array} -body { #<<<
+	json set newvar {[1, 2, 3]}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {[1,2,3]}
+#>>>
+test set-4.8 {Create a variable if it didn't exist with object} -body { #<<<
+	json set newvar {{"foo": null}}
+	set newvar
+} -cleanup {
+	unset -nocomplain newvar
+} -result {{"foo":null}}
 #>>>
 
 ::tcltest::cleanupTests
