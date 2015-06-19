@@ -725,9 +725,14 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 
 	pstatus = yajl_parse(parseHandle, (const unsigned char*)str, len);
 	if (pstatus != yajl_status_ok) {
+		unsigned char*	yajl_err = yajl_get_error(parseHandle, 1, (const unsigned char*)str, len);
+
 		Tcl_SetObjResult(interp,
-				Tcl_NewStringObj((const char*)yajl_get_error(parseHandle, 1, (const unsigned char*)str, len), -1)
+				Tcl_NewStringObj((const char*)yajl_err, -1)
 				);
+
+		yajl_free_error(parseHandle, yajl_err); yajl_err = NULL;
+
 		goto err;
 	}
 
@@ -937,12 +942,11 @@ followed_path:
 	// target points at the (first) object to replace.  It and its internalRep
 	// are unshared
 
-	// If any path elements remain then they need to be created as object
-	// keys
+	// If any path elements remain then they need to be created as object keys
 	for (i=0; i<pathc; i++) {
 		if (type != JSON_OBJECT) {
 			if (val != NULL)
-				Tcl_DecrRefCount((Tcl_Obj*)target->internalRep.ptrAndLongRep.ptr);
+				Tcl_DecrRefCount(val);
 			val = Tcl_NewDictObj();
 			TEST_OK(JSON_SetIntRep(interp, target, JSON_OBJECT, val));
 		}

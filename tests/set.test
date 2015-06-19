@@ -260,6 +260,12 @@ test set-2.1 {Do Nothing Gracefully (sort of - don't blow up if an empty path is
 	unset -nocomplain json
 } -result match
 #>>>
+test set-3.1 {array append} -body { #<<<
+	set jsobj [json new array]
+	json set jsobj end [json new string asdf]
+	set jsobj
+} -result {["asdf"]}
+#>>>
 
 ::tcltest::cleanupTests
 return
