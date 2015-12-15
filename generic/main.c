@@ -886,13 +886,13 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 					if (index < 0) {
 						// Prepend element to the array
 						target = JSON_NewJvalObj(JSON_NULL, NULL, 0);
-						TEST_OK(Tcl_ListObjReplace(interp, val, -1, 0, 0, &target));
+						TEST_OK(Tcl_ListObjReplace(interp, val, -1, 0, 1, &target));
 
 						i++;
 						goto followed_path;
 					} else if (index >= ac) {
 						int			new_i;
-						for (new_i=0; new_i<ac-index-1; new_i++) {
+						for (new_i=ac; new_i<index; new_i++) {
 							TEST_OK(Tcl_ListObjAppendElement(interp, val,
 										JSON_NewJvalObj(JSON_NULL, NULL, 0)));
 						}
