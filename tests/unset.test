@@ -1,0 +1,220 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+package require parse_args
+namespace path {::parse_args}
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+test unset-1.1 {Unset a key in an object} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json unset json bar
+	compare_json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result match
+#>>>
+test unset-1.2 {No args} -body { #<<<
+	set json	"{}"
+	json unset json
+} -cleanup {
+	unset -nocomplain json r o
+} -result "{}"
+#>>>
+test unset-1.3 {No args, invalid varname} -setup { #<<<
+	unset -nocomplain notset
+} -body {
+	list [catch {json unset notset} r o] [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {TCL LOOKUP VARNAME notset}}
+#>>>
+test unset-2.1 {Do Nothing Gracefully (sort of - don't blow up if an empty path is supplied} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json unset json
+	compare_json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	} $json
+} -cleanup {
+	unset -nocomplain json
+} -result match
+#>>>
+test unset-2.2 {Return value of unset is the new variable's value} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"bar": "Bar",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	json unset json bar
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":"Foo","baz":"Baz"}}
+#>>>
+test unset-3.1 {Throw error for missing objects in path} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	list [catch {json unset json bar Bar} r o] [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain json r o
+} -result {1 {RL JSON BAD_PATH bar}}
+#>>>
+test unset-3.1 {Throw error for dereferencing atomic objects in path} -setup { #<<<
+	set json {
+		{
+			"foo": "Foo",
+			"baz": "Baz"
+		}
+	}
+} -body {
+	list [catch {json unset json foo Bar} r o] [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain json r o
+} -result {1 {RL JSON BAD_PATH {foo Bar}}}
+#>>>
+test unset-4.1 {Named variable doesn't exist} -body { #<<<
+	list [catch {json unset newvar x} r o] [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain newvar r o
+} -result {1 {TCL LOOKUP VARNAME newvar}}
+#>>>
+test unset-5.1 {Unset an existing element in an array, numbered} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","c"]}}
+#>>>
+test unset-5.2 {Unset an element in an array, negative index} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo -1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c"]}}
+#>>>
+test unset-5.3 {Unset an element in an array, numbered, just beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo 3
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c"]}}
+#>>>
+test unset-5.4 {Unset an element in an array, numbered, 2 beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo 5
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c"]}}
+#>>>
+test unset-6.1 {Unset an existing element in an array, end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo end
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b"]}}
+#>>>
+test unset-6.2 {Unset an element in an array, end-relative} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo end-1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","c"]}}
+#>>>
+test unset-6.3 {Unset an element in an array, end-relative, just beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo end+1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c"]}}
+#>>>
+test unset-6.4 {Unset an element in an array, end-relative, 2 beyond end} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", "b", "c"]
+		}
+	}
+} -body {
+	json unset json foo end+3
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a","b","c"]}}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
