@@ -368,36 +368,37 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 		default:
 			// TODO: Reject leading zero?  The RFC doesn't allow leading zeros
 			{
+				// TESTED {{{
 				const char*	start = p;
 				const char*	t;
 
 				if (*p == '-') p++;
-				if (unlikely(p >= e || *p < '0' || *p > '9')) goto err;
+				if (unlikely(*p < '0' || *p > '9')) goto err;
 
-				t = p;
-				while (p < e && *p >= '0' && *p < '9') p++;
-				if (unlikely(p == t)) goto err;	// No integer part
+				while (*p >= '0' && *p < '9') p++;
 
-				if (*p == '.') {
+				if (*p == '.') {	// p could point at the NULL terminator at this point
 					p++;
 					t = p;
-					while (p < e && *p >= '0' && *p < '9') p++;
+					while (*p >= '0' && *p < '9') p++;
 					if (unlikely(p == t)) goto err;	// No integer part after the decimal point
 				}
 
-				if (unlikely((*p | 0b100000) == 'e')) {
+				if (unlikely((*p | 0b100000) == 'e')) {	// p could point at the NULL terminator at this point
 					p++;
-					if (p < e && (*p == '+' || *p == '-')) p++;
+					if (*p == '+' || *p == '-') p++;
 					t = p;
-					while (p < e && *p >= '0' && *p < '9') p++;
+					while (*p >= '0' && *p < '9') p++;
 					if (unlikely(p == t)) goto err;	// No integer part after the exponent symbol
 				}
 
 				*type = JSON_NUMBER;
 				*val = Tcl_NewStringObj(start, p-start);
+				//}}}
 			}
 	}
 
+	// TESTED {{{
 	*next = p;
 	return TCL_OK;
 
@@ -411,6 +412,7 @@ err:
 	_parse_error(l->interp, errmsg, doc, (err_at - doc) - *char_adj);
 
 	return TCL_ERROR;
+	//}}}
 }
 
 //}}}
@@ -578,15 +580,18 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 	}
 	//}}}
 
+	// TESTED {{{
 	if (unlikely(cx.val == NULL)) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("No JSON value found", -1));
-		goto err;
+		err_at = doc;
+		errmsg = "No JSON value found";
+		goto whitespace_err;
 	}
 
 	obj = Tcl_NewObj();
 	obj->typePtr = &json_type;
 	obj->internalRep.ptrAndLongRep.value = cx.val->internalRep.ptrAndLongRep.value;
 	obj->internalRep.ptrAndLongRep.ptr = cx.val->internalRep.ptrAndLongRep.ptr;
+	Tcl_InvalidateStringRep(obj);
 
 	// We're transferring the ref from cx.val to our intrep
 	//Tcl_IncrRefcount(obj->internalRep.ptrAndLongRep.ptr
@@ -602,6 +607,7 @@ whitespace_err:
 err:
 	free_cx(&cx);
 	return TCL_ERROR;
+	//}}}
 }
 
 //}}}

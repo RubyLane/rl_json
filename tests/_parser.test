@@ -19,13 +19,29 @@ test parser-1.1 {Test empty string optimization} -body { #<<<
 	unset -nocomplain j
 } -result [list "" は ""]
 #>>>
-test parser-2.1 {truncated string} -body { #<<<
+test parser-2.1 {Truncated string} -body { #<<<
 	list [catch {
 		test_parse "\"foo"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Document truncated} "\"foo" 4]]
+#>>>
+test parser-2.2 {Empty document} -body { #<<<
+	list [catch {
+		test_parse ""
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {No JSON value found} "" 0] {Error parsing JSON value: No JSON value found at offset 0}]
+#>>>
+test parser-2.3 {Empty value} -body { #<<<
+	list [catch {
+		test_parse "\{\"foo\":"
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} "\{\"foo\":" 7] {Error parsing JSON value: Document truncated at offset 7}]
 #>>>
 
 test parser/backslash-1.1 {\u in string value, no leading, no trailing} -body { #<<<
@@ -333,8 +349,7 @@ test parser/backslash-10.3 {\u in string value, valid hex bounds} -body { #<<<
 } -result \0		;# NULL
 #>>>
 
-# Test every ASCII escape char other than u (tested above)
-try {
+try { # Test every ASCII escape char other than u (tested above) <<<
 	set valid {
 		34	\u0022
 		92	\u005c
@@ -395,6 +410,7 @@ try {
 } finally {
 	unset -nocomplain c valid
 }
+#>>>
 
 test parser/backslash-30.1 {single backslash, closing quote} -body { #<<<
 	list [catch {
@@ -478,19 +494,141 @@ try { # Test all control chars (RFC4627 excludes 0x7f) <<<
 }
 #>>>
 
-try {
+try { # Test all ASCII non-escape chars <<<
 	set str	""
 	for {set c 0x20} {$c < 0x80} {incr c} {
 		if {$c in {34 92 98 102 110 114 116}} continue
 		append str	[format %c $c]
 	}
-	test parser/controlchar-4.1 {Test all ASCII non-escape chars} -body { #<<<
+	test parser/controlchar-4.1 {Test all ASCII non-escape chars} -body {
 		json get [test_parse "\"$str\""]
 	} -result $str
-	#>>>
 } finally {
 	unset -nocomplain c str
 }
+#>>>
+
+test parser/numbers-1.1 {Bare number value - integer} -body { #<<<
+	test_parse 42
+} -result 42
+#>>>
+test parser/numbers-1.2 {Bare number value - negative integer} -body { #<<<
+	test_parse -42
+} -result -42
+#>>>
+test parser/numbers-1.3 {Bare number value - integer, postive sign} -body { #<<<
+	list [catch {
+		test_parse +42
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} +42 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/numbers-2.1 {Invalid char - here because this is handled in the numeric case} -body { #<<<
+	list [catch {
+		test_parse x
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} x 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/numbers-2.2 {Document truncated after minus sign} -body { #<<<
+	list [catch {
+		test_parse -
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} - 1] {Error parsing JSON value: Document truncated at offset 1}]
+#>>>
+test parser/numbers-2.3 {Invalid char after minus sign} -body { #<<<
+	list [catch {
+		test_parse -x
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} -x 1] {Error parsing JSON value: Illegal character at offset 1}]
+#>>>
+test parser/numbers-3.1 {No integer part} -body { #<<<
+	list [catch {
+		test_parse .1
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} .1 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/numbers-4.1 {Decimal point without decimal part} -body { #<<<
+	list [catch {
+		test_parse 12.
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} 12. 3] {Error parsing JSON value: Document truncated at offset 3}]
+#>>>
+test parser/numbers-4.2 {Decimal point without decimal part} -body { #<<<
+	list [catch {
+		test_parse 12.
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} 12. 3] {Error parsing JSON value: Document truncated at offset 3}]
+#>>>
+test parser/numbers-4.3 {Decimal point with decimal part} -body { #<<<
+	json get [test_parse 12.34]
+} -result 12.34
+#>>>
+test parser/numbers-5.1 {Upper case exponent symbol, no exponent part, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse 12E]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} 12E 3] {Error parsing JSON value: Document truncated at offset 3}]
+#>>>
+test parser/numbers-5.2 {Lower case exponent symbol, no exponent part, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse 12e]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} 12e 3] {Error parsing JSON value: Document truncated at offset 3}]
+#>>>
+test parser/numbers-5.3 {Lower case exponent symbol, no exponent part} -body { #<<<
+	list [catch {
+		json get [test_parse {[12e,4]}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} {[12e,4]} 4] {Error parsing JSON value: Illegal character at offset 4}]
+#>>>
+test parser/numbers-6.1 {Upper case exponent symbol, simple integer exponent part} -body { #<<<
+	json get [test_parse 12E3]
+} -result 12E3
+#>>>
+test parser/numbers-6.2 {Lower case exponent symbol, simple integer exponent part} -body { #<<<
+	json get [test_parse 12e3]
+} -result 12e3
+#>>>
+test parser/numbers-7.1 {Upper case exponent symbol, negative integer exponent part} -body { #<<<
+	json get [test_parse 12E-3]
+} -result 12E-3
+#>>>
+test parser/numbers-7.2 {Lower case exponent symbol, negative integer exponent part} -body { #<<<
+	json get [test_parse 12e-3]
+} -result 12e-3
+#>>>
+test parser/numbers-8.1 {Upper case exponent symbol, positive integer exponent part} -body { #<<<
+	json get [test_parse 12E+3]
+} -result 12E+3
+#>>>
+test parser/numbers-8.2 {Lower case exponent symbol, positive integer exponent part} -body { #<<<
+	json get [test_parse 12e+3]
+} -result 12e+3
+#>>>
+test parser/numbers-9.1 {Lower case exponent symbol, many digit exponent} -body { #<<<
+	json get [test_parse 12e+321]
+} -result 12e+321
+#>>>
+
 
 ::tcltest::cleanupTests
 return
