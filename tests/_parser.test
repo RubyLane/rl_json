@@ -1,0 +1,498 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+# Stresses the refCount handling for l->tcl_empty.  Must be the first test run
+test parser-1.1 {Test empty string optimization} -body { #<<<
+	set j	[test_parse {
+		{
+			"bar": "\u306f",
+			"foo": "",
+			"baz": ""
+		}
+	}]
+	list [json get $j foo] [json get $j bar] [json get $j baz]
+} -cleanup {
+	unset -nocomplain j
+} -result [list "" は ""]
+#>>>
+test parser-2.1 {truncated string} -body { #<<<
+	list [catch {
+		test_parse "\"foo"
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} "\"foo" 4]]
+#>>>
+
+test parser/backslash-1.1 {\u in string value, no leading, no trailing} -body { #<<<
+	json get [test_parse {"\u306f"}]
+} -result は
+#>>>
+test parser/backslash-1.2 {\u in string value, leading, no trailing} -body { #<<<
+	json get [test_parse {"( \u306f"}]
+} -result "( は"
+#>>>
+test parser/backslash-1.3 {\u in string value, no leading, trailing} -body { #<<<
+	json get [test_parse {"\u306f )"}]
+} -result "は )"
+#>>>
+test parser/backslash-1.4 {\u in string value, leading, trailing} -body { #<<<
+	json get [test_parse {"( \u306f )"}]
+} -result "( は )"
+#>>>
+test parser/backslash-2.1 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u"} 3}}
+#>>>
+test parser/backslash-2.2 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3"} 4}}
+#>>>
+test parser/backslash-2.3 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30"} 5}}
+#>>>
+test parser/backslash-2.4 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306"} 6}}
+#>>>
+test parser/backslash-2.5 {\u in string value, too few digits, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u} 3}}
+#>>>
+test parser/backslash-2.6 {\u in string value, too few digits, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3} 4}}
+#>>>
+test parser/backslash-2.7 {\u in string value, too few digits, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30} 5}}
+#>>>
+test parser/backslash-2.8 {\u in string value, too few digits, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306} 6}}
+#>>>
+test parser/backslash-3.1 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u/xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u/xxxx"} 3}}
+#>>>
+test parser/backslash-3.2 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3/xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3/xxxx"} 4}}
+#>>>
+test parser/backslash-3.3 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30/xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30/xxxx"} 5}}
+#>>>
+test parser/backslash-3.4 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306/xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306/xxxx"} 6}}
+#>>>
+test parser/backslash-4.1 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u@xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u@xxxx"} 3}}
+#>>>
+test parser/backslash-4.2 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3@xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3@xxxx"} 4}}
+#>>>
+test parser/backslash-4.3 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30@xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30@xxxx"} 5}}
+#>>>
+test parser/backslash-4.4 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306@xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306@xxxx"} 6}}
+#>>>
+test parser/backslash-5.1 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u`xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u`xxxx"} 3}}
+#>>>
+test parser/backslash-5.2 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3`xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3`xxxx"} 4}}
+#>>>
+test parser/backslash-5.3 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30`xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30`xxxx"} 5}}
+#>>>
+test parser/backslash-5.4 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306`xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306`xxxx"} 6}}
+#>>>
+test parser/backslash-6.1 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u:xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u:xxxx"} 3}}
+#>>>
+test parser/backslash-6.2 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3:xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3:xxxx"} 4}}
+#>>>
+test parser/backslash-6.3 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30:xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30:xxxx"} 5}}
+#>>>
+test parser/backslash-6.4 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306:xxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306:xxxx"} 6}}
+#>>>
+test parser/backslash-6.1 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\uGxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\uGxxxx"} 3}}
+#>>>
+test parser/backslash-6.2 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3Gxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3Gxxxx"} 4}}
+#>>>
+test parser/backslash-6.3 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30Gxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30Gxxxx"} 5}}
+#>>>
+test parser/backslash-6.4 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306Gxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306Gxxxx"} 6}}
+#>>>
+test parser/backslash-6.1 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\ugxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\ugxxxx"} 3}}
+#>>>
+test parser/backslash-6.2 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u3gxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u3gxxxx"} 4}}
+#>>>
+test parser/backslash-6.3 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u30gxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u30gxxxx"} 5}}
+#>>>
+test parser/backslash-6.4 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u306gxxxx"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306gxxxx"} 6}}
+#>>>
+test parser/backslash-7.1 {\u in string value, too many digits} -body { #<<<
+	json get [test_parse {"\u306F3"}]
+} -result は3
+#>>>
+test parser/backslash-8.1 {\u in string value, reject leading sign} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u-306F"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u-306F"} 3}}
+#>>>
+test parser/backslash-8.2 {\u in string value, reject leading sign} -body { #<<<
+	list [catch {
+		json get [test_parse {"\u+306F"}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u+306F"} 3}}
+#>>>
+test parser/backslash-10.1 {\u in string value, valid hex bounds} -body { #<<<
+	json get [test_parse {"\u0009"}]
+} -result \t		;# tab
+#>>>
+test parser/backslash-10.2 {\u in string value, valid hex bounds} -body { #<<<
+	json get [test_parse {"\uAfaF"}]
+} -result \uafaf	;# 꾯
+#>>>
+test parser/backslash-10.3 {\u in string value, valid hex bounds} -body { #<<<
+	json get [test_parse {"\u0000"}]
+} -result \0		;# NULL
+#>>>
+
+# Test every ASCII escape char other than u (tested above)
+try {
+	set valid {
+		34	\u0022
+		92	\u005c
+		47	\u002f
+		98	\u0008
+		102	\u000c
+		110	\u000a
+		114	\u000d
+		116	\u0009
+	}
+	for {set c 0} {$c < 0x80} {incr c} {
+		if {[format %c $c] eq "u"} continue
+
+		if {[dict exists $valid $c]} {
+			test parser/backslash-20.$c.1 "test every non-u backquote: [format 0x%02x $c], no trailing" -body { #<<<
+				json get [test_parse [format {"\%c"} $c]]
+			} -result [dict get $valid $c]
+			#>>>
+			test parser/backslash-20.$c.2 "test every non-u backquote: [format 0x%02x $c], trailing" -body { #<<<
+				json get [test_parse [format {"\%cx"} $c]]
+			} -result [dict get $valid $c]x
+			#>>>
+			test parser/backslash-20.$c.3 "test every non-u backquote: [format 0x%02x $c], truncated" -body { #<<<
+				list [catch {
+					json get [test_parse [format "\"\\%c" $c]]
+				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+			} -cleanup {
+				unset -nocomplain r o
+			} -result [list 1 [list RL JSON PARSE {Document truncated} [format "\"\\%c" $c] 3] {Error parsing JSON value: Document truncated at offset 3}]
+			#>>>
+		} else {
+			test parser/backslash-20.$c.1 "test every non-u backquote: [format 0x%02x $c], no trailing" -body { #<<<
+				list [catch {
+					json get [test_parse [format {"\%c"} $c]]
+				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+			} -cleanup {
+				unset -nocomplain r o
+			} -result [list 1 [list RL JSON PARSE {Illegal character} [format "\"\\%c\"" $c] 2] {Error parsing JSON value: Illegal character at offset 2}]
+			#>>>
+			test parser/backslash-20.$c.2 "test every non-u backquote: [format 0x%02x $c], trailing" -body { #<<<
+				list [catch {
+					json get [test_parse [format {"\%cx"} $c]]
+				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+			} -cleanup {
+				unset -nocomplain r o
+			} -result [list 1 [list RL JSON PARSE {Illegal character} [format "\"\\%cx\"" $c] 2] {Error parsing JSON value: Illegal character at offset 2}]
+			#>>>
+			test parser/backslash-20.$c.3 "test every non-u backquote: [format 0x%02x $c], truncated" -body { #<<<
+				list [catch {
+					json get [test_parse [format "\"\\%c" $c]]
+				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+			} -cleanup {
+				unset -nocomplain r o
+			} -result [list 1 [list RL JSON PARSE {Illegal character} [format "\"\\%c" $c] 2] {Error parsing JSON value: Illegal character at offset 2}]
+			#>>>
+		}
+	}
+} finally {
+	unset -nocomplain c valid
+}
+
+test parser/backslash-30.1 {single backslash, closing quote} -body { #<<<
+	list [catch {
+		json get [test_parse "\"\\\""]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} "\"\\\"" 3] {Error parsing JSON value: Document truncated at offset 3}]
+#>>>
+test parser/backslash-30.2 {single backslash, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse "\"\\"]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Document truncated} "\"\\" 2] {Error parsing JSON value: Document truncated at offset 2}]
+#>>>
+
+test parser/controlchar-1.1 {Control char after valid chars, no trailing} -body { #<<<
+	list [catch {
+		json get [test_parse "\"foo\x1F\""]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\"foo\x1F\"" 4] {Error parsing JSON value: Illegal character at offset 4}]
+#>>>
+test parser/controlchar-1.2 {Control char after valid chars, trailing} -body { #<<<
+	list [catch {
+		json get [test_parse "\"foo\x1Fx\""]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\"foo\x1Fx\"" 4] {Error parsing JSON value: Illegal character at offset 4}]
+#>>>
+test parser/controlchar-1.3 {Control char after valid chars, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse "\"foo\x1F"]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\"foo\x1F" 4] {Error parsing JSON value: Illegal character at offset 4}]
+#>>>
+test parser/controlchar-2.1 {Control char at start, no trailing} -body { #<<<
+	list [catch {
+		json get [test_parse "\"\x1F\""]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\"\x1F\"" 1] {Error parsing JSON value: Illegal character at offset 1}]
+#>>>
+test parser/controlchar-2.2 {Control char at start, trailing} -body { #<<<
+	list [catch {
+		json get [test_parse "\"\x1Fx\""]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\"\x1Fx\"" 1] {Error parsing JSON value: Illegal character at offset 1}]
+#>>>
+test parser/controlchar-2.3 {Control char at start, truncated} -body { #<<<
+	list [catch {
+		json get [test_parse "\"\x1F"]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\"\x1F" 1] {Error parsing JSON value: Illegal character at offset 1}]
+#>>>
+
+try { # Test all control chars (RFC4627 excludes 0x7f) <<<
+	for {set c 0} {$c <= 0x1F} {incr c} {
+		test parser-controlchar-3.$c [format {Test control char 0x%02x} $c] -body { #<<<
+			list [catch {
+				json get [test_parse [format {"%c"} $c]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format {"%c"} $c] 1] {Error parsing JSON value: Illegal character at offset 1}]
+		#>>>
+	}
+} finally {
+	unset -nocomplain c
+}
+#>>>
+
+try {
+	set str	""
+	for {set c 0x20} {$c < 0x80} {incr c} {
+		if {$c in {34 92 98 102 110 114 116}} continue
+		append str	[format %c $c]
+	}
+	test parser/controlchar-4.1 {Test all ASCII non-escape chars} -body { #<<<
+		json get [test_parse "\"$str\""]
+	} -result $str
+	#>>>
+} finally {
+	unset -nocomplain c str
+}
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

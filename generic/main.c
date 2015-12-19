@@ -13,24 +13,6 @@ Tcl_ObjType json_type = {
 	set_from_any
 };
 
-enum json_types {
-	JSON_UNDEF,
-	JSON_OBJECT,
-	JSON_ARRAY,
-	JSON_STRING,
-	JSON_NUMBER,
-	JSON_BOOL,
-	JSON_NULL,
-
-	/* Dynamic types - placeholders for dynamic values in templates */
-	JSON_DYN_STRING,	// ~S:
-	JSON_DYN_NUMBER,	// ~N:
-	JSON_DYN_BOOL,		// ~B:
-	JSON_DYN_JSON,		// ~J:
-	JSON_DYN_TEMPLATE,	// ~T:
-	JSON_DYN_LITERAL	// ~L:	literal escape - used to quote literal values that start with the above sequences
-};
-
 static const char* dyn_prefix[] = {
 	NULL,	// JSON_UNDEF
 	NULL,	// JSON_OBJECT
@@ -100,15 +82,6 @@ static const char* type_names_dbg[] = {
 };
 /*
 */
-
-struct parse_context {
-	struct parse_context*	prev;
-	struct parse_context*	last;
-
-	Tcl_Obj*	val;
-	int			container;
-	Tcl_Obj*	hold_key;
-};
 
 enum serialize_modes {
 	SERIALIZE_NORMAL,		// We're updating the string rep of a json value or template
@@ -188,6 +161,40 @@ static Tcl_Obj* JSON_NewJvalObj(int type, const void* p, int l) //{{{
 		case JSON_DYN_TEMPLATE:
 		case JSON_DYN_LITERAL:
 			val = Tcl_NewStringObj(p, l);
+			break;
+
+		default:
+			Tcl_Panic("JSON_NewJvalObj, unhandled type: %d", type);
+	}
+
+	if (JSON_SetIntRep(NULL, res, type, val) != TCL_OK)
+		Tcl_Panic("Couldn't set JSON intrep");
+
+	return res;
+}
+
+//}}}
+Tcl_Obj* JSON_NewJvalObj2(int type, Tcl_Obj* val) //{{{
+{
+	Tcl_Obj*	res = Tcl_NewObj();
+
+	res->typePtr = &json_type;
+	res->internalRep.ptrAndLongRep.ptr = NULL;
+
+	switch (type) {
+		case JSON_OBJECT:
+		case JSON_ARRAY:
+		case JSON_STRING:
+		case JSON_NUMBER:
+		case JSON_BOOL:
+		case JSON_NULL:
+
+		case JSON_DYN_STRING:
+		case JSON_DYN_NUMBER:
+		case JSON_DYN_BOOL:
+		case JSON_DYN_JSON:
+		case JSON_DYN_TEMPLATE:
+		case JSON_DYN_LITERAL:
 			break;
 
 		default:
@@ -455,7 +462,7 @@ done:
 
 //}}}
 
-static void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
+void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 {
 	struct parse_context*	tail = cx->last;
 
@@ -2312,14 +2319,39 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 }
 
 //}}}
+void free_interp_cx(ClientData cdata) //{{{
+{
+	struct interp_cx* l = cdata;
+
+	l->interp = NULL;
+
+	Tcl_DecrRefCount(l->tcl_true);  l->tcl_true = NULL;
+	Tcl_DecrRefCount(l->tcl_false); l->tcl_false = NULL;
+	Tcl_DecrRefCount(l->tcl_empty); l->tcl_empty = NULL;
+}
+
+//}}}
 int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
+	struct interp_cx*	l = NULL;
+
 	if (Tcl_InitStubs(interp, "8.5", 0) == NULL)
 		return TCL_ERROR;
 
 	Tcl_RegisterObjType(&json_type);
 
 	NEW_CMD("json", jsonObjCmd);
+
+	l = (struct interp_cx*)ckalloc(sizeof *l);
+	l->interp = interp;
+	Tcl_IncrRefCount(l->tcl_true  = Tcl_NewStringObj("true", 4));
+	Tcl_IncrRefCount(l->tcl_false = Tcl_NewStringObj("false", 5));
+	Tcl_IncrRefCount(l->tcl_empty = Tcl_NewStringObj("", 0));
+
+	// Ensure the empty string rep is considered "shared"
+	Tcl_IncrRefCount(l->tcl_empty);
+
+	Tcl_CreateObjCommand(interp, "test_parse", test_parse, (ClientData)l, free_interp_cx);
 
 	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
 

@@ -20,7 +20,7 @@ dnl	to configure the system for the local environment.
 #-----------------------------------------------------------------------
 
 AC_PREREQ(2.61)
-AC_INIT([rl_json], [0.7])
+AC_INIT([rl_json], [0.8])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -72,7 +72,7 @@ TEA_SETUP_COMPILER
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([main.c])
+TEA_ADD_SOURCES([parser.c main.c])
 TEA_ADD_HEADERS([])
 #TEA_ADD_INCLUDES([-I/home/cyan/local/include])
 #TEA_ADD_LIBS([-L/home/cyan/local/lib -lyajl])
