@@ -17,38 +17,6 @@ static void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned 
 }
 
 //}}}
-static void _string_callback(struct parse_context* cx, Tcl_Obj* val) //{{{
-{
-	int	type, l;
-	const char*	s;
-
-	s = Tcl_GetStringFromObj(val, &l);
-
-	if (
-			l >= 3 &&
-			s[0] == '~' &&
-			s[2] == ':'
-	) {
-		switch (s[1]) {
-			case 'S': type = JSON_DYN_STRING; break;
-			case 'N': type = JSON_DYN_NUMBER; break;
-			case 'B': type = JSON_DYN_BOOL; break;
-			case 'J': type = JSON_DYN_JSON; break;
-			case 'T': type = JSON_DYN_TEMPLATE; break;
-			case 'L': type = JSON_DYN_LITERAL; break;
-			default:  type = JSON_UNDEF; break;
-		}
-
-		if (type != JSON_UNDEF) {
-			append_to_cx(cx, JSON_NewJvalObj2(type, Tcl_NewStringObj(s+3, l-3)));
-			return;
-		}
-	}
-
-	append_to_cx(cx, JSON_NewJvalObj2(JSON_STRING, val));
-}
-
-//}}}
 static void _start_map_callback(struct parse_context* cx, size_t char_ofs) //{{{
 {
 	struct parse_context*	new;
@@ -320,6 +288,21 @@ static int value_type(struct interp_cx* l, const unsigned char* doc, const unsig
 				const unsigned char*	chunk;
 				size_t					len;
 				char					mapped;
+				enum json_types			stype = JSON_STRING;
+
+				// Peek ahead to detect template subst markers.
+				if (p[0] == '~' && e-p >= 3 && p[2] == ':') {
+					switch (p[1]) {
+						case 'S': stype = JSON_DYN_STRING; break;
+						case 'N': stype = JSON_DYN_NUMBER; break;
+						case 'B': stype = JSON_DYN_BOOL; break;
+						case 'J': stype = JSON_DYN_JSON; break;
+						case 'T': stype = JSON_DYN_TEMPLATE; break;
+						case 'L': stype = JSON_DYN_LITERAL; break;
+						default:  stype = JSON_STRING; p -= 3; break;
+					}
+					p += 3;
+				}
 
 				while (1) {
 					chunk = p;
@@ -476,7 +459,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 					p++;	// Advance to the first byte after the backquoted sequence
 				}
 
-				*type = JSON_STRING;
+				*type = stype;
 				*val = out;
 			}
 			break;
@@ -635,11 +618,23 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 			size_t					key_start_char_adj = char_adj;
 
 			TEST_OK(value_type(l, doc, p, e, &char_adj, &p, &type, &val));
-			if (unlikely(type != JSON_STRING && type != JSON_DYN_STRING && type != JSON_DYN_LITERAL)) {
-				_parse_error(interp, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
-				goto err;
+			switch (type) {
+				case JSON_DYN_STRING:
+				case JSON_DYN_LITERAL:
+					/* Add back the template format prefix, since we can't store the type
+					 * in the dict key.  The template generation code reparses it later.
+					 */
+					// Can do this because val's ref is on loan from new_stringobj_dedup
+					val = Tcl_ObjPrintf("~%c:%s", type == JSON_DYN_STRING ? 'S' : 'L', Tcl_GetString(val));
+					// Falls through
+				case JSON_STRING:
+					Tcl_IncrRefCount(cx.last->hold_key = val);
+					break;
+
+				default:
+					_parse_error(interp, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
+					goto err;
 			}
-			Tcl_IncrRefCount(cx.last->hold_key = val);
 
 			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
 
@@ -679,10 +674,13 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 				}
 				continue;
 
+			case JSON_DYN_STRING:
+			case JSON_DYN_NUMBER:
+			case JSON_DYN_BOOL:
+			case JSON_DYN_JSON:
+			case JSON_DYN_TEMPLATE:
+			case JSON_DYN_LITERAL:
 			case JSON_STRING:
-				_string_callback(&cx, val);
-				break;
-
 			case JSON_BOOL:
 			case JSON_NULL:
 			case JSON_NUMBER:

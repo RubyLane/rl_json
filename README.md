@@ -19,6 +19,8 @@ character determines what the resulting type of the substituted value will be:
 * T: A JSON template (substitutions are performed on the inserted fragment).
 * L: A literal - the resulting string is simply everything from the forth character onwards (this allows literal strings to be included in the template that would otherwise be interpreted as the substitutions above).
 
+None of the first three characters for a template may be escaped.
+
 The value inserted is determined by the characters following the substitution
 type prefix.  When interpolating values from a dictionary they name keys in the
 dictionary which hold the values to interpolate.  When interpolating from
