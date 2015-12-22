@@ -106,9 +106,41 @@ enum modifiers {
 
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
 
+static int first_free(long long* freemap) //{{{
+{
+	int	i=0, bit, res;
+	while ((bit = ffsll(freemap[i])) == 0) {
+		//fprintf(stderr, "freemap[%d] is full, moving on: %lx\n", i, freemap[i]);
+		i++;
+	}
+	res = i * (sizeof(long long)*8) + (bit-1);
+	//fprintf(stderr, "first_free, returning idx: %d\n", res);
+	return res;
+}
+
+//}}}
+static void mark_used(long long* freemap, int idx) //{{{
+{
+	int	i = idx / (sizeof(long long)*8);
+	int bit = idx - (i * (sizeof(long long)*8));
+	freemap[i] &= ~(1LL << bit);
+	//fprintf(stderr, "mark_used: %d\n", idx);
+}
+
+//}}}
+static void mark_free(long long* freemap, int idx) //{{{
+{
+	int	i = idx / (sizeof(long long)*8);
+	int bit = idx - (i * (sizeof(long long)*8));
+	//fprintf(stderr, "mark_free: %d\n", idx);
+	freemap[i] |= 1LL << bit;
+}
+
+//}}}
 Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length) //{{{
 {
-	unsigned char		buf[STRING_DEDUP_MAX];
+	char				buf[STRING_DEDUP_MAX];
+	const char			*keyname;
 	int					is_new;
 	struct kc_entry*	kce;
 	Tcl_Obj*			out;
@@ -122,21 +154,50 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 	if (length > STRING_DEDUP_MAX)
 		return Tcl_NewStringObj(bytes, length);
 
-	memcpy(buf, bytes, length);
-	buf[length] = 0;
-	Tcl_HashEntry* entry = Tcl_CreateHashEntry(l->kc, buf, &is_new);
+	if (likely(bytes[length] == 0)) {
+		keyname = bytes;
+	} else {
+		memcpy(buf, bytes, length);
+		buf[length] = 0;
+		keyname = buf;
+	}
+	Tcl_HashEntry* entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
 
 	if (is_new) {
+#if 1
+		ptrdiff_t	idx = first_free(l->freemap);
+		if (idx > KC_ENTRIES) {
+			// Cache overflow
+			// TODO: trigger a cache aging event?
+			fprintf(stderr, "Cache overflow (KC_ENTRIES: %d)\n", KC_ENTRIES);
+			return Tcl_NewStringObj(bytes, length);
+		}
+
+		kce = &l->kc_entries[idx];
+		kce->hits = 0;
+		out = &kce->val;
+		out->refCount = 2;
+		out->bytes = (length <= KC_ENTRY_MAXPACK) ? &kce->tail[1] : ckalloc(length+1);
+		memcpy(out->bytes, bytes, length);
+		out->bytes[length] = 0;
+		out->length = length;
+		out->typePtr = NULL;
+
+		mark_used(l->freemap, idx);
+
+		Tcl_SetHashValue(entry, (void*)idx);
+#else
 		kce = ckalloc(sizeof *kce);
-		kce->val = out = Tcl_NewStringObj((const char*)bytes, length);
+		kce->val = out = Tcl_NewStringObj(bytes, length);
 		Tcl_IncrRefCount(out);	// Two references - one for the cache table and one on loan to callers' interim processing.
 		Tcl_IncrRefCount(out);	// Without this, values not referenced elsewhere could reach callers with refCount 1, allowing
 								// the value to be mutated in place and corrupt the state of the cache (hash key not matching obj value)
 		kce->hits = 0;
 
 		Tcl_SetHashValue(entry, kce);
+#endif
 
-		if (unlikely(l->kc_count > 1000)) {
+		if (unlikely(l->kc_count > KC_ENTRIES/3-1)) {
 			//int				del_count = 0, total = 0;
 			Tcl_HashEntry*	he;
 			Tcl_HashSearch	search;
@@ -153,20 +214,34 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 			kce->hits++; // Prevent the just-created entry from being pruned
 
 			//cleans++;
-			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(l->kc));
-			he = Tcl_FirstHashEntry(l->kc, &search);
+			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(&l->kc));
+			//fprintf(stderr, "Cache sweep\n");
+			he = Tcl_FirstHashEntry(&l->kc, &search);
 			while (he) {
+#if 1
+				ptrdiff_t			idx = (ptrdiff_t)Tcl_GetHashValue(he);
+				struct kc_entry*	e;
+				//fprintf(stderr, "Got idx: %d\n", idx);
+				e = &l->kc_entries[idx];
+#else
 				struct kc_entry*	e = Tcl_GetHashValue(he);
+#endif
 
 				//if (cleans == 4)
-				//	fprintf(stderr, "%3d\t%5d\t\"%s\"\n", e->hits, e->val->refCount, Tcl_GetHashKey(l->kc, he));
+				//	fprintf(stderr, "%3d\t%5d\t\"%s\"\n", e->hits, e->val->refCount, Tcl_GetHashKey(&l->kc, he));
 
 				if (e->hits < 1) {
 					Tcl_DeleteHashEntry(he);
+#if 1
+					if (e->val.bytes != (const char*)(&e->tail[1])) ckfree(e->val.bytes);
+					e->val.bytes = NULL;
+					mark_free(l->freemap, idx);
+#else
 					Tcl_DecrRefCount(e->val);
 					Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
 					e->val = NULL;
 					ckfree(e); e = NULL;
+#endif
 					//del_count++;
 				} else {
 					e->hits >>= 1;
@@ -175,7 +250,7 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 				//total++;
 			}
 			l->kc_count = 0;
-			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(l->kc));
+			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(&l->kc));
 
 			/*
 			gettimeofday(&ts, NULL);
@@ -188,8 +263,14 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 		l->kc_count++;
 		//fprintf(stderr, "Created new cache entry for (%s)[%d]\n", Tcl_GetString(out), out->refCount);
 	} else {
+#if 1
+		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(entry);
+		kce = &l->kc_entries[idx];
+		out = &kce->val;
+#else
 		kce = Tcl_GetHashValue(entry);
 		out = kce->val;
+#endif
 		if (kce->hits < 255) kce->hits++;
 		//fprintf(stderr, "Retrieved existing cache entry for (%s)[%d]\n", Tcl_GetString(out), out->refCount);
 	}
@@ -2439,9 +2520,10 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 	// Ensure the empty string rep is considered "shared"
 	Tcl_IncrRefCount(l->tcl_empty);
 
-	l->kc = ckalloc(sizeof(Tcl_HashTable));
-	Tcl_InitHashTable(l->kc, TCL_STRING_KEYS);
+	Tcl_InitHashTable(&l->kc, TCL_STRING_KEYS);
 	l->kc_count = 0;
+	memset(&l->freemap, 0xFF, sizeof(l->freemap));
+	memset(&l->terminator, 0xFF, sizeof(l->terminator));
 
 	Tcl_CreateObjCommand(interp, "test_parse", test_parse, (ClientData)l, free_interp_cx);
 
