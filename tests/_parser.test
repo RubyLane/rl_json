@@ -478,9 +478,9 @@ test parser/controlchar-2.3 {Control char at start, truncated} -body { #<<<
 } -result [list 1 [list RL JSON PARSE {Illegal character} "\"\x1F" 1] {Error parsing JSON value: Illegal character at offset 1}]
 #>>>
 
-try { # Test all control chars (RFC4627 excludes 0x7f) <<<
-	for {set c 0} {$c <= 0x1F} {incr c} {
-		test parser-controlchar-3.$c [format {Test control char 0x%02x} $c] -body { #<<<
+try { # Test all control chars except \0 (Tcl will always supply this as 0xC0 0x80) (RFC4627 excludes 0x7f) <<<
+	for {set c 1} {$c <= 0x1F} {incr c} {
+		test parser/controlchar-3.$c [format {Test control char 0x%02x} $c] -body { #<<<
 			list [catch {
 				json get [test_parse [format {"%c"} $c]]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
@@ -523,6 +523,22 @@ test parser/numbers-1.3 {Bare number value - integer, postive sign} -body { #<<<
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} +42 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/numbers-1.4 {Bare number value - medium integer} -body { #<<<
+	test_parse 1234567890
+} -result 1234567890
+#>>>
+test parser/numbers-1.5 {Ranges in integer part} -body { #<<<
+	test_parse 909090
+} -result 909090
+#>>>
+test parser/numbers-1.6 {Ranges in fractional part} -body { #<<<
+	test_parse 1.909090
+} -result 1.909090
+#>>>
+test parser/numbers-1.7 {Ranges in exponent part} -body { #<<<
+	test_parse 1e909090
+} -result 1e909090
 #>>>
 test parser/numbers-2.1 {Invalid char - here because this is handled in the numeric case} -body { #<<<
 	list [catch {
@@ -629,6 +645,289 @@ test parser/numbers-9.1 {Lower case exponent symbol, many digit exponent} -body 
 } -result 12e+321
 #>>>
 
+test parser/keywords-1.1 {true, incomplete} -body { #<<<
+	list [catch {
+		test_parse t
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} t 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-1.2 {true, incomplete} -body { #<<<
+	list [catch {
+		test_parse tr
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} tr 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-1.3 {true, incomplete} -body { #<<<
+	list [catch {
+		test_parse tru
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} tru 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-1.4 {true, complete} -body { #<<<
+	test_parse true
+} -result true
+#>>>
+test parser/keywords-1.5 {true, trailing garbage} -body { #<<<
+	list [catch {
+		test_parse truely
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Trailing garbage after value} truely 4] {Error parsing JSON value: Trailing garbage after value at offset 4}]
+#>>>
+test parser/keywords-1.6 {true, trailing whitespace} -body { #<<<
+	test_parse "true "
+} -result true
+#>>>
+test parser/keywords-1.7 {true, leading whitespace} -body { #<<<
+	test_parse " true"
+} -result true
+#>>>
+
+test parser/keywords-2.1 {false, incomplete} -body { #<<<
+	list [catch {
+		test_parse f
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} f 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-2.2 {false, incomplete} -body { #<<<
+	list [catch {
+		test_parse fa
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} fa 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-2.3 {false, incomplete} -body { #<<<
+	list [catch {
+		test_parse fal
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} fal 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-2.4 {false, incomplete} -body { #<<<
+	list [catch {
+		test_parse fals
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} fals 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-2.5 {false, complete} -body { #<<<
+	test_parse false
+} -result false
+#>>>
+test parser/keywords-2.6 {false, trailing garbage} -body { #<<<
+	list [catch {
+		test_parse falsely
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Trailing garbage after value} falsely 5] {Error parsing JSON value: Trailing garbage after value at offset 5}]
+#>>>
+test parser/keywords-2.6 {false, trailing whitespace} -body { #<<<
+	test_parse "false "
+} -result false
+#>>>
+test parser/keywords-2.7 {false, leading whitespace} -body { #<<<
+	test_parse " false"
+} -result false
+#>>>
+
+test parser/keywords-3.1 {null, incomplete} -body { #<<<
+	list [catch {
+		test_parse n
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} n 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-3.2 {null, incomplete} -body { #<<<
+	list [catch {
+		test_parse nu
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} nu 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-3.3 {null, incomplete} -body { #<<<
+	list [catch {
+		test_parse nul
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} nul 0] {Error parsing JSON value: Illegal character at offset 0}]
+#>>>
+test parser/keywords-3.4 {null, complete} -body { #<<<
+	set j	[test_parse null]
+	list $j [json get $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list null ""]
+#>>>
+test parser/keywords-3.5 {null, trailing garbage} -body { #<<<
+	list [catch {
+		test_parse nullo
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Trailing garbage after value} nullo 4] {Error parsing JSON value: Trailing garbage after value at offset 4}]
+#>>>
+test parser/keywords-3.6 {null, trailing whitespace} -body { #<<<
+	test_parse "null "
+} -result null
+#>>>
+test parser/keywords-3.7 {null, leading whitespace} -body { #<<<
+	test_parse " null"
+} -result null
+#>>>
+
+test parser/structure-1.1 {start of object} -body { #<<<
+	set j	[test_parse "{}"]
+	list $j [json get $j ?size]
+} -cleanup {
+	unset -nocomplain j
+} -result [list "{}" 0]
+#>>>
+test parser/structure-1.2 {start of array} -body { #<<<
+	set j	[test_parse {[]}]
+	list $j [json get $j ?length]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {[]} 0]
+#>>>
+test parser/structure-1.3 {nested empty structures} -body { #<<<
+	set j	[test_parse {[{}]}]
+	list $j [json get $j ?length] [json get $j 0 ?size]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {[{}]} 1 0]
+#>>>
+test parser/structure-1.4 {nested empty structures with whitespace} -body { #<<<
+	set j	[test_parse { [ { } ] } ]
+	list $j [json get $j ?length] [json get $j 0 ?size]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {[{}]} 1 0]
+#>>>
+test parser/structure-2.1 {object, single key packed} -body { #<<<
+	set j	[test_parse {{"foo":"bar"}}]
+	list $j [json get $j foo]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar"}} bar]
+#>>>
+test parser/structure-2.2 {object, single key whitespace} -body { #<<<
+	try {
+		set j	[test_parse { 	{ 	"foo" 	: 	"bar" 	} 	}]
+	} trap {RL JSON PARSE} {errmsg options} {
+		lassign [lrange [dict get $options -errorcode] 4 5] doc char_ofs
+		puts stderr "char_ofs: ($char_ofs)"
+		puts stderr "$errmsg: [string range $doc 0 $char_ofs-1](here ->)[string range $doc $char_ofs end]"
+		return -options $options $errmsg
+	}
+	list $j [json get $j foo]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar"}} bar]
+#>>>
+test parser/structure-2.3 {object, multi key packed} -body { #<<<
+	set j	[test_parse {{"foo":"bar","foo2":"bar2"}}]
+	list $j [json get $j foo2]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar","foo2":"bar2"}} bar2]
+#>>>
+test parser/structure-2.4 {object, multi key whitespace} -body { #<<<
+	set j	[test_parse { 	{ 	"foo" 	: 	"bar" 	, 	"foo2": 	"bar2" 	} 	}]
+	list $j [json get $j foo2]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar","foo2":"bar2"}} bar2]
+#>>>
+test parser/structure-3.1 {array, single element packed} -body { #<<<
+	set j	[test_parse {["foo"]}]
+	list $j [json get $j end]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo"]} foo]
+#>>>
+test parser/structure-3.2 {array, single element whitespace} -body { #<<<
+	set j	[test_parse { 	[ 	"foo" 	] 	}]
+	list $j [json get $j end]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo"]} foo]
+#>>>
+test parser/structure-3.3 {array, multi element packed} -body { #<<<
+	set j	[test_parse {["foo","bar"]}]
+	list $j [json get $j end]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo","bar"]} bar]
+#>>>
+test parser/structure-3.4 {array, multi element whitespace} -body { #<<<
+	set j	[test_parse { 	[ 	"foo" 	, 	"bar" 	] 	}]
+	list $j [json get $j end]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo","bar"]} bar]
+#>>>
+
+test parser/utf-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
+	json get [test_parse {"helloは"}]
+} -result helloは
+#>>>
+test parser/utf-1.2 {Length calculation for } -body { #<<<
+	json get [test_parse {"h¿は"}] ?length
+} -result 3
+#>>>
+try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (the BMP) by Tcl support) <<<
+	# 0x20 is used as the lower bound for the 1 byte case because 0x1F and
+	# below are control characters and not legal in JSON as unescaped chars
+	foreach {bytes lower upper} {
+		1	0x20	0x7f
+		2	0x80	0x7ff
+		3	0x800	0xffff
+	} {
+		test parser/utf-2.$bytes.1 "lower bound of $bytes byte chars" -body { #<<<
+			json get [test_parse [format {"%1$c%1$c"} $lower]]
+		} -result [format {%1$c%1$c} $lower]
+		#>>>
+		test parser/utf-2.$bytes.2 "upper bound of $bytes byte chars" -body { #<<<
+			json get [test_parse [format {"%1$c%1$c"} $upper]]
+		} -result [format {%1$c%1$c} $upper]
+		#>>>
+		test parser/utf-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars" -body { #<<<
+			list [catch {
+				json get [test_parse [format {"%1$c%1$c%2$c"} $lower 0x1f]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format {"%1$c%1$c%2$c"} $lower 0x1f] 3] {Error parsing JSON value: Illegal character at offset 3}]
+		#>>>
+		test parser/utf-2.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars" -body { #<<<
+			list [catch {
+				json get [test_parse [format {"%1$c%1$c%2$c"} $upper 0x1f]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format {"%1$c%1$c%2$c"} $upper 0x1f] 3] {Error parsing JSON value: Illegal character at offset 3}]
+		#>>>
+	}
+} finally {
+	unset -nocomplain bytes lower upper
+}
+#>>>
 
 ::tcltest::cleanupTests
 return

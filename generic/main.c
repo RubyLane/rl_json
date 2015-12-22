@@ -106,6 +106,99 @@ enum modifiers {
 
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
 
+Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length) //{{{
+{
+	unsigned char		buf[STRING_DEDUP_MAX];
+	int					is_new;
+	struct kc_entry*	kce;
+	Tcl_Obj*			out;
+
+	if (length == 0) {
+		return l->tcl_empty;
+	} else if (length < 0) {
+		length = strlen(bytes);
+	}
+
+	if (length > STRING_DEDUP_MAX)
+		return Tcl_NewStringObj(bytes, length);
+
+	memcpy(buf, bytes, length);
+	buf[length] = 0;
+	Tcl_HashEntry* entry = Tcl_CreateHashEntry(l->kc, buf, &is_new);
+
+	if (is_new) {
+		kce = ckalloc(sizeof *kce);
+		kce->val = out = Tcl_NewStringObj((const char*)bytes, length);
+		Tcl_IncrRefCount(out);	// Two references - one for the cache table and one on loan to callers' interim processing.
+		Tcl_IncrRefCount(out);	// Without this, values not referenced elsewhere could reach callers with refCount 1, allowing
+								// the value to be mutated in place and corrupt the state of the cache (hash key not matching obj value)
+		kce->hits = 0;
+
+		Tcl_SetHashValue(entry, kce);
+
+		if (unlikely(l->kc_count > 1000)) {
+			//int				del_count = 0, total = 0;
+			Tcl_HashEntry*	he;
+			Tcl_HashSearch	search;
+			//static int		cleans;
+			/*
+			struct timeval	ts;
+			uint64_t		before, after;
+
+
+			gettimeofday(&ts, NULL);
+			before = ts.tv_sec*1000000 + ts.tv_usec;
+			*/
+
+			kce->hits++; // Prevent the just-created entry from being pruned
+
+			//cleans++;
+			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(l->kc));
+			he = Tcl_FirstHashEntry(l->kc, &search);
+			while (he) {
+				struct kc_entry*	e = Tcl_GetHashValue(he);
+
+				//if (cleans == 4)
+				//	fprintf(stderr, "%3d\t%5d\t\"%s\"\n", e->hits, e->val->refCount, Tcl_GetHashKey(l->kc, he));
+
+				if (e->hits < 1) {
+					Tcl_DeleteHashEntry(he);
+					Tcl_DecrRefCount(e->val);
+					Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
+					e->val = NULL;
+					ckfree(e); e = NULL;
+					//del_count++;
+				} else {
+					e->hits >>= 1;
+				}
+				he = Tcl_NextHashEntry(&search);
+				//total++;
+			}
+			l->kc_count = 0;
+			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(l->kc));
+
+			/*
+			gettimeofday(&ts, NULL);
+			after = ts.tv_sec*1000000 + ts.tv_usec;
+
+			fprintf(stderr, "Prune pass: removed %d / %d cached values (%d remain) in %ld usec\n", del_count, total, total-del_count, after-before);
+			*/
+		}
+
+		l->kc_count++;
+		//fprintf(stderr, "Created new cache entry for (%s)[%d]\n", Tcl_GetString(out), out->refCount);
+	} else {
+		kce = Tcl_GetHashValue(entry);
+		out = kce->val;
+		if (kce->hits < 255) kce->hits++;
+		//fprintf(stderr, "Retrieved existing cache entry for (%s)[%d]\n", Tcl_GetString(out), out->refCount);
+	}
+
+	return out;
+}
+
+//}}}
+
 static int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, int* type, Tcl_Obj** val) //{{{
 {
 	if (obj->typePtr != &json_type)
@@ -474,7 +567,9 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 	*/
 	switch (tail->container) {
 		case JSON_OBJECT:
+			//fprintf(stderr, "append_to_cx, tail->hold_key->refCount: %d (%s)\n", tail->hold_key->refCount, Tcl_GetString(tail->hold_key));
 			Tcl_DictObjPut(NULL, tail->val->internalRep.ptrAndLongRep.ptr, tail->hold_key, val);
+			Tcl_DecrRefCount(tail->hold_key);
 			tail->hold_key = NULL;
 			break;
 
@@ -572,6 +667,7 @@ static int parse_map_key_callback(void* cd, const unsigned char*s, size_t l) //{
 	struct parse_context*	tail = cx->last;
 
 	tail->hold_key = Tcl_NewStringObj((const char*)s, l);
+	Tcl_IncrRefCount(tail->hold_key);
 	return 1;
 }
 
@@ -1288,11 +1384,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 									break;
 								case JSON_STRING:
 									EXISTS(1);
-									{
-										int len;
-										Tcl_GetStringFromObj(val, &len);
-										*target = Tcl_NewIntObj(len);
-									}
+									*target = Tcl_NewIntObj(Tcl_GetCharLength(val));
 									break;
 								case JSON_DYN_STRING:
 								case JSON_DYN_NUMBER:
@@ -1301,11 +1393,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 								case JSON_DYN_TEMPLATE:
 								case JSON_DYN_LITERAL:
 									EXISTS(1);
-									{
-										int len;
-										Tcl_GetStringFromObj(val, &len);
-										*target = Tcl_NewIntObj(len+3);
-									}
+									*target = Tcl_NewIntObj(Tcl_GetCharLength(val) + 3);
 									break;
 								default:
 									EXISTS(0);
@@ -2350,6 +2438,10 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 
 	// Ensure the empty string rep is considered "shared"
 	Tcl_IncrRefCount(l->tcl_empty);
+
+	l->kc = ckalloc(sizeof(Tcl_HashTable));
+	Tcl_InitHashTable(l->kc, TCL_STRING_KEYS);
+	l->kc_count = 0;
 
 	Tcl_CreateObjCommand(interp, "test_parse", test_parse, (ClientData)l, free_interp_cx);
 

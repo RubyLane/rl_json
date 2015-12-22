@@ -15,7 +15,10 @@ bench normalize-1.1 {Normalize a JSON doc} -setup { #<<<
 	}
 } -compare {
 	ours {
-		json normalize $json
+		json normalize [string trim $json]
+	}
+	new {
+		test_parse [string trim $json]
 	}
 } -cleanup {
 	unset -nocomplain json

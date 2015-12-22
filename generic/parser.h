@@ -25,6 +25,13 @@ struct interp_cx {
 	Tcl_Obj*		tcl_true;
 	Tcl_Obj*		tcl_false;
 	Tcl_Obj*		tcl_empty;
+	Tcl_HashTable*	kc;
+	int				kc_count;
+};
+
+struct kc_entry {
+	Tcl_Obj*		val;
+	unsigned char	hits;
 };
 
 int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]);

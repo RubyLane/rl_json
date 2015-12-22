@@ -7,6 +7,17 @@ package require rl_json
 package require yajltcl
 package require json_old
 
+proc readfile fn { #<<<
+	set h	[open $fn r]
+	try {
+		chan configure $h -encoding utf-8
+		read $h
+	} finally {
+		close $h
+	}
+}
+#>>>
+
 bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
 	set json {
 		{
@@ -28,6 +39,10 @@ bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
 		json get [string trim $json] baz end inner
 	}
 
+	ours_get_new {
+		json get [test_parse $json] baz end inner
+	}
+
 	ours_pre {
 		dict get [lindex [dict get $pre baz] end] inner
 	}
@@ -42,6 +57,64 @@ bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
 } -cleanup {
 	unset -nocomplain json pre
 } -result obj
+#>>>
+bench parse-2.1 {Parse a few MB of json} -batch 3 -setup { #<<<
+	#set json [readfile [file join [file dirname [file normalize [info script]]] items0.json]]
+	set json [readfile [file join [file dirname [file normalize [info script]]] items1.json]]
+	#set json [readfile [file join [file dirname [file normalize [info script]]] itemsm.json]]
+} -compare {
+	just_parse_first {
+		test_parse $json
+		list 83000 5434
+	}
+	new {
+		set c	0
+		set nrpics	0
+		set p	[test_parse [string trim $json]]
+		json foreach hit [json extract $p hits hits] {
+			if {[json exists $hit _source shopstatus]} {
+				json get $hit _source shopstatus
+			}
+			incr c [json get $hit _source ?size]
+			incr nrpics [json get $hit _source itemnrpics]
+		}
+		json get $p hits hits end _source shopstatus
+		list $c $nrpics
+	}
+	old {
+		set c	0
+		set nrpics	0
+		set p	[string trim $json]
+		json foreach hit [json extract $p hits hits] {
+			if {[json exists $hit _source shopstatus]} {
+				json get $hit _source shopstatus
+			}
+			incr c [json get $hit _source ?size]
+			incr nrpics [json get $hit _source itemnrpics]
+		}
+		json get $p hits hits end _source shopstatus
+		list $c $nrpics
+	}
+	just_parse {
+		test_parse $json
+		list 83000 5434
+	}
+	yajltcl_access {
+		set c	0
+		set nrpics	0
+		foreach hit [dict get [yajl::json2dict $json] hits hits] {
+			if {[dict exists $hit _source shopstatus]} {
+				dict get $hit _source shopstatus
+			}
+			incr c [dict size [dict get $hit _source]]
+			incr nrpics [dict get $hit _source itemnrpics]
+		}
+		dict get [lindex [dict get [yajl::json2dict $json] hits hits] end] _source shopstatus
+		list $c $nrpics
+	}
+} -cleanup {
+	unset -nocomplain json
+} -result {83000 5434}
 #>>>
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

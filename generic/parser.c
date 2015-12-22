@@ -7,16 +7,8 @@
 		{ __auto_type __a = (a); __auto_type __b = (b); \
 		  __a > __b ? __a : __b; })
 
-#ifdef __builtin_expect
-#	define likely(exp)   __builtin_expect(!!(exp), 1)
-#	define unlikely(exp) __builtin_expect(!!(exp), 0)
-#else
-#	define likely(exp)   (exp)
-#	define unlikely(exp) (exp)
-#endif
 
-
-static void _parse_error(Tcl_Interp* interp, const char* errmsg, const char* doc, size_t char_ofs) //{{{
+static void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
 {
 	const char*	char_ofs_str = Tcl_GetString(Tcl_NewIntObj(char_ofs));
 
@@ -124,7 +116,7 @@ static void _end_array_callback(struct parse_context* cx) //{{{
 
 //}}}
 
-static int is_whitespace(const char c) //{{{
+static int is_whitespace(const unsigned char c) //{{{
 {
 	switch (c) {
 		case 0x20:
@@ -139,64 +131,158 @@ static int is_whitespace(const char c) //{{{
 }
 
 //}}}
-static void char_advance(const char** p, const char* e, size_t* char_adj) //{{{
+// TESTED {{{
+#if 1
+static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 {
 	// TODO: use Tcl_UtfNext instead?
-	const char		first = **p;
-	unsigned char	eat;
-	size_t			remaining;
+	// This relies on some properties from the utf-8 returned by Tcl_GetString:
+	//	- no invalid encodings (partial utf-8 sequences, etc)
+	//	- not truncated in the middle of a char
+	const unsigned char	first = **p;
+	unsigned int		eat;
 
 	(*p)++;
-	if (unlikely(first >= 0x80)) {
-		remaining = e - *p;
+	if (unlikely(first >= 0xC0)) {
 		// Advance to next UTF-8 character
 		// TODO: detect invalid sequences?
 		if (first < 0b11100000) {
-			eat = MIN(1, remaining);
-		} else if (first < 0b11110000) {
-			eat = MIN(2, remaining);
-		} else if (first < 0b11111000) {
-			eat = MIN(3, remaining);
-		} else if (first < 0b11111100) {
-			eat = MIN(4, remaining);
+			eat = 1;
+#if TCL_UTF_MAX == 3
 		} else {
-			eat = MIN(5, remaining);
+			eat = 2;
+#else
+		} else if (first < 0b11110000) {
+			eat = 2;
+		} else if (first < 0b11111000) {
+			eat = 3;
+		} else if (first < 0b11111100) {
+			eat = 4;
+		} else {
+			eat = 5;
+#endif
 		}
+		//fprintf(stderr, "skipping %d, from (%s) to (%s)\n", eat+1, *p-1, *p+eat);
 		*p += eat;
 		*char_adj += eat;
 	}
 }
 
 //}}}
-static int skip_whitespace(const char** s, const char* e, const char** err, const char** err_at, size_t* char_adj) //{{{
+#else
+/*
+static const unsigned char utf_skip[64] __attribute__((__aligned__(64))) = {
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+#if TCL_UTF_MAX > 3
+    3,3,3,3,3,3,3,3,
+#else
+    0,0,0,0,0,0,0,0,
+#endif
+#if TCL_UTF_MAX > 4
+    4,4,4,4,
+#else
+    0,0,0,0,
+#endif
+#if TCL_UTF_MAX > 5
+    5,5,5,5
+#else
+    0,0,0,0
+#endif
+};
+
+static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 {
-	const char*	start;
-	const char* p;
+	// TODO: use Tcl_UtfNext instead?
+	// This relies on some properties from the utf-8 returned by Tcl_GetString:
+	//	- no invalid encodings (partial utf-8 sequences, etc)
+	//	- not truncated in the middle of a char
+	const unsigned char	first = **p;
+	unsigned char		eat;
+
+	(*p)++;
+	if (unlikely(first >= 0xC0)) {
+		eat = utf_skip[first - 0xC0];
+		*p += eat;
+		*char_adj += eat;
+	}
+}
+
+//}}}
+*/
+static const unsigned char utf_skip[16] __attribute__((__aligned__(64))) = {
+    1,1,1,1,1,1,1,1,
+    2,2,2,2,
+#if TCL_UTF_MAX > 3
+    3,3,
+#else
+    0,0,
+#endif
+#if TCL_UTF_MAX > 4
+    4,
+#else
+    0,
+#endif
+#if TCL_UTF_MAX > 5
+    5
+#else
+    0
+#endif
+};
+
+static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
+{
+	// This relies on some properties from the utf-8 returned by Tcl_GetString:
+	//	- no invalid encodings (partial utf-8 sequences, etc)
+	//	- not truncated in the middle of a char
+	const int		first = **p - 0xC0;
+	unsigned char	eat;
+	//const signed char	was = **p;
+
+	(*p)++;
+	if (unlikely(first >= 0)) {
+		eat = utf_skip[first >> 2];
+		//fprintf(stderr, "Byte 0x%02X, was: 0x%02X(%d), first: %d, first>>2: %d, eat: %d, str: %s\n", *((*p)-1), was, was-0xC0, first, first>>2, eat, (*p)-1);
+		*p += eat;
+		*char_adj += eat;
+	}
+}
+
+//}}}
+#endif
+//}}}
+static int skip_whitespace(const unsigned char** s, const unsigned char* e, const char** errmsg, const unsigned char** err_at, size_t* char_adj) //{{{
+{
+	const unsigned char*	p;
+	const unsigned char*	start;
+	size_t					start_char_adj;
 
 	p = start = *s;
 
 	while (1) {
-		while (p < e && is_whitespace(*p)) p++;
+		while (is_whitespace(*p)) p++;
 
-		if (p < e-1 && *p == '/') {
+		if (unlikely(*p == '/')) {
 			start = p;
-			char_advance(&p, e, char_adj);
+			start_char_adj = *char_adj;
+			p++;
 			if (*p == '/') {
 				p++;
 
-				while (p < e && *p != '\n')
-					char_advance(&p, e, char_adj);
+				while (likely(p < e && *p != '\n'))
+					char_advance(&p, char_adj);
 			} else if (*p == '*') {
 				p++;
 
-				while (p < e-2 && *p != '*')
-					char_advance(&p, e, char_adj);
+				while (likely(p < e-2 && *p != '*'))
+					char_advance(&p, char_adj);
 
-				if (unlikely(p > e-2 || *p++ != '*' || *p++ != '/')) {
-					*err = "Unterminated comment";
+				if (unlikely(*p++ != '*' || *p++ != '/')) {
+					*errmsg = "Unterminated comment";
+					goto err;
 				}
 			} else {
-				*err = "Illegal character";
+				*errmsg = "Illegal character";
 				goto err;
 			}
 			continue;
@@ -211,14 +297,16 @@ static int skip_whitespace(const char** s, const char* e, const char** err, cons
 err:
 	*s = p;
 	*err_at = start;
+	*char_adj = start_char_adj;
 	return 1;
 }
 
 //}}}
-static int value_type(struct interp_cx* l, const char* doc, const char* p, const char* e, size_t* char_adj, const char** next, enum json_types *type, Tcl_Obj** val) //{{{
+	// TESTED {{{
+static int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned char* p, const unsigned char* e, size_t* char_adj, const unsigned char** next, enum json_types *type, Tcl_Obj** val) //{{{
 {
-	const char*		err_at = NULL;
-	const char*		errmsg = NULL;
+	const unsigned char*	err_at = NULL;
+	const char*				errmsg = NULL;
 
 	*val = NULL;
 
@@ -226,31 +314,68 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 
 	switch (*p) {
 		case '"':
-			p++;	// Advance to the first byte of the string
+			p++;	// Advance past the " to the first byte of the string
 			{
-				Tcl_Obj*	out = NULL;
-				const char*	chunk;
-				size_t		len;
+				Tcl_Obj*				out = NULL;
+				const unsigned char*	chunk;
+				size_t					len;
+				char					mapped;
 
 				while (1) {
 					chunk = p;
-					//fprintf(stderr, "string char walk loop top, index %d: %c\n", p-doc, *p);
 					while (likely(p < e && *p != '"' && *p != '\\' && *p > 0x1f))
-						char_advance(&p, e, char_adj);
+						char_advance(&p, char_adj);
 
-					// TESTED {{{
 					if (unlikely(p >= e)) goto err;
 
 					len = p-chunk;
 
 					if (likely(out == NULL)) {
+#if 0
 						// Optimized case - no backquoted sequences to deal with
-						out = len == 0 ? l->tcl_empty : Tcl_NewStringObj(chunk, len);
+						out = len == 0 ? l->tcl_empty : Tcl_NewStringObj((const char*)chunk, len);
+#else
+						//out = Tcl_NewStringObj((const char*)chunk, MIN(len,5));
+#if 0
+						if (len == 0) {
+							out = l->tcl_empty;
+						} else if (len < STRING_DEDUP_MAX && *p == '"') { // TODO: check that Tcl_AppendUnicodeToObj translates \u0000 to c080
+							out = new_stringobj_dedup(l, (const char*)chunk, len);
+						} else {
+							out = Tcl_NewStringObj((const char*)chunk, len);
+						}
+#else
+						out = new_stringobj_dedup(l, (const char*)chunk, len);
+						//fprintf(stderr, "New string: (%s) for chunk: (%s)\n", Tcl_GetString(out), Tcl_GetString(Tcl_NewStringObj(chunk, len)));
+#endif
+						/*
+						//out = Tcl_NewStringObj((const char*)chunk, 1);
+						dbuf = ckalloc(len);
+						memcpy(dbuf, chunk, len);
+						//ckfree(dbuf);
+						*/
+
+						/*
+						out = Tcl_NewObj();
+						//out = ckalloc(sizeof(Tcl_Obj));
+						//out = Tcl_DuplicateObj(l->tcl_empty);
+						//out = (Tcl_Obj*)ckalloc(sizeof(Tcl_Obj));
+						//out->refCount = 1;
+						//out->typePtr = 0;
+
+						//len = MIN(len,4);
+						out->bytes = ckalloc(len+1);
+						out->length = len;
+						memcpy(out->bytes, chunk, len);
+						out->bytes[len] = 0;
+						*/
+#endif
 					} else if (len > 0) {
 						if (unlikely(Tcl_IsShared(out)))
-							out = Tcl_DuplicateObj(out);	// Shouldn't be possible to reach
+							out = Tcl_DuplicateObj(out);	// Can do this because the ref were were operating under is on loan from new_stringobj_dedup
 
-						Tcl_AppendToObj(out, chunk, len);
+						//fprintf(stderr, "Appending chunk (%s) to (%s)\n", Tcl_GetString(Tcl_NewStringObj(chunk,len)), Tcl_GetString(out));
+						Tcl_AppendToObj(out, (const char*)chunk, len);
 					}
 
 					if (likely(*p == '"')) {
@@ -261,23 +386,49 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 					if (unlikely(*p != '\\')) goto err;
 
 					p++;	// Advance to the backquoted byte
-					if (unlikely(p >= e)) goto err;
 
-					if (Tcl_IsShared(out))
-						out = Tcl_DuplicateObj(out);
+					if (unlikely(Tcl_IsShared(out)))
+						out = Tcl_DuplicateObj(out);	// Can do this because the ref were were operating under is on loan from new_stringobj_dedup
 
-					switch (*p) {
+					switch (*p) {	// p could point at the NULL terminator at this point
 						case '\\':
 						case '"':
 						case '/':		// RFC4627 allows this for some reason
-							Tcl_AppendToObj(out, p, 1);
+							mapped = *p;
+							goto append_mapped;
+
+						case 'b': mapped='\b'; goto append_mapped;
+						case 'f': mapped='\f'; goto append_mapped;
+						case 'n': mapped='\n'; goto append_mapped;
+						case 'r': mapped='\r'; goto append_mapped;
+						case 't': mapped='\t';
+append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this way the compiler optimizes it to a jump table
 							break;
 
+						/* Works, but bloats code size by about 150 bytes
 						case 'b': Tcl_AppendToObj(out, "\b", 1); break;
 						case 'f': Tcl_AppendToObj(out, "\f", 1); break;
 						case 'n': Tcl_AppendToObj(out, "\n", 1); break;
 						case 'r': Tcl_AppendToObj(out, "\r", 1); break;
 						case 't': Tcl_AppendToObj(out, "\t", 1); break;
+						*/
+
+						/* Works
+						case 'b':
+						case 'f':
+						case 'n':
+						case 'r':
+						case 't':
+							{
+								char	decoded[TCL_UTF_MAX+1];
+								int		advanced;
+								int		len;
+
+								len = Tcl_UtfBackslash(p-1, &advanced, decoded);
+								Tcl_AppendToObj(out, decoded, len);
+								break;
+							}
+						*/
 
 						case 'u':
 							{
@@ -327,7 +478,6 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 
 				*type = JSON_STRING;
 				*val = out;
-				//}}}
 			}
 			break;
 
@@ -342,7 +492,10 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 			break;
 
 		case 't':
-			if (unlikely(strncmp(p, "true", MIN(4, e-p)) != 0)) goto err;
+			//if (unlikely(strncmp(p, "true", 4) != 0)) goto err;
+			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x65757274)) goto err;			// Evil little-endian trick
+			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x74727565)) goto err;			// Evil big-endian trick
+			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"true")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
 			*val = l->tcl_true;
@@ -350,7 +503,10 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 			break;
 
 		case 'f':
-			if (unlikely(strncmp(p, "false", MIN(5, e-p)) != 0)) goto err;
+			//if (unlikely(strncmp(p, "false", 5) != 0)) goto err;
+			//if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != 0x65736c61)) goto err;		// Evil little-endian trick (alse)
+			//if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != 0x616c7365)) goto err;		// Evil big-endian trick (alse)
+			if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != *(uint32_t*)"alse")) goto err;	// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
 			*val = l->tcl_false;
@@ -358,29 +514,32 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 			break;
 
 		case 'n':
-			if (unlikely(strncmp(p, "null", MIN(4, e-p)) != 0)) goto err;
+			//if (unlikely(strncmp(p, "null", 4) != 0)) goto err;
+			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x6c6c756e)) goto err;			// Evil little-endian trick
+			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x6e756c6c)) goto err;			// Evil big-endian trick
+			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"null")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_NULL;
-			p += 4;
 			*val = l->tcl_empty;
+			p += 4;
 			break;
 
 		default:
 			// TODO: Reject leading zero?  The RFC doesn't allow leading zeros
 			{
-				// TESTED {{{
-				const char*	start = p;
-				const char*	t;
+				const unsigned char*	start = p;
+				const unsigned char*	t;
 
 				if (*p == '-') p++;
-				if (unlikely(*p < '0' || *p > '9')) goto err;
 
-				while (*p >= '0' && *p < '9') p++;
+				t = p;
+				while (*p >= '0' && *p <= '9') p++;
+				if (unlikely(p == t)) goto err;	// No integer part after the decimal point
 
 				if (*p == '.') {	// p could point at the NULL terminator at this point
 					p++;
 					t = p;
-					while (*p >= '0' && *p < '9') p++;
+					while (*p >= '0' && *p <= '9') p++;
 					if (unlikely(p == t)) goto err;	// No integer part after the decimal point
 				}
 
@@ -388,17 +547,17 @@ static int value_type(struct interp_cx* l, const char* doc, const char* p, const
 					p++;
 					if (*p == '+' || *p == '-') p++;
 					t = p;
-					while (*p >= '0' && *p < '9') p++;
+					while (*p >= '0' && *p <= '9') p++;
 					if (unlikely(p == t)) goto err;	// No integer part after the exponent symbol
 				}
 
 				*type = JSON_NUMBER;
-				*val = Tcl_NewStringObj(start, p-start);
-				//}}}
+				//*val = Tcl_NewStringObj((const char*)start, p-start);
+				*val = new_stringobj_dedup(l, (const char*)start, p-start);
+				//*val = p-start < 6 ? new_stringobj_dedup(l, (const char*)start, p-start) : Tcl_NewStringObj((const char*)start, p-start);
 			}
 	}
 
-	// TESTED {{{
 	*next = p;
 	return TCL_OK;
 
@@ -412,19 +571,27 @@ err:
 	_parse_error(l->interp, errmsg, doc, (err_at - doc) - *char_adj);
 
 	return TCL_ERROR;
-	//}}}
 }
 
 //}}}
+	//}}}
 static void free_cx(struct parse_context* cx) //{{{
 {
 	struct parse_context*	tail = cx->last;
 
 	while (cx->last != cx) {
 		cx->last = tail->prev;
-		if (tail->val != NULL) {
-			Tcl_DecrRefCount(tail->val); tail->val = NULL;
+
+		if (tail->hold_key != NULL) {
+			Tcl_DecrRefCount(tail->hold_key);
+			tail->hold_key = NULL;
 		}
+
+		if (tail->val != NULL) {
+			Tcl_DecrRefCount(tail->val);
+			tail->val = NULL;
+		}
+
 		ckfree((char*)tail); tail = NULL;
 	}
 }
@@ -432,19 +599,19 @@ static void free_cx(struct parse_context* cx) //{{{
 //}}}
 int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	struct interp_cx* l = cdata;
-	const char*		err_at = NULL;
-	const char*		errmsg = "Illegal character";
-	size_t			char_adj = 0;		// Offset addjustment to account for multibyte UTF-8 sequences
-	const char*		doc;
-	enum json_types	type;
-	Tcl_Obj*		val;
-	const char*		p;
-	const char*		e;
-	const char*		val_start;
-	int				len;
+	struct interp_cx*		l = cdata;
+	const unsigned char*	err_at = NULL;
+	const char*				errmsg = "Illegal character";
+	size_t					char_adj = 0;		// Offset addjustment to account for multibyte UTF-8 sequences
+	const unsigned char*	doc;
+	enum json_types			type;
+	Tcl_Obj*				val;
+	const unsigned char*	p;
+	const unsigned char*	e;
+	const unsigned char*	val_start;
+	int						len;
 	struct parse_context	cx;
-	Tcl_Obj*		obj = NULL;
+	Tcl_Obj*				obj = NULL;
 
 	cx.prev = NULL;
 	cx.last = &cx;
@@ -455,7 +622,7 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 
 	CHECK_ARGS(1, "json_value");
 
-	p = doc = Tcl_GetStringFromObj(objv[1], &len);
+	p = doc = (const unsigned char*)Tcl_GetStringFromObj(objv[1], &len);
 	e = p + len;
 
 	// Skip leading whitespace and comments
@@ -464,15 +631,17 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 	while (p < e) {
 		//fprintf(stderr, "value_type loop top, byte ofs %d, *p: %c%c\n", p-doc, *p, *(p+1));
 		if (cx.last->container == JSON_OBJECT) { // Read the key if in object mode {{{
-			const char*	key_start = p;
-			size_t		key_start_char_adj = char_adj;
+			const unsigned char*	key_start = p;
+			size_t					key_start_char_adj = char_adj;
 
 			TEST_OK(value_type(l, doc, p, e, &char_adj, &p, &type, &val));
 			if (unlikely(type != JSON_STRING && type != JSON_DYN_STRING && type != JSON_DYN_LITERAL)) {
 				_parse_error(interp, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
 				goto err;
 			}
-			cx.last->hold_key = val;
+			Tcl_IncrRefCount(cx.last->hold_key = val);
+
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
 
 			if (unlikely(*p != ':')) {
 				_parse_error(interp, "Expecting : after object key", doc, (p-doc) - char_adj);

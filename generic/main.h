@@ -12,7 +12,19 @@
 #include <stdlib.h>
 #include <math.h>
 #include <malloc.h>
+#include <stdint.h>
+#include <sys/time.h>
 #include "parser.h"
+
+#define STRING_DEDUP_MAX	32
+
+#ifdef __builtin_expect
+#	define likely(exp)   __builtin_expect(!!(exp), 1)
+#	define unlikely(exp) __builtin_expect(!!(exp), 0)
+#else
+#	define likely(exp)   (exp)
+#	define unlikely(exp) (exp)
+#endif
 
 extern Tcl_ObjType json_type;
 
@@ -28,5 +40,7 @@ struct parse_context {
 
 void append_to_cx(struct parse_context* cx, Tcl_Obj* val);
 Tcl_Obj* JSON_NewJvalObj2(int type, Tcl_Obj* val);
+
+Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length);
 
 #endif
