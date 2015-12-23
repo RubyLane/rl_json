@@ -64,7 +64,7 @@ static const char* type_names[] = {
 	"string"		// JSON_DYN_LITERAL
 };
 // These are just for debugging
-static const char* type_names_dbg[] = {
+const char* type_names_dbg[] = {
 	"JSON_UNDEF",
 	"JSON_OBJECT",
 	"JSON_ARRAY",
@@ -137,6 +137,33 @@ static void mark_free(long long* freemap, int idx) //{{{
 }
 
 //}}}
+static void age_cache(struct interp_cx* l) //{{{
+{
+	Tcl_HashEntry*		he;
+	Tcl_HashSearch		search;
+	struct kc_entry*	e;
+
+	he = Tcl_FirstHashEntry(&l->kc, &search);
+	while (he) {
+		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(he);
+
+		e = &l->kc_entries[idx];
+
+		if (e->hits < 1) {
+			Tcl_DeleteHashEntry(he);
+			Tcl_DecrRefCount(e->val);
+			Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
+			mark_free(l->freemap, idx);
+			e->val = NULL;
+		} else {
+			e->hits >>= 1;
+		}
+		he = Tcl_NextHashEntry(&search);
+	}
+	l->kc_count = 0;
+}
+
+//}}}
 Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length) //{{{
 {
 	char				buf[STRING_DEDUP_MAX];
@@ -164,115 +191,37 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 	Tcl_HashEntry* entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
 
 	if (is_new) {
-#if 1
 		ptrdiff_t	idx = first_free(l->freemap);
-		if (idx > KC_ENTRIES) {
+
+		if (unlikely(idx > KC_ENTRIES)) {
 			// Cache overflow
-			// TODO: trigger a cache aging event?
-			fprintf(stderr, "Cache overflow (KC_ENTRIES: %d)\n", KC_ENTRIES);
+			Tcl_DeleteHashEntry(entry);
+			age_cache(l);
 			return Tcl_NewStringObj(bytes, length);
 		}
 
 		kce = &l->kc_entries[idx];
 		kce->hits = 0;
-		out = &kce->val;
-		out->refCount = 2;
-		out->bytes = (length <= KC_ENTRY_MAXPACK) ? &kce->tail[1] : ckalloc(length+1);
-		memcpy(out->bytes, bytes, length);
-		out->bytes[length] = 0;
-		out->length = length;
-		out->typePtr = NULL;
+		out = kce->val = Tcl_NewStringObj(bytes, length);;
+		Tcl_IncrRefCount(out);	// Two references - one for the cache table and one on loan to callers' interim processing.
+		Tcl_IncrRefCount(out);	// Without this, values not referenced elsewhere could reach callers with refCount 1, allowing
+								// the value to be mutated in place and corrupt the state of the cache (hash key not matching obj value)
 
 		mark_used(l->freemap, idx);
 
 		Tcl_SetHashValue(entry, (void*)idx);
-#else
-		kce = ckalloc(sizeof *kce);
-		kce->val = out = Tcl_NewStringObj(bytes, length);
-		Tcl_IncrRefCount(out);	// Two references - one for the cache table and one on loan to callers' interim processing.
-		Tcl_IncrRefCount(out);	// Without this, values not referenced elsewhere could reach callers with refCount 1, allowing
-								// the value to be mutated in place and corrupt the state of the cache (hash key not matching obj value)
-		kce->hits = 0;
-
-		Tcl_SetHashValue(entry, kce);
-#endif
-
-		if (unlikely(l->kc_count > KC_ENTRIES/3-1)) {
-			//int				del_count = 0, total = 0;
-			Tcl_HashEntry*	he;
-			Tcl_HashSearch	search;
-			//static int		cleans;
-			/*
-			struct timeval	ts;
-			uint64_t		before, after;
-
-
-			gettimeofday(&ts, NULL);
-			before = ts.tv_sec*1000000 + ts.tv_usec;
-			*/
-
-			kce->hits++; // Prevent the just-created entry from being pruned
-
-			//cleans++;
-			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(&l->kc));
-			//fprintf(stderr, "Cache sweep\n");
-			he = Tcl_FirstHashEntry(&l->kc, &search);
-			while (he) {
-#if 1
-				ptrdiff_t			idx = (ptrdiff_t)Tcl_GetHashValue(he);
-				struct kc_entry*	e;
-				//fprintf(stderr, "Got idx: %d\n", idx);
-				e = &l->kc_entries[idx];
-#else
-				struct kc_entry*	e = Tcl_GetHashValue(he);
-#endif
-
-				//if (cleans == 4)
-				//	fprintf(stderr, "%3d\t%5d\t\"%s\"\n", e->hits, e->val->refCount, Tcl_GetHashKey(&l->kc, he));
-
-				if (e->hits < 1) {
-					Tcl_DeleteHashEntry(he);
-#if 1
-					if (e->val.bytes != (const char*)(&e->tail[1])) ckfree(e->val.bytes);
-					e->val.bytes = NULL;
-					mark_free(l->freemap, idx);
-#else
-					Tcl_DecrRefCount(e->val);
-					Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
-					e->val = NULL;
-					ckfree(e); e = NULL;
-#endif
-					//del_count++;
-				} else {
-					e->hits >>= 1;
-				}
-				he = Tcl_NextHashEntry(&search);
-				//total++;
-			}
-			l->kc_count = 0;
-			//if (cleans == 4) fprintf(stderr, "%s\n", Tcl_HashStats(&l->kc));
-
-			/*
-			gettimeofday(&ts, NULL);
-			after = ts.tv_sec*1000000 + ts.tv_usec;
-
-			fprintf(stderr, "Prune pass: removed %d / %d cached values (%d remain) in %ld usec\n", del_count, total, total-del_count, after-before);
-			*/
-		}
-
 		l->kc_count++;
-		//fprintf(stderr, "Created new cache entry for (%s)[%d]\n", Tcl_GetString(out), out->refCount);
+
+		if (unlikely(l->kc_count > (int)(KC_ENTRIES/2.5))) {
+			kce->hits++; // Prevent the just-created entry from being pruned
+			age_cache(l);
+		}
 	} else {
-#if 1
 		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(entry);
+
 		kce = &l->kc_entries[idx];
-		out = &kce->val;
-#else
-		kce = Tcl_GetHashValue(entry);
 		out = kce->val;
-#endif
 		if (kce->hits < 255) kce->hits++;
-		//fprintf(stderr, "Retrieved existing cache entry for (%s)[%d]\n", Tcl_GetString(out), out->refCount);
 	}
 
 	return out;
@@ -661,6 +610,36 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 		default:
 			tail->val = val;
 			Tcl_IncrRefCount(tail->val);
+	}
+}
+
+//}}}
+void append_to_cx2(struct parse_context* cx, Tcl_Obj* val) //{{{
+{
+	/*
+	fprintf(stderr, "append_to_cx, storing %s: \"%s\"\n",
+			type_names[val->internalRep.ptrAndLongRep.value],
+			val->internalRep.ptrAndLongRep.ptr == NULL ? "NULL" :
+			Tcl_GetString((Tcl_Obj*)val->internalRep.ptrAndLongRep.ptr));
+	*/
+	switch (cx->container) {
+		case JSON_OBJECT:
+			//fprintf(stderr, "append_to_cx2, cx->hold_key->refCount: %d (%s)\n", cx->hold_key->refCount, Tcl_GetString(cx->hold_key));
+			Tcl_DictObjPut(NULL, cx->val->internalRep.ptrAndLongRep.ptr, cx->hold_key, val);
+			Tcl_InvalidateStringRep(cx->val);
+			Tcl_DecrRefCount(cx->hold_key);
+			cx->hold_key = NULL;
+			break;
+
+		case JSON_ARRAY:
+			//fprintf(stderr, "append_to_cx2, appending to list: (%s)\n", Tcl_GetString(val));
+			Tcl_ListObjAppendElement(NULL, cx->val->internalRep.ptrAndLongRep.ptr, val);
+			Tcl_InvalidateStringRep(cx->val);
+			break;
+
+		default:
+			cx->val = val;
+			Tcl_IncrRefCount(cx->val);
 	}
 }
 

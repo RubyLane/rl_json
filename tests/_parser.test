@@ -827,14 +827,7 @@ test parser/structure-2.1 {object, single key packed} -body { #<<<
 } -result [list {{"foo":"bar"}} bar]
 #>>>
 test parser/structure-2.2 {object, single key whitespace} -body { #<<<
-	try {
-		set j	[test_parse { 	{ 	"foo" 	: 	"bar" 	} 	}]
-	} trap {RL JSON PARSE} {errmsg options} {
-		lassign [lrange [dict get $options -errorcode] 4 5] doc char_ofs
-		puts stderr "char_ofs: ($char_ofs)"
-		puts stderr "$errmsg: [string range $doc 0 $char_ofs-1](here ->)[string range $doc $char_ofs end]"
-		return -options $options $errmsg
-	}
+	set j	[test_parse { 	{ 	"foo" 	: 	"bar" 	} 	}]
 	list $j [json get $j foo]
 } -cleanup {
 	unset -nocomplain j
@@ -882,12 +875,64 @@ test parser/structure-3.4 {array, multi element whitespace} -body { #<<<
 	unset -nocomplain j
 } -result [list {["foo","bar"]} bar]
 #>>>
+test parser/structure-4.1 {orphaned hold_key} -body { #<<<
+	list [catch {
+		test_parse {{"structure-4.1"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Expecting : after object key} {{"structure-4.1"}} 16] {Error parsing JSON value: Expecting : after object key at offset 16}]
+#>>>
+test parser/structure-4.2 {orphaned hold_key} -body { #<<<
+	list [catch {
+		test_parse {{"structure-4.2":}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-4.2":}} 17] {Error parsing JSON value: Illegal character at offset 17}]
+#>>>
+test parser/structure-4.3 {nested orphaned hold_key} -body { #<<<
+	list [catch {
+		test_parse {{"x":"y","structure-4.3":{"nested-4.3":}}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {{"x":"y","structure-4.3":{"nested-4.3":}}} 39] {Error parsing JSON value: Illegal character at offset 39}]
+#>>>
+test parser/structure-4.4 {nested orphaned hold_key, nested key parse error} -body { #<<<
+	list [catch {
+		test_parse {{"structure-4.4":{"nested-4.4\x":"bar"}}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-4.4":{"nested-4.4\x":"bar"}}} 30] {Error parsing JSON value: Illegal character at offset 30}]
+#>>>
+test parser/structure-5.4 {Deep nesting, ensure that this test nests deeper than CX_STACK_SIZE} -body { #<<<
+	json get [test_parse {
+		{
+			"first": {
+				"second": {
+					"third": {
+						"fourth": {
+							"fifth": {
+								"sixth": {
+									"seventh": {
+										"eighth": {
+											"ninth": {
+												"tenth": {
+													"eleventh": [1, 2, "structure-5.4"]
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}] first second third fourth fifth sixth seventh eighth ninth tenth eleventh end
+} -result structure-5.4
+#>>>
 
 test parser/utf-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
 	json get [test_parse {"helloは"}]
 } -result helloは
 #>>>
-test parser/utf-1.2 {Length calculation for } -body { #<<<
+test parser/utf-1.2 {Length calculation for 1, 2 and 3 byte UTF-8 sequences} -body { #<<<
 	json get [test_parse {"h¿は"}] ?length
 } -result 3
 #>>>
@@ -927,6 +972,155 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 } finally {
 	unset -nocomplain bytes lower upper
 }
+#>>>
+
+test parser/whitespace-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
+	json get [test_parse {	/*hello€*/  "helloは" //The rest is a comment ほ}]
+} -result helloは
+#>>>
+test parser/whitespace-1.2 {All whitespace chars and utf-8 char lengths in comments, no whitespace between comments and string} -body { #<<<
+	json get [test_parse "\n\t\r /*h¿は*/\"foo\"//h¿は\n"]
+} -result foo
+#>>>
+test parser/whitespace-1.3 {All whitespace chars and utf-8 char lengths in comments, leading whitespace between comments and string} -body { #<<<
+	json get [test_parse "\n\t\r /*h¿は*/\r\"foo\"//h¿は\n"]
+} -result foo
+#>>>
+test parser/whitespace-1.4 {All whitespace chars and utf-8 char lengths in comments, trailing whitespace between comments and string} -body { #<<<
+	json get [test_parse "\n\t\r /*h¿は*/\"foo\"\r//h¿は\n"]
+} -result foo
+#>>>
+test parser/whitespace-1.5 {All whitespace chars and utf-8 char lengths in comments, leading and trailing whitespace between comments and string} -body { #<<<
+	json get [test_parse "\n\t\r /*h¿は*/\t\"foo\"\r//h¿は\n"]
+} -result foo
+#>>>
+test parser/whitespace-1.6 {char offset counting for skipped chars in comments} -body { #<<<
+	list [catch {
+		json get [test_parse "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar"]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Trailing garbage after value} "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar" 22] "Error parsing JSON value: Trailing garbage after value at offset 22"]
+#>>>
+try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (the BMP) by Tcl support) <<<
+	# 0x20 is used as the lower bound for the 1 byte case because 0x1F and
+	# below are control characters and not legal in JSON as unescaped chars
+	foreach {bytes lower upper} {
+		1	0x20	0x7f
+		2	0x80	0x7ff
+		3	0x800	0xffff
+	} {
+		test parser/whitespace-2.$bytes.1 "lower bound of $bytes byte chars in // comment" -body { #<<<
+			json get [test_parse [format "//%1\$c%1\$c\nfalse" $lower]]
+		} -result false
+		#>>>
+		test parser/whitespace-2.$bytes.2 "upper bound of $bytes byte chars in // comment" -body { #<<<
+			json get [test_parse [format "//%1\$c%1\$c\nfalse" $upper]]
+		} -result false
+		#>>>
+		test parser/whitespace-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in // comment" -body { #<<<
+			list [catch {
+				json get [test_parse [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f] 4] {Error parsing JSON value: Illegal character at offset 4}]
+		#>>>
+		test parser/whitespace-2.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars in // comment" -body { #<<<
+			list [catch {
+				json get [test_parse [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f] 4] {Error parsing JSON value: Illegal character at offset 4}]
+		#>>>
+
+		test parser/whitespace-3.$bytes.1 "lower bound of $bytes byte chars in /* */ comment" -body { #<<<
+			json get [test_parse [format "/*%1\$c%1\$c*/false" $lower]]
+		} -result false
+		#>>>
+		test parser/whitespace-3.$bytes.2 "upper bound of $bytes byte chars in /* */ comment" -body { #<<<
+			json get [test_parse [format "/*%1\$c%1\$c*/false" $upper]]
+		} -result false
+		#>>>
+		test parser/whitespace-3.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [catch {
+				json get [test_parse [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f] 4] {Error parsing JSON value: Illegal character at offset 4}]
+		#>>>
+		test parser/whitespace-3.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [catch {
+				json get [test_parse [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f]]
+			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		} -cleanup {
+			unset -nocomplain r o
+		} -result [list 1 [list RL JSON PARSE {Illegal character} [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f] 4] {Error parsing JSON value: Illegal character at offset 4}]
+		#>>>
+	}
+} finally {
+	unset -nocomplain bytes lower upper
+}
+#>>>
+test parser/whitespace-4.1 {Half opened // comment sequence} -body { #<<<
+	list [catch {
+		test_parse " /foo"
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 {RL JSON PARSE {Illegal character} { /foo} 2} {Error parsing JSON value: Illegal character at offset 2}]
+#>>>
+test parser/whitespace-5.1 {Two comments, no whitespace} -body { #<<<
+	json get [test_parse {/*foo*//*bar*/123}]
+} -result 123
+#>>>
+test parser/whitespace-6.1 {Two comments, whitespace between} -body { #<<<
+	json get [test_parse {/*foo*/ /*bar*/123}]
+} -result 123
+#>>>
+test parser/whitespace-7.1 {Two // comments} -body { #<<<
+	json get [test_parse "321//foo\n//bar"]
+} -result 321
+#>>>
+test parser/whitespace-8.1 {// comment, no newline} -body { #<<<
+	json get [test_parse "8.1//bar"]
+} -result 8.1
+#>>>
+test parser/whitespace-8.2 {// comment, no newline, no value} -body { #<<<
+	list [catch {
+		json get [test_parse {//bar}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {No JSON value found} //bar 0} {Error parsing JSON value: No JSON value found at offset 0}}
+#>>>
+test parser/whitespace-9.1 {Unterminated comment} -body { #<<<
+	list [catch {
+		json get [test_parse {9.1/* はhello}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unterminated comment} {9.1/* はhello} 3} {Error parsing JSON value: Unterminated comment at offset 3}}
+#>>>
+test parser/whitespace-9.2 {Unterminated comment} -body { #<<<
+	list [catch {
+		json get [test_parse {9.2/* はhello*}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unterminated comment} {9.2/* はhello*} 3} {Error parsing JSON value: Unterminated comment at offset 3}}
+#>>>
+test parser/whitespace-9.3 {Unterminated comment} -body { #<<<
+	list [catch {
+		json get [test_parse {9.3/* はhello*x}]
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {RL JSON PARSE {Unterminated comment} {9.3/* はhello*x} 3} {Error parsing JSON value: Unterminated comment at offset 3}}
+#>>>
+test parser/whitespace-9.4 {Comment terminated at EOF} -body { #<<<
+	json get [test_parse {9.4/* はhello*/}]
+} -result 9.4
 #>>>
 
 ::tcltest::cleanupTests

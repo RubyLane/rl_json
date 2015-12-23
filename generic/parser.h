@@ -19,17 +19,11 @@ enum json_types {
 	JSON_DYN_LITERAL	// ~L:	literal escape - used to quote literal values that start with the above sequences
 };
 
-#define KC_ENTRIES		2048
-
-#define KC_ENTRY_TAILSIZE	(64 - sizeof(Tcl_Obj))
-#define KC_ENTRY_MAXPACK	(KC_ENTRY_TAILSIZE - 2)		// tailsize less null byte and hits
+#define KC_ENTRIES		3072
 
 struct kc_entry {
-	Tcl_Obj			val;
-	union {
-		unsigned char	hits;
-		unsigned char	tail[KC_ENTRY_TAILSIZE];
-	};
+	Tcl_Obj			*val;
+	unsigned int	hits;
 };
 
 struct interp_cx {
@@ -43,6 +37,8 @@ struct interp_cx {
 	long long		terminator;
 	struct kc_entry	kc_entries[KC_ENTRIES];
 };
+
+#define CX_STACK_SIZE	8
 
 int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]);
 
