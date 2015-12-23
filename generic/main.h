@@ -18,7 +18,7 @@
 #include <sys/time.h>
 #include "parser.h"
 
-#define STRING_DEDUP_MAX	32
+#define STRING_DEDUP_MAX	16
 
 #ifdef __builtin_expect
 #	define likely(exp)   __builtin_expect(!!(exp), 1)

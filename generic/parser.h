@@ -19,7 +19,7 @@ enum json_types {
 	JSON_DYN_LITERAL	// ~L:	literal escape - used to quote literal values that start with the above sequences
 };
 
-#define KC_ENTRIES		3072
+#define KC_ENTRIES		400
 
 struct kc_entry {
 	Tcl_Obj			*val;
@@ -38,7 +38,7 @@ struct interp_cx {
 	struct kc_entry	kc_entries[KC_ENTRIES];
 };
 
-#define CX_STACK_SIZE	8
+#define CX_STACK_SIZE	6
 
 int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]);
 
