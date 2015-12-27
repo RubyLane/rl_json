@@ -24,15 +24,12 @@ static struct parse_context* push_parse_context(struct parse_context* cx, const 
 	Tcl_Obj*				ival;
 
 	if (last->container == JSON_UNDEF) {
-		//fprintf(stderr, "push_parse_context: at top of stack\n");
 		new = last;
 	} else if (likely((ptrdiff_t)last >= (ptrdiff_t)cx && (ptrdiff_t)last < (ptrdiff_t)(cx + CX_STACK_SIZE - 1))) {
 		// Space remains on the cx array stack
 		new = cx->last+1;
-		//fprintf(stderr, "Allocated slot on CX stack: %ld / %d\n", new - cx, CX_STACK_SIZE-1);
 	} else {
 		new = (struct parse_context*)malloc(sizeof(*new));
-		//fprintf(stderr, "Allocated slot on heap, stack full\n");
 	}
 
 	ival = JSON_NewJvalObj2(container, container == JSON_OBJECT  ?  Tcl_NewDictObj()  :  Tcl_NewListObj(0, NULL));
@@ -57,14 +54,11 @@ static struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 
 	cx->last->closed = 1;
 
-	//fprintf(stderr, "pop_parse_context %s\n", type_names_dbg[last->container]);
 	if (unlikely((ptrdiff_t)cx == (ptrdiff_t)last)) {
-		//fprintf(stderr, "pop_parse_context: at top of stack\n");
 		return cx->last;
 	}
 
 	if (likely(last->val != NULL)) {
-		//fprintf(stderr, "Appending to prev cx (%s) val (%s)\n", Tcl_GetString(last->prev->val), Tcl_GetString(last->val));
 		append_to_cx2(last->prev, last->val);
 		Tcl_DecrRefCount(last->val);
 		last->val = NULL;
@@ -73,11 +67,9 @@ static struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 	if (likely((ptrdiff_t)last >= (ptrdiff_t)cx && (ptrdiff_t)last < (ptrdiff_t)(cx + CX_STACK_SIZE))) {
 		// last is on the cx array stack
 		cx->last--;
-		//fprintf(stderr, "Deallocated slot from CX stack, now %ld / %d\n", cx->last - cx, CX_STACK_SIZE-1);
 	} else {
 		if (last->prev) {
 			cx->last = last->prev;
-			//fprintf(stderr, "Freeing slot on heap\n");
 			free(last);
 		}
 	}
@@ -94,10 +86,7 @@ static void free_cx(struct parse_context* cx) //{{{
 		struct parse_context*	t = cx;
 		struct parse_context*	next;
 
-		//fprintf(stderr, "Unwinding parse_context stack after error\n");
 		while (1) {
-			//fprintf(stderr, "\t%p: %s\n", t, Tcl_GetString(t->val));
-
 			if (t == cx->last) break;
 
 			next = cx->last;
@@ -106,10 +95,8 @@ static void free_cx(struct parse_context* cx) //{{{
 		}
 	}
 
-	//fprintf(stderr, "free_cx: %p\n", cx);
 	while (1) {
 		if (tail->hold_key != NULL) {
-			//fprintf(stderr, "Freeing hold_key: \"%s\"\n", Tcl_GetString(tail->hold_key));
 			Tcl_DecrRefCount(tail->hold_key);
 			tail->hold_key = NULL;
 		}
@@ -119,16 +106,13 @@ static void free_cx(struct parse_context* cx) //{{{
 			tail->val = NULL;
 		}
 
-		//fprintf(stderr, "Freeing tail:   %p\n", tail);
 		tail = pop_parse_context(cx);
-		//fprintf(stderr, "after pop tail: %p\n", tail);
 
 		if (tail == cx) break;
 	}
 }
 
 //}}}
-	// TESTED {{{
 static int is_whitespace(const unsigned char c) //{{{
 {
 	switch (c) {
@@ -173,7 +157,6 @@ static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 			eat = 5;
 #endif
 		}
-		//fprintf(stderr, "skipping %d, from (%s) to (%s)\n", eat+1, *p-1, *p+eat);
 		*p += eat;
 		*char_adj += eat;
 	}
@@ -277,50 +260,11 @@ static int value_type(struct interp_cx* l, const unsigned char* doc, const unsig
 					len = p-chunk;
 
 					if (likely(out == NULL)) {
-#if 0
-						// Optimized case - no backquoted sequences to deal with
-						out = len == 0 ? l->tcl_empty : Tcl_NewStringObj((const char*)chunk, len);
-#else
-						//out = Tcl_NewStringObj((const char*)chunk, MIN(len,5));
-#if 0
-						if (len == 0) {
-							out = l->tcl_empty;
-						} else if (len < STRING_DEDUP_MAX && *p == '"') { // TODO: check that Tcl_AppendUnicodeToObj translates \u0000 to c080
-							out = new_stringobj_dedup(l, (const char*)chunk, len);
-						} else {
-							out = Tcl_NewStringObj((const char*)chunk, len);
-						}
-#else
 						out = new_stringobj_dedup(l, (const char*)chunk, len);
-						//fprintf(stderr, "New string: (%s) for chunk: (%s)\n", Tcl_GetString(out), Tcl_GetString(Tcl_NewStringObj(chunk, len)));
-#endif
-						/*
-						//out = Tcl_NewStringObj((const char*)chunk, 1);
-						dbuf = ckalloc(len);
-						memcpy(dbuf, chunk, len);
-						//ckfree(dbuf);
-						*/
-
-						/*
-						out = Tcl_NewObj();
-						//out = ckalloc(sizeof(Tcl_Obj));
-						//out = Tcl_DuplicateObj(l->tcl_empty);
-						//out = (Tcl_Obj*)ckalloc(sizeof(Tcl_Obj));
-						//out->refCount = 1;
-						//out->typePtr = 0;
-
-						//len = MIN(len,4);
-						out->bytes = ckalloc(len+1);
-						out->length = len;
-						memcpy(out->bytes, chunk, len);
-						out->bytes[len] = 0;
-						*/
-#endif
 					} else if (len > 0) {
 						if (unlikely(Tcl_IsShared(out)))
 							out = Tcl_DuplicateObj(out);	// Can do this because the ref were were operating under is on loan from new_stringobj_dedup
 
-						//fprintf(stderr, "Appending chunk (%s) to (%s)\n", Tcl_GetString(Tcl_NewStringObj(chunk,len)), Tcl_GetString(out));
 						Tcl_AppendToObj(out, (const char*)chunk, len);
 					}
 
@@ -350,31 +294,6 @@ static int value_type(struct interp_cx* l, const unsigned char* doc, const unsig
 						case 't': mapped='\t';
 append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this way the compiler optimizes it to a jump table
 							break;
-
-						/* Works, but bloats code size by about 150 bytes
-						case 'b': Tcl_AppendToObj(out, "\b", 1); break;
-						case 'f': Tcl_AppendToObj(out, "\f", 1); break;
-						case 'n': Tcl_AppendToObj(out, "\n", 1); break;
-						case 'r': Tcl_AppendToObj(out, "\r", 1); break;
-						case 't': Tcl_AppendToObj(out, "\t", 1); break;
-						*/
-
-						/* Works
-						case 'b':
-						case 'f':
-						case 'n':
-						case 'r':
-						case 't':
-							{
-								char	decoded[TCL_UTF_MAX+1];
-								int		advanced;
-								int		len;
-
-								len = Tcl_UtfBackslash(p-1, &advanced, decoded);
-								Tcl_AppendToObj(out, decoded, len);
-								break;
-							}
-						*/
 
 						case 'u':
 							{
@@ -438,9 +357,6 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			break;
 
 		case 't':
-			//if (unlikely(strncmp(p, "true", 4) != 0)) goto err;
-			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x65757274)) goto err;			// Evil little-endian trick
-			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x74727565)) goto err;			// Evil big-endian trick
 			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"true")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
@@ -449,9 +365,6 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			break;
 
 		case 'f':
-			//if (unlikely(strncmp(p, "false", 5) != 0)) goto err;
-			//if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != 0x65736c61)) goto err;		// Evil little-endian trick (alse)
-			//if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != 0x616c7365)) goto err;		// Evil big-endian trick (alse)
 			if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != *(uint32_t*)"alse")) goto err;	// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
@@ -460,9 +373,6 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			break;
 
 		case 'n':
-			//if (unlikely(strncmp(p, "null", 4) != 0)) goto err;
-			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x6c6c756e)) goto err;			// Evil little-endian trick
-			//if (unlikely(e-p < 4 || *(uint32_t*)p != 0x6e756c6c)) goto err;			// Evil big-endian trick
 			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"null")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_NULL;
@@ -498,9 +408,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 				}
 
 				*type = JSON_NUMBER;
-				//*val = Tcl_NewStringObj((const char*)start, p-start);
 				*val = new_stringobj_dedup(l, (const char*)start, p-start);
-				//*val = p-start < 6 ? new_stringobj_dedup(l, (const char*)start, p-start) : Tcl_NewStringObj((const char*)start, p-start);
 			}
 	}
 
@@ -520,7 +428,6 @@ err:
 }
 
 //}}}
-	//}}}
 int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	struct interp_cx*		l = cdata;
@@ -550,20 +457,15 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 	p = doc = (const unsigned char*)Tcl_GetStringFromObj(objv[1], &len);
 	e = p + len;
 
-	//fprintf(stderr, "start parse -----------------------\n%s\n-----------------------------------\n", doc);
-
 	// Skip leading whitespace and comments
 	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0) goto whitespace_err;
 
 	while (p < e) {
-		//fprintf(stderr, "value_type loop top, byte ofs %d, *p: %c%c\n", p-doc, *p, *(p+1));
 		if (cx[0].last->container == JSON_OBJECT) { // Read the key if in object mode {{{
 			const unsigned char*	key_start = p;
 			size_t					key_start_char_adj = char_adj;
 
 			if (value_type(l, doc, p, e, &char_adj, &p, &type, &val) != TCL_OK) goto err;
-
-			//fprintf(stderr, "Got obj key \"%s\", type %s\n", Tcl_GetString(val), type_names_dbg[type]);
 
 			switch (type) {
 				case JSON_DYN_STRING:
@@ -579,7 +481,6 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 					val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
 					// Falls through
 				case JSON_STRING:
-					//fprintf(stderr, "Storing hold_key %p: \"%s\"\n", val, Tcl_GetString(val));
 					Tcl_IncrRefCount(cx[0].last->hold_key = val);
 					break;
 
@@ -699,7 +600,6 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 	}
 	//}}}
 
-	// TESTED {{{
 	if (unlikely(cx[0].val == NULL)) {
 		err_at = doc;
 		errmsg = "No JSON value found";
@@ -723,7 +623,6 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 whitespace_err:
 	_parse_error(interp, errmsg, doc, (err_at - doc) - char_adj);
 
-	//}}}
 err:
 	free_cx(cx);
 	return TCL_ERROR;

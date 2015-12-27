@@ -110,11 +110,9 @@ static int first_free(long long* freemap) //{{{
 {
 	int	i=0, bit, res;
 	while ((bit = ffsll(freemap[i])) == 0) {
-		//fprintf(stderr, "freemap[%d] is full, moving on: %lx\n", i, freemap[i]);
 		i++;
 	}
 	res = i * (sizeof(long long)*8) + (bit-1);
-	//fprintf(stderr, "first_free, returning idx: %d\n", res);
 	return res;
 }
 
@@ -124,7 +122,6 @@ static void mark_used(long long* freemap, int idx) //{{{
 	int	i = idx / (sizeof(long long)*8);
 	int bit = idx - (i * (sizeof(long long)*8));
 	freemap[i] &= ~(1LL << bit);
-	//fprintf(stderr, "mark_used: %d\n", idx);
 }
 
 //}}}
@@ -132,7 +129,6 @@ static void mark_free(long long* freemap, int idx) //{{{
 {
 	int	i = idx / (sizeof(long long)*8);
 	int bit = idx - (i * (sizeof(long long)*8));
-	//fprintf(stderr, "mark_free: %d\n", idx);
 	freemap[i] |= 1LL << bit;
 }
 
