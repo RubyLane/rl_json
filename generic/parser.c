@@ -8,7 +8,7 @@
 		  __a > __b ? __a : __b; })
 
 
-static void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
+void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
 {
 	const char*	char_ofs_str = Tcl_GetString(Tcl_NewIntObj(char_ofs));
 
@@ -17,7 +17,7 @@ static void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned 
 }
 
 //}}}
-static struct parse_context* push_parse_context(struct parse_context* cx, const int container, const size_t char_ofs) //{{{
+struct parse_context* push_parse_context(struct parse_context* cx, const int container, const size_t char_ofs) //{{{
 {
 	struct parse_context*	last = cx->last;
 	struct parse_context*	new;
@@ -48,7 +48,7 @@ static struct parse_context* push_parse_context(struct parse_context* cx, const 
 }
 
 //}}}
-static struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
+struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 {
 	struct parse_context*	last = cx->last;
 
@@ -78,7 +78,7 @@ static struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 }
 
 //}}}
-static void free_cx(struct parse_context* cx) //{{{
+void free_cx(struct parse_context* cx) //{{{
 {
 	struct parse_context*	tail = cx->last;
 
@@ -163,7 +163,7 @@ static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 }
 
 //}}}
-static int skip_whitespace(const unsigned char** s, const unsigned char* e, const char** errmsg, const unsigned char** err_at, size_t* char_adj) //{{{
+int skip_whitespace(const unsigned char** s, const unsigned char* e, const char** errmsg, const unsigned char** err_at, size_t* char_adj) //{{{
 {
 	const unsigned char*	p = *s;
 	const unsigned char*	start;
@@ -215,7 +215,7 @@ err_illegal_char:
 }
 
 //}}}
-static int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned char* p, const unsigned char* e, size_t* char_adj, const unsigned char** next, enum json_types *type, Tcl_Obj** val) //{{{
+int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned char* p, const unsigned char* e, size_t* char_adj, const unsigned char** next, enum json_types *type, Tcl_Obj** val) //{{{
 {
 	const unsigned char*	err_at = NULL;
 	const char*				errmsg = NULL;

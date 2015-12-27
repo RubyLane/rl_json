@@ -1156,11 +1156,11 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 	} {
 		test parser/whitespace-2.$bytes.1 "lower bound of $bytes byte chars in // comment" -body { #<<<
 			json get [test_parse [format "//%1\$c%1\$c\nfalse" $lower]]
-		} -result false
+		} -result 0
 		#>>>
 		test parser/whitespace-2.$bytes.2 "upper bound of $bytes byte chars in // comment" -body { #<<<
 			json get [test_parse [format "//%1\$c%1\$c\nfalse" $upper]]
-		} -result false
+		} -result 0
 		#>>>
 		test parser/whitespace-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in // comment" -body { #<<<
 			list [catch {
@@ -1181,11 +1181,11 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 
 		test parser/whitespace-3.$bytes.1 "lower bound of $bytes byte chars in /* */ comment" -body { #<<<
 			json get [test_parse [format "/*%1\$c%1\$c*/false" $lower]]
-		} -result false
+		} -result 0
 		#>>>
 		test parser/whitespace-3.$bytes.2 "upper bound of $bytes byte chars in /* */ comment" -body { #<<<
 			json get [test_parse [format "/*%1\$c%1\$c*/false" $upper]]
-		} -result false
+		} -result 0
 		#>>>
 		test parser/whitespace-3.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in /* */ comment" -body { #<<<
 			list [catch {
