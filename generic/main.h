@@ -39,6 +39,7 @@ struct parse_context {
 	Tcl_Obj*	hold_key;
 	size_t		char_ofs;
 	int			container;
+	int			closed;
 };
 
 void append_to_cx(struct parse_context* cx, Tcl_Obj* val);

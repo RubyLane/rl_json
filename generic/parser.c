@@ -43,6 +43,7 @@ static struct parse_context* push_parse_context(struct parse_context* cx, const 
 	new->hold_key = NULL;
 	new->char_ofs = char_ofs;
 	new->container = container;
+	new->closed = 0;
 
 	cx->last = new;
 
@@ -53,6 +54,8 @@ static struct parse_context* push_parse_context(struct parse_context* cx, const 
 static struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 {
 	struct parse_context*	last = cx->last;
+
+	cx->last->closed = 1;
 
 	//fprintf(stderr, "pop_parse_context %s\n", type_names_dbg[last->container]);
 	if (unlikely((ptrdiff_t)cx == (ptrdiff_t)last)) {
@@ -264,6 +267,8 @@ static int value_type(struct interp_cx* l, const unsigned char* doc, const unsig
 
 				while (1) {
 					chunk = p;
+
+					// These tests are where the majority of the parsing time is spent
 					while (likely(p < e && *p != '"' && *p != '\\' && *p > 0x1f))
 						char_advance(&p, char_adj);
 
@@ -538,6 +543,7 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 	cx[0].container = JSON_UNDEF;
 	cx[0].val = NULL;
 	cx[0].char_ofs = 0;
+	cx[0].closed = 0;
 
 	CHECK_ARGS(1, "json_value");
 
@@ -561,12 +567,16 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 
 			switch (type) {
 				case JSON_DYN_STRING:
+				case JSON_DYN_NUMBER:
+				case JSON_DYN_BOOL:
+				case JSON_DYN_JSON:
+				case JSON_DYN_TEMPLATE:
 				case JSON_DYN_LITERAL:
 					/* Add back the template format prefix, since we can't store the type
 					 * in the dict key.  The template generation code reparses it later.
 					 */
 					// Can do this because val's ref is on loan from new_stringobj_dedup
-					val = Tcl_ObjPrintf("~%c:%s", type == JSON_DYN_STRING ? 'S' : 'L', Tcl_GetString(val));
+					val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
 					// Falls through
 				case JSON_STRING:
 					//fprintf(stderr, "Storing hold_key %p: \"%s\"\n", val, Tcl_GetString(val));
@@ -676,7 +686,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		//}}}
 	}
 
-	if (unlikely(cx != cx[0].last)) { // Unterminated object or array context {{{
+	if (unlikely(cx != cx[0].last || !cx[0].closed)) { // Unterminated object or array context {{{
 		switch (cx[0].last->container) {
 			case JSON_OBJECT:
 				_parse_error(interp, "Unterminated object", doc, cx[0].last->char_ofs);

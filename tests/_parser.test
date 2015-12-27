@@ -819,6 +819,54 @@ test parser/structure-1.4 {nested empty structures with whitespace} -body { #<<<
 	unset -nocomplain j
 } -result [list {[{}]} 1 0]
 #>>>
+test parser/structure-1.5 {nested empty structures with error in whitespace} -body { #<<<
+	list [catch {
+		test_parse " \[ { /*\x1f*/ } \] "
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} " \[ { /*\x1f*/ } \] " 7] {Error parsing JSON value: Illegal character at offset 7}]
+#>>>
+test parser/structure-1.6 {empty array with error in whitespace} -body { #<<<
+	list [catch {
+		test_parse " \[ /*\x1f*/ \] "
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} " \[ /*\x1f*/ \] " 5] {Error parsing JSON value: Illegal character at offset 5}]
+#>>>
+test parser/structure-1.7 {No comma} -body { #<<<
+	list [catch {
+		test_parse {["foo" "bar"]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Expecting ] or ,} {["foo" "bar"]} 7] {Error parsing JSON value: Expecting ] or , at offset 7}]
+#>>>
+test parser/structure-1.8 {Error in whitespace after comma} -body { #<<<
+	list [catch {
+		test_parse "\[\"foo\",/*\x1f*/\"bar\"\]"
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Illegal character} "\[\"foo\",/*\x1f*/\"bar\"\]" 9] {Error parsing JSON value: Illegal character at offset 9}]
+#>>>
+test parser/structure-1.9 {Unterminated object} -body { #<<<
+	list [catch {
+		test_parse "\{\"foo\":1.9,"
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Unterminated object} "\{\"foo\":1.9," 0] {Error parsing JSON value: Unterminated object at offset 0}]
+#>>>
+test parser/structure-1.10 {Unterminated array} -body { #<<<
+	list [catch {
+		test_parse "\[1.10,"
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 [list RL JSON PARSE {Unterminated array} "\[1.10," 0] {Error parsing JSON value: Unterminated array at offset 0}]
+#>>>
 test parser/structure-2.1 {object, single key packed} -body { #<<<
 	set j	[test_parse {{"foo":"bar"}}]
 	list $j [json get $j foo]
@@ -962,6 +1010,66 @@ test parser/structure-6.6 {Nesting error} -body { #<<<
 		test_parse {[{"structure-6.6":1,]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.6":1,]}]} 20] {Error parsing JSON value: Illegal character at offset 20}]
+#>>>
+test parser/structure-7.1 {Object key not a string: number} -body { #<<<
+	list [catch {
+		test_parse {{7.1:"structure-7.1"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Object key is not a string} {{7.1:"structure-7.1"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
+#>>>
+test parser/structure-7.2 {Object key not a string: true} -body { #<<<
+	list [catch {
+		test_parse {{true:"structure-7.2"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Object key is not a string} {{true:"structure-7.2"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
+#>>>
+test parser/structure-7.3 {Object key not a string: false} -body { #<<<
+	list [catch {
+		test_parse {{false:"structure-7.3"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Object key is not a string} {{false:"structure-7.3"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
+#>>>
+test parser/structure-7.4 {Object key not a string: null} -body { #<<<
+	list [catch {
+		test_parse {{null:"structure-7.4"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Object key is not a string} {{null:"structure-7.4"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
+#>>>
+test parser/structure-7.5 {Object key not a string: object} -body { #<<<
+	list [catch {
+		test_parse {{{}:"structure-7.5"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Object key is not a string} {{{}:"structure-7.5"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
+#>>>
+test parser/structure-7.6 {Object key not a string: array} -body { #<<<
+	list [catch {
+		test_parse {{[]:"structure-7.6"}}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Object key is not a string} {{[]:"structure-7.6"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
+#>>>
+test parser/structure-8.1 {Object key not a string: dyn_number} -body { #<<<
+	test_parse {{"~N:f":"structure-8.1"}}
+} -result {{"~N:f":"structure-8.1"}}
+#>>>
+test parser/structure-8.2 {Object key not a string: dyn_bool} -body { #<<<
+	test_parse {{"~B:f":"structure-8.2"}}
+} -result {{"~B:f":"structure-8.2"}}
+#>>>
+test parser/structure-8.5 {Object key not a string: dyn_json} -body { #<<<
+	test_parse {{"~J:f":"structure-8.5"}}
+} -result {{"~J:f":"structure-8.5"}}
+#>>>
+test parser/structure-8.6 {Object key not a string: dyn_template} -body { #<<<
+	test_parse {{"~T:f":"structure-8.6"}}
+} -result {{"~T:f":"structure-8.6"}}
+#>>>
+test parser/structure-8.7 {Object key not a string: dyn_literal} -body { #<<<
+	test_parse {{"~L:~S:f":"structure-8.7"}}
+} -result {{"~L:~S:f":"structure-8.7"}}
+#>>>
+test parser/structure-8.8 {Object key not a string: dyn_string} -body { #<<<
+	test_parse {{"~S:f":"structure-8.8"}}
+} -result {{"~S:f":"structure-8.8"}}
 #>>>
 
 test parser/utf-1.1 {String containing multibyte utf-8 encoding} -body { #<<<

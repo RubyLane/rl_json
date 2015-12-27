@@ -530,6 +530,7 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 				}
 
 				if (subst_val == NULL) {
+					// TODO: reject a null substitution if we're in an object key context?  Would need an extra flag on the function :(
 					subst_type = JSON_NULL;
 				} else {
 					subst_type = from_dyn[type];
