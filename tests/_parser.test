@@ -927,6 +927,42 @@ test parser/structure-5.4 {Deep nesting, ensure that this test nests deeper than
 	}] first second third fourth fifth sixth seventh eighth ninth tenth eleventh end
 } -result structure-5.4
 #>>>
+test parser/structure-6.1 {Nesting error} -body { #<<<
+	list [catch {
+		test_parse {{"structure-6.1":[}]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-6.1":[}]} 18] {Error parsing JSON value: Illegal character at offset 18}]
+#>>>
+test parser/structure-6.2 {Nesting error} -body { #<<<
+	list [catch {
+		test_parse {{"structure-6.2":[null,}]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-6.2":[null,}]} 23] {Error parsing JSON value: Illegal character at offset 23}]
+#>>>
+test parser/structure-6.3 {Nesting error} -body { #<<<
+	list [catch {
+		test_parse {[{"structure-6.3"]}]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Expecting : after object key} {[{"structure-6.3"]}]} 17] {Error parsing JSON value: Expecting : after object key at offset 17}]
+#>>>
+test parser/structure-6.4 {Nesting error} -body { #<<<
+	list [catch {
+		test_parse {[{"structure-6.4":]}]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.4":]}]} 18] {Error parsing JSON value: Illegal character at offset 18}]
+#>>>
+test parser/structure-6.5 {Nesting error} -body { #<<<
+	list [catch {
+		test_parse {[{"structure-6.5":1]}]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE "Expecting \} or ," {[{"structure-6.5":1]}]} 19] "Error parsing JSON value: Expecting \} or , at offset 19"]
+#>>>
+test parser/structure-6.6 {Nesting error} -body { #<<<
+	list [catch {
+		test_parse {[{"structure-6.6":1,]}]}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.6":1,]}]} 20] {Error parsing JSON value: Illegal character at offset 20}]
+#>>>
 
 test parser/utf-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
 	json get [test_parse {"helloは"}]
