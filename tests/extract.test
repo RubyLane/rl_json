@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test extract-1.1 {extract a value from an object} -body { #<<<
 	json extract {

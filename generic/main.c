@@ -686,7 +686,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 	int						len;
 	struct parse_context	cx[CX_STACK_SIZE];
 
-	if (Tcl_GetCommandInfo(interp, "json", &parse_cmd) != 1) return TCL_ERROR;
+	if (Tcl_GetCommandInfo(interp, "::rl_json::json", &parse_cmd) != 1) return TCL_ERROR;
 	l = parse_cmd.objClientData;
 
 	cx[0].prev = NULL;
@@ -2471,8 +2471,8 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 	l->kc_count = 0;
 	memset(&l->freemap, 0xFF, sizeof(l->freemap));
 
-	Tcl_CreateObjCommand(interp, "json", jsonObjCmd, (ClientData)l, free_interp_cx);
-	Tcl_CreateObjCommand(interp, "test_parse", test_parse, (ClientData)l, NULL);
+	Tcl_CreateObjCommand(interp, "::rl_json::json", jsonObjCmd, (ClientData)l, free_interp_cx);
+	TEST_OK(Tcl_EvalEx(interp, "namespace eval ::rl_json {namespace export *}", -1, TCL_EVAL_DIRECT | TCL_EVAL_GLOBAL));
 
 	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
 

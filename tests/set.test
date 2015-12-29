@@ -5,7 +5,7 @@ if {"::tcltest" ni [namespace children]} {
 
 package require rl_json
 package require parse_args
-namespace path {::parse_args}
+namespace path {::rl_json ::parse_args}
 
 source [file join [file dirname [info script]] helpers.tcl]
 

@@ -7,6 +7,8 @@ package require rl_json
 package require yajltcl
 package require json_old
 
+namespace import ::rl_json::json
+
 proc readfile fn { #<<<
 	set h	[open $fn r]
 	try {
@@ -39,10 +41,6 @@ bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
 		json get [string trim $json] baz end inner
 	}
 
-	ours_get_new {
-		json get [test_parse $json] baz end inner
-	}
-
 	ours_pre {
 		dict get [lindex [dict get $pre baz] end] inner
 	}
@@ -58,30 +56,15 @@ bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
 	unset -nocomplain json pre
 } -result obj
 #>>>
+if {[file readable [file join [file dirname [file normalize [info script]]] items1.json]]} {
 bench parse-2.1 {Parse a few MB of json} -batch 3 -setup { #<<<
-	#set json [readfile [file join [file dirname [file normalize [info script]]] items0.json]]
 	set json [readfile [file join [file dirname [file normalize [info script]]] items1.json]]
-	#set json [readfile [file join [file dirname [file normalize [info script]]] itemsm.json]]
 } -compare {
-	just_parse_first {
-		test_parse $json
+	just_parse {
+		json normalize $json
 		list 83000 5434
 	}
-	new {
-		set c	0
-		set nrpics	0
-		set p	[test_parse [string trim $json]]
-		json foreach hit [json extract $p hits hits] {
-			if {[json exists $hit _source shopstatus]} {
-				json get $hit _source shopstatus
-			}
-			incr c [json get $hit _source ?size]
-			incr nrpics [json get $hit _source itemnrpics]
-		}
-		json get $p hits hits end _source shopstatus
-		list $c $nrpics
-	}
-	old {
+	ours {
 		set c	0
 		set nrpics	0
 		set p	[string trim $json]
@@ -94,10 +77,6 @@ bench parse-2.1 {Parse a few MB of json} -batch 3 -setup { #<<<
 		}
 		json get $p hits hits end _source shopstatus
 		list $c $nrpics
-	}
-	just_parse {
-		test_parse $json
-		list 83000 5434
 	}
 	yajltcl_access {
 		set c	0
@@ -116,5 +95,22 @@ bench parse-2.1 {Parse a few MB of json} -batch 3 -setup { #<<<
 	unset -nocomplain json
 } -result {83000 5434}
 #>>>
+}
+if {[file readable [file join [file dirname [file normalize [info script]]] sample.json]]} {
+bench parse-3.1 {Parse a large json doc with deep nesting and many UTF-8 chars} -batch 3 -setup { #<<<
+	# Sample from the json-test-suite project: https://code.google.com/p/json-test-suite/downloads/detail?name=sample.zip
+	set json [readfile [file join [file dirname [file normalize [info script]]] sample.json]]
+} -compare {
+	ours {
+		json get [string trim $json] ?keys
+	}
+	yajltcl {
+		dict keys [yajl::json2dict [string trim $json]]
+	}
+} -cleanup {
+	unset -nocomplain json
+} -result {a key z}
+#>>>
+}
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

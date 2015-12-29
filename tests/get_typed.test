@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test get_typed-1.1 {get_typed a value from an object} -body { #<<<
 	json get_typed {

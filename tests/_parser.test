@@ -4,16 +4,17 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 # Stresses the refCount handling for l->tcl_empty.  Must be the first test run
 test parser-1.1 {Test empty string optimization} -body { #<<<
-	set j	[test_parse {
+	set j	{
 		{
 			"bar": "\u306f",
 			"foo": "",
 			"baz": ""
 		}
-	}]
+	}
 	list [json get $j foo] [json get $j bar] [json get $j baz]
 } -cleanup {
 	unset -nocomplain j
@@ -21,7 +22,7 @@ test parser-1.1 {Test empty string optimization} -body { #<<<
 #>>>
 test parser-2.1 {Truncated string} -body { #<<<
 	list [catch {
-		test_parse "\"foo"
+		json normalize "\"foo"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -29,7 +30,7 @@ test parser-2.1 {Truncated string} -body { #<<<
 #>>>
 test parser-2.2 {Empty document} -body { #<<<
 	list [catch {
-		test_parse ""
+		json normalize ""
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -37,7 +38,7 @@ test parser-2.2 {Empty document} -body { #<<<
 #>>>
 test parser-2.3 {Empty value} -body { #<<<
 	list [catch {
-		test_parse "\{\"foo\":"
+		json normalize "\{\"foo\":"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -45,24 +46,24 @@ test parser-2.3 {Empty value} -body { #<<<
 #>>>
 
 test parser/backslash-1.1 {\u in string value, no leading, no trailing} -body { #<<<
-	json get [test_parse {"\u306f"}]
+	json get {"\u306f"}
 } -result は
 #>>>
 test parser/backslash-1.2 {\u in string value, leading, no trailing} -body { #<<<
-	json get [test_parse {"( \u306f"}]
+	json get {"( \u306f"}
 } -result "( は"
 #>>>
 test parser/backslash-1.3 {\u in string value, no leading, trailing} -body { #<<<
-	json get [test_parse {"\u306f )"}]
+	json get {"\u306f )"}
 } -result "は )"
 #>>>
 test parser/backslash-1.4 {\u in string value, leading, trailing} -body { #<<<
-	json get [test_parse {"( \u306f )"}]
+	json get {"( \u306f )"}
 } -result "( は )"
 #>>>
 test parser/backslash-2.1 {\u in string value, too few digits, no trailing} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u"}]
+		json get {"\u"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -70,7 +71,7 @@ test parser/backslash-2.1 {\u in string value, too few digits, no trailing} -bod
 #>>>
 test parser/backslash-2.2 {\u in string value, too few digits, no trailing} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3"}]
+		json get {"\u3"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -78,7 +79,7 @@ test parser/backslash-2.2 {\u in string value, too few digits, no trailing} -bod
 #>>>
 test parser/backslash-2.3 {\u in string value, too few digits, no trailing} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30"}]
+		json get {"\u30"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -86,7 +87,7 @@ test parser/backslash-2.3 {\u in string value, too few digits, no trailing} -bod
 #>>>
 test parser/backslash-2.4 {\u in string value, too few digits, no trailing} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306"}]
+		json get {"\u306"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -94,7 +95,7 @@ test parser/backslash-2.4 {\u in string value, too few digits, no trailing} -bod
 #>>>
 test parser/backslash-2.5 {\u in string value, too few digits, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u}]
+		json get "\"\\u"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -102,7 +103,7 @@ test parser/backslash-2.5 {\u in string value, too few digits, truncated} -body 
 #>>>
 test parser/backslash-2.6 {\u in string value, too few digits, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3}]
+		json get "\"\\u3"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -110,7 +111,7 @@ test parser/backslash-2.6 {\u in string value, too few digits, truncated} -body 
 #>>>
 test parser/backslash-2.7 {\u in string value, too few digits, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30}]
+		json get "\"\\u30"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -118,7 +119,7 @@ test parser/backslash-2.7 {\u in string value, too few digits, truncated} -body 
 #>>>
 test parser/backslash-2.8 {\u in string value, too few digits, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306}]
+		json get "\"\\u306"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -126,7 +127,7 @@ test parser/backslash-2.8 {\u in string value, too few digits, truncated} -body 
 #>>>
 test parser/backslash-3.1 {\u in string value, too few digits, trailing < '0'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u/xxxx"}]
+		json get {"\u/xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -134,7 +135,7 @@ test parser/backslash-3.1 {\u in string value, too few digits, trailing < '0'} -
 #>>>
 test parser/backslash-3.2 {\u in string value, too few digits, trailing < '0'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3/xxxx"}]
+		json get {"\u3/xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -142,7 +143,7 @@ test parser/backslash-3.2 {\u in string value, too few digits, trailing < '0'} -
 #>>>
 test parser/backslash-3.3 {\u in string value, too few digits, trailing < '0'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30/xxxx"}]
+		json get {"\u30/xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -150,7 +151,7 @@ test parser/backslash-3.3 {\u in string value, too few digits, trailing < '0'} -
 #>>>
 test parser/backslash-3.4 {\u in string value, too few digits, trailing < '0'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306/xxxx"}]
+		json get {"\u306/xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -158,7 +159,7 @@ test parser/backslash-3.4 {\u in string value, too few digits, trailing < '0'} -
 #>>>
 test parser/backslash-4.1 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u@xxxx"}]
+		json get {"\u@xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -166,7 +167,7 @@ test parser/backslash-4.1 {\u in string value, too few digits, trailing < 'A'} -
 #>>>
 test parser/backslash-4.2 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3@xxxx"}]
+		json get {"\u3@xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -174,7 +175,7 @@ test parser/backslash-4.2 {\u in string value, too few digits, trailing < 'A'} -
 #>>>
 test parser/backslash-4.3 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30@xxxx"}]
+		json get {"\u30@xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -182,7 +183,7 @@ test parser/backslash-4.3 {\u in string value, too few digits, trailing < 'A'} -
 #>>>
 test parser/backslash-4.4 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306@xxxx"}]
+		json get {"\u306@xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -190,7 +191,7 @@ test parser/backslash-4.4 {\u in string value, too few digits, trailing < 'A'} -
 #>>>
 test parser/backslash-5.1 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u`xxxx"}]
+		json get {"\u`xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -198,7 +199,7 @@ test parser/backslash-5.1 {\u in string value, too few digits, trailing < 'a'} -
 #>>>
 test parser/backslash-5.2 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3`xxxx"}]
+		json get {"\u3`xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -206,7 +207,7 @@ test parser/backslash-5.2 {\u in string value, too few digits, trailing < 'a'} -
 #>>>
 test parser/backslash-5.3 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30`xxxx"}]
+		json get {"\u30`xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -214,7 +215,7 @@ test parser/backslash-5.3 {\u in string value, too few digits, trailing < 'a'} -
 #>>>
 test parser/backslash-5.4 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306`xxxx"}]
+		json get {"\u306`xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -222,7 +223,7 @@ test parser/backslash-5.4 {\u in string value, too few digits, trailing < 'a'} -
 #>>>
 test parser/backslash-6.1 {\u in string value, too few digits, trailing > '9'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u:xxxx"}]
+		json get {"\u:xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -230,7 +231,7 @@ test parser/backslash-6.1 {\u in string value, too few digits, trailing > '9'} -
 #>>>
 test parser/backslash-6.2 {\u in string value, too few digits, trailing > '9'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3:xxxx"}]
+		json get {"\u3:xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -238,7 +239,7 @@ test parser/backslash-6.2 {\u in string value, too few digits, trailing > '9'} -
 #>>>
 test parser/backslash-6.3 {\u in string value, too few digits, trailing > '9'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30:xxxx"}]
+		json get {"\u30:xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -246,7 +247,7 @@ test parser/backslash-6.3 {\u in string value, too few digits, trailing > '9'} -
 #>>>
 test parser/backslash-6.4 {\u in string value, too few digits, trailing > '9'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306:xxxx"}]
+		json get {"\u306:xxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -254,7 +255,7 @@ test parser/backslash-6.4 {\u in string value, too few digits, trailing > '9'} -
 #>>>
 test parser/backslash-6.1 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\uGxxxx"}]
+		json get {"\uGxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -262,7 +263,7 @@ test parser/backslash-6.1 {\u in string value, too few digits, trailing > 'F'} -
 #>>>
 test parser/backslash-6.2 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3Gxxxx"}]
+		json get {"\u3Gxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -270,7 +271,7 @@ test parser/backslash-6.2 {\u in string value, too few digits, trailing > 'F'} -
 #>>>
 test parser/backslash-6.3 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30Gxxxx"}]
+		json get {"\u30Gxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -278,7 +279,7 @@ test parser/backslash-6.3 {\u in string value, too few digits, trailing > 'F'} -
 #>>>
 test parser/backslash-6.4 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306Gxxxx"}]
+		json get {"\u306Gxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -286,7 +287,7 @@ test parser/backslash-6.4 {\u in string value, too few digits, trailing > 'F'} -
 #>>>
 test parser/backslash-6.1 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\ugxxxx"}]
+		json get {"\ugxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -294,7 +295,7 @@ test parser/backslash-6.1 {\u in string value, too few digits, trailing > 'f'} -
 #>>>
 test parser/backslash-6.2 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u3gxxxx"}]
+		json get {"\u3gxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -302,7 +303,7 @@ test parser/backslash-6.2 {\u in string value, too few digits, trailing > 'f'} -
 #>>>
 test parser/backslash-6.3 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u30gxxxx"}]
+		json get {"\u30gxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -310,19 +311,19 @@ test parser/backslash-6.3 {\u in string value, too few digits, trailing > 'f'} -
 #>>>
 test parser/backslash-6.4 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u306gxxxx"}]
+		json get {"\u306gxxxx"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
 } -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u306gxxxx"} 6}}
 #>>>
 test parser/backslash-7.1 {\u in string value, too many digits} -body { #<<<
-	json get [test_parse {"\u306F3"}]
+	json get {"\u306F3"}
 } -result は3
 #>>>
 test parser/backslash-8.1 {\u in string value, reject leading sign} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u-306F"}]
+		json get {"\u-306F"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
@@ -330,22 +331,22 @@ test parser/backslash-8.1 {\u in string value, reject leading sign} -body { #<<<
 #>>>
 test parser/backslash-8.2 {\u in string value, reject leading sign} -body { #<<<
 	list [catch {
-		json get [test_parse {"\u+306F"}]
+		json get {"\u+306F"}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
 } -cleanup {
 	unset -nocomplain r o
 } -result {1 {RL JSON PARSE {Unicode sequence too short} {"\u+306F"} 3}}
 #>>>
 test parser/backslash-10.1 {\u in string value, valid hex bounds} -body { #<<<
-	json get [test_parse {"\u0009"}]
+	json get {"\u0009"}
 } -result \t		;# tab
 #>>>
 test parser/backslash-10.2 {\u in string value, valid hex bounds} -body { #<<<
-	json get [test_parse {"\uAfaF"}]
+	json get {"\uAfaF"}
 } -result \uafaf	;# 꾯
 #>>>
 test parser/backslash-10.3 {\u in string value, valid hex bounds} -body { #<<<
-	json get [test_parse {"\u0000"}]
+	json get {"\u0000"}
 } -result \0		;# NULL
 #>>>
 
@@ -365,16 +366,16 @@ try { # Test every ASCII escape char other than u (tested above) <<<
 
 		if {[dict exists $valid $c]} {
 			test parser/backslash-20.$c.1 "test every non-u backquote: [format 0x%02x $c], no trailing" -body { #<<<
-				json get [test_parse [format {"\%c"} $c]]
+				json get [format {"\%c"} $c]
 			} -result [dict get $valid $c]
 			#>>>
 			test parser/backslash-20.$c.2 "test every non-u backquote: [format 0x%02x $c], trailing" -body { #<<<
-				json get [test_parse [format {"\%cx"} $c]]
+				json get [format {"\%cx"} $c]
 			} -result [dict get $valid $c]x
 			#>>>
 			test parser/backslash-20.$c.3 "test every non-u backquote: [format 0x%02x $c], truncated" -body { #<<<
 				list [catch {
-					json get [test_parse [format "\"\\%c" $c]]
+					json get [format "\"\\%c" $c]
 				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 			} -cleanup {
 				unset -nocomplain r o
@@ -383,7 +384,7 @@ try { # Test every ASCII escape char other than u (tested above) <<<
 		} else {
 			test parser/backslash-20.$c.1 "test every non-u backquote: [format 0x%02x $c], no trailing" -body { #<<<
 				list [catch {
-					json get [test_parse [format {"\%c"} $c]]
+					json get [format {"\%c"} $c]
 				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 			} -cleanup {
 				unset -nocomplain r o
@@ -391,7 +392,7 @@ try { # Test every ASCII escape char other than u (tested above) <<<
 			#>>>
 			test parser/backslash-20.$c.2 "test every non-u backquote: [format 0x%02x $c], trailing" -body { #<<<
 				list [catch {
-					json get [test_parse [format {"\%cx"} $c]]
+					json get [format {"\%cx"} $c]
 				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 			} -cleanup {
 				unset -nocomplain r o
@@ -399,7 +400,7 @@ try { # Test every ASCII escape char other than u (tested above) <<<
 			#>>>
 			test parser/backslash-20.$c.3 "test every non-u backquote: [format 0x%02x $c], truncated" -body { #<<<
 				list [catch {
-					json get [test_parse [format "\"\\%c" $c]]
+					json get [format "\"\\%c" $c]
 				} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 			} -cleanup {
 				unset -nocomplain r o
@@ -414,7 +415,7 @@ try { # Test every ASCII escape char other than u (tested above) <<<
 
 test parser/backslash-30.1 {single backslash, closing quote} -body { #<<<
 	list [catch {
-		json get [test_parse "\"\\\""]
+		json get "\"\\\""
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -422,7 +423,7 @@ test parser/backslash-30.1 {single backslash, closing quote} -body { #<<<
 #>>>
 test parser/backslash-30.2 {single backslash, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse "\"\\"]
+		json get "\"\\"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -431,7 +432,7 @@ test parser/backslash-30.2 {single backslash, truncated} -body { #<<<
 
 test parser/controlchar-1.1 {Control char after valid chars, no trailing} -body { #<<<
 	list [catch {
-		json get [test_parse "\"foo\x1F\""]
+		json get "\"foo\x1F\""
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -439,7 +440,7 @@ test parser/controlchar-1.1 {Control char after valid chars, no trailing} -body 
 #>>>
 test parser/controlchar-1.2 {Control char after valid chars, trailing} -body { #<<<
 	list [catch {
-		json get [test_parse "\"foo\x1Fx\""]
+		json get "\"foo\x1Fx\""
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -447,7 +448,7 @@ test parser/controlchar-1.2 {Control char after valid chars, trailing} -body { #
 #>>>
 test parser/controlchar-1.3 {Control char after valid chars, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse "\"foo\x1F"]
+		json get "\"foo\x1F"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -455,7 +456,7 @@ test parser/controlchar-1.3 {Control char after valid chars, truncated} -body { 
 #>>>
 test parser/controlchar-2.1 {Control char at start, no trailing} -body { #<<<
 	list [catch {
-		json get [test_parse "\"\x1F\""]
+		json get "\"\x1F\""
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -463,7 +464,7 @@ test parser/controlchar-2.1 {Control char at start, no trailing} -body { #<<<
 #>>>
 test parser/controlchar-2.2 {Control char at start, trailing} -body { #<<<
 	list [catch {
-		json get [test_parse "\"\x1Fx\""]
+		json get "\"\x1Fx\""
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -471,7 +472,7 @@ test parser/controlchar-2.2 {Control char at start, trailing} -body { #<<<
 #>>>
 test parser/controlchar-2.3 {Control char at start, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse "\"\x1F"]
+		json get "\"\x1F"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -482,7 +483,7 @@ try { # Test all control chars except \0 (Tcl will always supply this as 0xC0 0x
 	for {set c 1} {$c <= 0x1F} {incr c} {
 		test parser/controlchar-3.$c [format {Test control char 0x%02x} $c] -body { #<<<
 			list [catch {
-				json get [test_parse [format {"%c"} $c]]
+				json get [format {"%c"} $c]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -501,7 +502,7 @@ try { # Test all ASCII non-escape chars <<<
 		append str	[format %c $c]
 	}
 	test parser/controlchar-4.1 {Test all ASCII non-escape chars} -body {
-		json get [test_parse "\"$str\""]
+		json get "\"$str\""
 	} -result $str
 } finally {
 	unset -nocomplain c str
@@ -509,40 +510,40 @@ try { # Test all ASCII non-escape chars <<<
 #>>>
 
 test parser/numbers-1.1 {Bare number value - integer} -body { #<<<
-	test_parse 42
+	json normalize 42
 } -result 42
 #>>>
 test parser/numbers-1.2 {Bare number value - negative integer} -body { #<<<
-	test_parse -42
+	json normalize -42
 } -result -42
 #>>>
 test parser/numbers-1.3 {Bare number value - integer, postive sign} -body { #<<<
 	list [catch {
-		test_parse +42
+		json normalize +42
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} +42 0] {Error parsing JSON value: Illegal character at offset 0}]
 #>>>
 test parser/numbers-1.4 {Bare number value - medium integer} -body { #<<<
-	test_parse 1234567890
+	json normalize 1234567890
 } -result 1234567890
 #>>>
 test parser/numbers-1.5 {Ranges in integer part} -body { #<<<
-	test_parse 909090
+	json normalize 909090
 } -result 909090
 #>>>
 test parser/numbers-1.6 {Ranges in fractional part} -body { #<<<
-	test_parse 1.909090
+	json normalize 1.909090
 } -result 1.909090
 #>>>
 test parser/numbers-1.7 {Ranges in exponent part} -body { #<<<
-	test_parse 1e909090
+	json normalize 1e909090
 } -result 1e909090
 #>>>
 test parser/numbers-2.1 {Invalid char - here because this is handled in the numeric case} -body { #<<<
 	list [catch {
-		test_parse x
+		json normalize x
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -550,7 +551,7 @@ test parser/numbers-2.1 {Invalid char - here because this is handled in the nume
 #>>>
 test parser/numbers-2.2 {Document truncated after minus sign} -body { #<<<
 	list [catch {
-		test_parse -
+		json normalize -
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -558,7 +559,7 @@ test parser/numbers-2.2 {Document truncated after minus sign} -body { #<<<
 #>>>
 test parser/numbers-2.3 {Invalid char after minus sign} -body { #<<<
 	list [catch {
-		test_parse -x
+		json normalize -x
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -566,7 +567,7 @@ test parser/numbers-2.3 {Invalid char after minus sign} -body { #<<<
 #>>>
 test parser/numbers-3.1 {No integer part} -body { #<<<
 	list [catch {
-		test_parse .1
+		json normalize .1
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -574,7 +575,7 @@ test parser/numbers-3.1 {No integer part} -body { #<<<
 #>>>
 test parser/numbers-4.1 {Decimal point without decimal part} -body { #<<<
 	list [catch {
-		test_parse 12.
+		json normalize 12.
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -582,19 +583,19 @@ test parser/numbers-4.1 {Decimal point without decimal part} -body { #<<<
 #>>>
 test parser/numbers-4.2 {Decimal point without decimal part} -body { #<<<
 	list [catch {
-		test_parse 12.
+		json normalize 12.
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Document truncated} 12. 3] {Error parsing JSON value: Document truncated at offset 3}]
 #>>>
 test parser/numbers-4.3 {Decimal point with decimal part} -body { #<<<
-	json get [test_parse 12.34]
+	json get 12.34
 } -result 12.34
 #>>>
 test parser/numbers-5.1 {Upper case exponent symbol, no exponent part, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse 12E]
+		json get 12E
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -602,7 +603,7 @@ test parser/numbers-5.1 {Upper case exponent symbol, no exponent part, truncated
 #>>>
 test parser/numbers-5.2 {Lower case exponent symbol, no exponent part, truncated} -body { #<<<
 	list [catch {
-		json get [test_parse 12e]
+		json get 12e
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -610,44 +611,44 @@ test parser/numbers-5.2 {Lower case exponent symbol, no exponent part, truncated
 #>>>
 test parser/numbers-5.3 {Lower case exponent symbol, no exponent part} -body { #<<<
 	list [catch {
-		json get [test_parse {[12e,4]}]
+		json get {[12e,4]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {[12e,4]} 4] {Error parsing JSON value: Illegal character at offset 4}]
 #>>>
 test parser/numbers-6.1 {Upper case exponent symbol, simple integer exponent part} -body { #<<<
-	json get [test_parse 12E3]
+	json get 12E3
 } -result 12E3
 #>>>
 test parser/numbers-6.2 {Lower case exponent symbol, simple integer exponent part} -body { #<<<
-	json get [test_parse 12e3]
+	json get 12e3
 } -result 12e3
 #>>>
 test parser/numbers-7.1 {Upper case exponent symbol, negative integer exponent part} -body { #<<<
-	json get [test_parse 12E-3]
+	json get 12E-3
 } -result 12E-3
 #>>>
 test parser/numbers-7.2 {Lower case exponent symbol, negative integer exponent part} -body { #<<<
-	json get [test_parse 12e-3]
+	json get 12e-3
 } -result 12e-3
 #>>>
 test parser/numbers-8.1 {Upper case exponent symbol, positive integer exponent part} -body { #<<<
-	json get [test_parse 12E+3]
+	json get 12E+3
 } -result 12E+3
 #>>>
 test parser/numbers-8.2 {Lower case exponent symbol, positive integer exponent part} -body { #<<<
-	json get [test_parse 12e+3]
+	json get 12e+3
 } -result 12e+3
 #>>>
 test parser/numbers-9.1 {Lower case exponent symbol, many digit exponent} -body { #<<<
-	json get [test_parse 12e+321]
+	json get 12e+321
 } -result 12e+321
 #>>>
 
 test parser/keywords-1.1 {true, incomplete} -body { #<<<
 	list [catch {
-		test_parse t
+		json normalize t
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -655,7 +656,7 @@ test parser/keywords-1.1 {true, incomplete} -body { #<<<
 #>>>
 test parser/keywords-1.2 {true, incomplete} -body { #<<<
 	list [catch {
-		test_parse tr
+		json normalize tr
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -663,36 +664,36 @@ test parser/keywords-1.2 {true, incomplete} -body { #<<<
 #>>>
 test parser/keywords-1.3 {true, incomplete} -body { #<<<
 	list [catch {
-		test_parse tru
+		json normalize tru
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} tru 0] {Error parsing JSON value: Illegal character at offset 0}]
 #>>>
 test parser/keywords-1.4 {true, complete} -body { #<<<
-	test_parse true
+	json normalize true
 } -result true
 #>>>
 test parser/keywords-1.5 {true, trailing garbage} -body { #<<<
 	list [catch {
-		test_parse truely
+		json normalize truely
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Trailing garbage after value} truely 4] {Error parsing JSON value: Trailing garbage after value at offset 4}]
 #>>>
 test parser/keywords-1.6 {true, trailing whitespace} -body { #<<<
-	test_parse "true "
+	json normalize "true "
 } -result true
 #>>>
 test parser/keywords-1.7 {true, leading whitespace} -body { #<<<
-	test_parse " true"
+	json normalize " true"
 } -result true
 #>>>
 
 test parser/keywords-2.1 {false, incomplete} -body { #<<<
 	list [catch {
-		test_parse f
+		json normalize f
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -700,7 +701,7 @@ test parser/keywords-2.1 {false, incomplete} -body { #<<<
 #>>>
 test parser/keywords-2.2 {false, incomplete} -body { #<<<
 	list [catch {
-		test_parse fa
+		json normalize fa
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -708,7 +709,7 @@ test parser/keywords-2.2 {false, incomplete} -body { #<<<
 #>>>
 test parser/keywords-2.3 {false, incomplete} -body { #<<<
 	list [catch {
-		test_parse fal
+		json normalize fal
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -716,36 +717,36 @@ test parser/keywords-2.3 {false, incomplete} -body { #<<<
 #>>>
 test parser/keywords-2.4 {false, incomplete} -body { #<<<
 	list [catch {
-		test_parse fals
+		json normalize fals
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} fals 0] {Error parsing JSON value: Illegal character at offset 0}]
 #>>>
 test parser/keywords-2.5 {false, complete} -body { #<<<
-	test_parse false
+	json normalize false
 } -result false
 #>>>
 test parser/keywords-2.6 {false, trailing garbage} -body { #<<<
 	list [catch {
-		test_parse falsely
+		json normalize falsely
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Trailing garbage after value} falsely 5] {Error parsing JSON value: Trailing garbage after value at offset 5}]
 #>>>
 test parser/keywords-2.6 {false, trailing whitespace} -body { #<<<
-	test_parse "false "
+	json normalize "false "
 } -result false
 #>>>
 test parser/keywords-2.7 {false, leading whitespace} -body { #<<<
-	test_parse " false"
+	json normalize " false"
 } -result false
 #>>>
 
 test parser/keywords-3.1 {null, incomplete} -body { #<<<
 	list [catch {
-		test_parse n
+		json normalize n
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -753,7 +754,7 @@ test parser/keywords-3.1 {null, incomplete} -body { #<<<
 #>>>
 test parser/keywords-3.2 {null, incomplete} -body { #<<<
 	list [catch {
-		test_parse nu
+		json normalize nu
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -761,14 +762,14 @@ test parser/keywords-3.2 {null, incomplete} -body { #<<<
 #>>>
 test parser/keywords-3.3 {null, incomplete} -body { #<<<
 	list [catch {
-		test_parse nul
+		json normalize nul
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} nul 0] {Error parsing JSON value: Illegal character at offset 0}]
 #>>>
 test parser/keywords-3.4 {null, complete} -body { #<<<
-	set j	[test_parse null]
+	set j	[json normalize null]
 	list $j [json get $j]
 } -cleanup {
 	unset -nocomplain j
@@ -776,44 +777,44 @@ test parser/keywords-3.4 {null, complete} -body { #<<<
 #>>>
 test parser/keywords-3.5 {null, trailing garbage} -body { #<<<
 	list [catch {
-		test_parse nullo
+		json normalize nullo
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Trailing garbage after value} nullo 4] {Error parsing JSON value: Trailing garbage after value at offset 4}]
 #>>>
 test parser/keywords-3.6 {null, trailing whitespace} -body { #<<<
-	test_parse "null "
+	json normalize "null "
 } -result null
 #>>>
 test parser/keywords-3.7 {null, leading whitespace} -body { #<<<
-	test_parse " null"
+	json normalize " null"
 } -result null
 #>>>
 
 test parser/structure-1.1 {start of object} -body { #<<<
-	set j	[test_parse "{}"]
+	set j	[json normalize "{}"]
 	list $j [json get $j ?size]
 } -cleanup {
 	unset -nocomplain j
 } -result [list "{}" 0]
 #>>>
 test parser/structure-1.2 {start of array} -body { #<<<
-	set j	[test_parse {[]}]
+	set j	[json normalize {[]}]
 	list $j [json get $j ?length]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {[]} 0]
 #>>>
 test parser/structure-1.3 {nested empty structures} -body { #<<<
-	set j	[test_parse {[{}]}]
+	set j	[json normalize {[{}]}]
 	list $j [json get $j ?length] [json get $j 0 ?size]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {[{}]} 1 0]
 #>>>
 test parser/structure-1.4 {nested empty structures with whitespace} -body { #<<<
-	set j	[test_parse { [ { } ] } ]
+	set j	[json normalize { [ { } ] } ]
 	list $j [json get $j ?length] [json get $j 0 ?size]
 } -cleanup {
 	unset -nocomplain j
@@ -821,7 +822,7 @@ test parser/structure-1.4 {nested empty structures with whitespace} -body { #<<<
 #>>>
 test parser/structure-1.5 {nested empty structures with error in whitespace} -body { #<<<
 	list [catch {
-		test_parse " \[ { /*\x1f*/ } \] "
+		json normalize " \[ { /*\x1f*/ } \] "
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -829,7 +830,7 @@ test parser/structure-1.5 {nested empty structures with error in whitespace} -bo
 #>>>
 test parser/structure-1.6 {empty array with error in whitespace} -body { #<<<
 	list [catch {
-		test_parse " \[ /*\x1f*/ \] "
+		json normalize " \[ /*\x1f*/ \] "
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -837,7 +838,7 @@ test parser/structure-1.6 {empty array with error in whitespace} -body { #<<<
 #>>>
 test parser/structure-1.7 {No comma} -body { #<<<
 	list [catch {
-		test_parse {["foo" "bar"]}
+		json normalize {["foo" "bar"]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -845,7 +846,7 @@ test parser/structure-1.7 {No comma} -body { #<<<
 #>>>
 test parser/structure-1.8 {Error in whitespace after comma} -body { #<<<
 	list [catch {
-		test_parse "\[\"foo\",/*\x1f*/\"bar\"\]"
+		json normalize "\[\"foo\",/*\x1f*/\"bar\"\]"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -853,7 +854,7 @@ test parser/structure-1.8 {Error in whitespace after comma} -body { #<<<
 #>>>
 test parser/structure-1.9 {Unterminated object} -body { #<<<
 	list [catch {
-		test_parse "\{\"foo\":1.9,"
+		json normalize "\{\"foo\":1.9,"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -861,63 +862,63 @@ test parser/structure-1.9 {Unterminated object} -body { #<<<
 #>>>
 test parser/structure-1.10 {Unterminated array} -body { #<<<
 	list [catch {
-		test_parse "\[1.10,"
+		json normalize "\[1.10,"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Unterminated array} "\[1.10," 0] {Error parsing JSON value: Unterminated array at offset 0}]
 #>>>
 test parser/structure-2.1 {object, single key packed} -body { #<<<
-	set j	[test_parse {{"foo":"bar"}}]
+	set j	[json normalize {{"foo":"bar"}}]
 	list $j [json get $j foo]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {{"foo":"bar"}} bar]
 #>>>
 test parser/structure-2.2 {object, single key whitespace} -body { #<<<
-	set j	[test_parse { 	{ 	"foo" 	: 	"bar" 	} 	}]
+	set j	[json normalize { 	{ 	"foo" 	: 	"bar" 	} 	}]
 	list $j [json get $j foo]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {{"foo":"bar"}} bar]
 #>>>
 test parser/structure-2.3 {object, multi key packed} -body { #<<<
-	set j	[test_parse {{"foo":"bar","foo2":"bar2"}}]
+	set j	[json normalize {{"foo":"bar","foo2":"bar2"}}]
 	list $j [json get $j foo2]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {{"foo":"bar","foo2":"bar2"}} bar2]
 #>>>
 test parser/structure-2.4 {object, multi key whitespace} -body { #<<<
-	set j	[test_parse { 	{ 	"foo" 	: 	"bar" 	, 	"foo2": 	"bar2" 	} 	}]
+	set j	[json normalize { 	{ 	"foo" 	: 	"bar" 	, 	"foo2": 	"bar2" 	} 	}]
 	list $j [json get $j foo2]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {{"foo":"bar","foo2":"bar2"}} bar2]
 #>>>
 test parser/structure-3.1 {array, single element packed} -body { #<<<
-	set j	[test_parse {["foo"]}]
+	set j	[json normalize {["foo"]}]
 	list $j [json get $j end]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {["foo"]} foo]
 #>>>
 test parser/structure-3.2 {array, single element whitespace} -body { #<<<
-	set j	[test_parse { 	[ 	"foo" 	] 	}]
+	set j	[json normalize { 	[ 	"foo" 	] 	}]
 	list $j [json get $j end]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {["foo"]} foo]
 #>>>
 test parser/structure-3.3 {array, multi element packed} -body { #<<<
-	set j	[test_parse {["foo","bar"]}]
+	set j	[json normalize {["foo","bar"]}]
 	list $j [json get $j end]
 } -cleanup {
 	unset -nocomplain j
 } -result [list {["foo","bar"]} bar]
 #>>>
 test parser/structure-3.4 {array, multi element whitespace} -body { #<<<
-	set j	[test_parse { 	[ 	"foo" 	, 	"bar" 	] 	}]
+	set j	[json normalize { 	[ 	"foo" 	, 	"bar" 	] 	}]
 	list $j [json get $j end]
 } -cleanup {
 	unset -nocomplain j
@@ -925,30 +926,30 @@ test parser/structure-3.4 {array, multi element whitespace} -body { #<<<
 #>>>
 test parser/structure-4.1 {orphaned hold_key} -body { #<<<
 	list [catch {
-		test_parse {{"structure-4.1"}}
+		json normalize {{"structure-4.1"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Expecting : after object key} {{"structure-4.1"}} 16] {Error parsing JSON value: Expecting : after object key at offset 16}]
 #>>>
 test parser/structure-4.2 {orphaned hold_key} -body { #<<<
 	list [catch {
-		test_parse {{"structure-4.2":}}
+		json normalize {{"structure-4.2":}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-4.2":}} 17] {Error parsing JSON value: Illegal character at offset 17}]
 #>>>
 test parser/structure-4.3 {nested orphaned hold_key} -body { #<<<
 	list [catch {
-		test_parse {{"x":"y","structure-4.3":{"nested-4.3":}}}
+		json normalize {{"x":"y","structure-4.3":{"nested-4.3":}}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"x":"y","structure-4.3":{"nested-4.3":}}} 39] {Error parsing JSON value: Illegal character at offset 39}]
 #>>>
 test parser/structure-4.4 {nested orphaned hold_key, nested key parse error} -body { #<<<
 	list [catch {
-		test_parse {{"structure-4.4":{"nested-4.4\x":"bar"}}}
+		json normalize {{"structure-4.4":{"nested-4.4\x":"bar"}}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-4.4":{"nested-4.4\x":"bar"}}} 30] {Error parsing JSON value: Illegal character at offset 30}]
 #>>>
 test parser/structure-5.4 {Deep nesting, ensure that this test nests deeper than CX_STACK_SIZE} -body { #<<<
-	json get [test_parse {
+	json get {
 		{
 			"first": {
 				"second": {
@@ -972,112 +973,112 @@ test parser/structure-5.4 {Deep nesting, ensure that this test nests deeper than
 				}
 			}
 		}
-	}] first second third fourth fifth sixth seventh eighth ninth tenth eleventh end
+	} first second third fourth fifth sixth seventh eighth ninth tenth eleventh end
 } -result structure-5.4
 #>>>
 test parser/structure-6.1 {Nesting error} -body { #<<<
 	list [catch {
-		test_parse {{"structure-6.1":[}]}
+		json normalize {{"structure-6.1":[}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-6.1":[}]} 18] {Error parsing JSON value: Illegal character at offset 18}]
 #>>>
 test parser/structure-6.2 {Nesting error} -body { #<<<
 	list [catch {
-		test_parse {{"structure-6.2":[null,}]}
+		json normalize {{"structure-6.2":[null,}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-6.2":[null,}]} 23] {Error parsing JSON value: Illegal character at offset 23}]
 #>>>
 test parser/structure-6.3 {Nesting error} -body { #<<<
 	list [catch {
-		test_parse {[{"structure-6.3"]}]}
+		json normalize {[{"structure-6.3"]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Expecting : after object key} {[{"structure-6.3"]}]} 17] {Error parsing JSON value: Expecting : after object key at offset 17}]
 #>>>
 test parser/structure-6.4 {Nesting error} -body { #<<<
 	list [catch {
-		test_parse {[{"structure-6.4":]}]}
+		json normalize {[{"structure-6.4":]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.4":]}]} 18] {Error parsing JSON value: Illegal character at offset 18}]
 #>>>
 test parser/structure-6.5 {Nesting error} -body { #<<<
 	list [catch {
-		test_parse {[{"structure-6.5":1]}]}
+		json normalize {[{"structure-6.5":1]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE "Expecting \} or ," {[{"structure-6.5":1]}]} 19] "Error parsing JSON value: Expecting \} or , at offset 19"]
 #>>>
 test parser/structure-6.6 {Nesting error} -body { #<<<
 	list [catch {
-		test_parse {[{"structure-6.6":1,]}]}
+		json normalize {[{"structure-6.6":1,]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.6":1,]}]} 20] {Error parsing JSON value: Illegal character at offset 20}]
 #>>>
 test parser/structure-7.1 {Object key not a string: number} -body { #<<<
 	list [catch {
-		test_parse {{7.1:"structure-7.1"}}
+		json normalize {{7.1:"structure-7.1"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{7.1:"structure-7.1"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.2 {Object key not a string: true} -body { #<<<
 	list [catch {
-		test_parse {{true:"structure-7.2"}}
+		json normalize {{true:"structure-7.2"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{true:"structure-7.2"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.3 {Object key not a string: false} -body { #<<<
 	list [catch {
-		test_parse {{false:"structure-7.3"}}
+		json normalize {{false:"structure-7.3"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{false:"structure-7.3"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.4 {Object key not a string: null} -body { #<<<
 	list [catch {
-		test_parse {{null:"structure-7.4"}}
+		json normalize {{null:"structure-7.4"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{null:"structure-7.4"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.5 {Object key not a string: object} -body { #<<<
 	list [catch {
-		test_parse {{{}:"structure-7.5"}}
+		json normalize {{{}:"structure-7.5"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{{}:"structure-7.5"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.6 {Object key not a string: array} -body { #<<<
 	list [catch {
-		test_parse {{[]:"structure-7.6"}}
+		json normalize {{[]:"structure-7.6"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{[]:"structure-7.6"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-8.1 {Object key not a string: dyn_number} -body { #<<<
-	test_parse {{"~N:f":"structure-8.1"}}
+	json normalize {{"~N:f":"structure-8.1"}}
 } -result {{"~N:f":"structure-8.1"}}
 #>>>
 test parser/structure-8.2 {Object key not a string: dyn_bool} -body { #<<<
-	test_parse {{"~B:f":"structure-8.2"}}
+	json normalize {{"~B:f":"structure-8.2"}}
 } -result {{"~B:f":"structure-8.2"}}
 #>>>
 test parser/structure-8.5 {Object key not a string: dyn_json} -body { #<<<
-	test_parse {{"~J:f":"structure-8.5"}}
+	json normalize {{"~J:f":"structure-8.5"}}
 } -result {{"~J:f":"structure-8.5"}}
 #>>>
 test parser/structure-8.6 {Object key not a string: dyn_template} -body { #<<<
-	test_parse {{"~T:f":"structure-8.6"}}
+	json normalize {{"~T:f":"structure-8.6"}}
 } -result {{"~T:f":"structure-8.6"}}
 #>>>
 test parser/structure-8.7 {Object key not a string: dyn_literal} -body { #<<<
-	test_parse {{"~L:~S:f":"structure-8.7"}}
+	json normalize {{"~L:~S:f":"structure-8.7"}}
 } -result {{"~L:~S:f":"structure-8.7"}}
 #>>>
 test parser/structure-8.8 {Object key not a string: dyn_string} -body { #<<<
-	test_parse {{"~S:f":"structure-8.8"}}
+	json normalize {{"~S:f":"structure-8.8"}}
 } -result {{"~S:f":"structure-8.8"}}
 #>>>
 
 test parser/utf-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
-	json get [test_parse {"helloは"}]
+	json get {"helloは"}
 } -result helloは
 #>>>
 test parser/utf-1.2 {Length calculation for 1, 2 and 3 byte UTF-8 sequences} -body { #<<<
-	json get [test_parse {"h¿は"}] ?length
+	json get {"h¿は"} ?length
 } -result 3
 #>>>
 try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (the BMP) by Tcl support) <<<
@@ -1089,16 +1090,16 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 		3	0x800	0xffff
 	} {
 		test parser/utf-2.$bytes.1 "lower bound of $bytes byte chars" -body { #<<<
-			json get [test_parse [format {"%1$c%1$c"} $lower]]
+			json get [format {"%1$c%1$c"} $lower]
 		} -result [format {%1$c%1$c} $lower]
 		#>>>
 		test parser/utf-2.$bytes.2 "upper bound of $bytes byte chars" -body { #<<<
-			json get [test_parse [format {"%1$c%1$c"} $upper]]
+			json get [format {"%1$c%1$c"} $upper]
 		} -result [format {%1$c%1$c} $upper]
 		#>>>
 		test parser/utf-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars" -body { #<<<
 			list [catch {
-				json get [test_parse [format {"%1$c%1$c%2$c"} $lower 0x1f]]
+				json get [format {"%1$c%1$c%2$c"} $lower 0x1f]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -1106,7 +1107,7 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 		#>>>
 		test parser/utf-2.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars" -body { #<<<
 			list [catch {
-				json get [test_parse [format {"%1$c%1$c%2$c"} $upper 0x1f]]
+				json get [format {"%1$c%1$c%2$c"} $upper 0x1f]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -1119,28 +1120,28 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 #>>>
 
 test parser/whitespace-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
-	json get [test_parse {	/*hello€*/  "helloは" //The rest is a comment ほ}]
+	json get {	/*hello€*/  "helloは" //The rest is a comment ほ}
 } -result helloは
 #>>>
 test parser/whitespace-1.2 {All whitespace chars and utf-8 char lengths in comments, no whitespace between comments and string} -body { #<<<
-	json get [test_parse "\n\t\r /*h¿は*/\"foo\"//h¿は\n"]
+	json get "\n\t\r /*h¿は*/\"foo\"//h¿は\n"
 } -result foo
 #>>>
 test parser/whitespace-1.3 {All whitespace chars and utf-8 char lengths in comments, leading whitespace between comments and string} -body { #<<<
-	json get [test_parse "\n\t\r /*h¿は*/\r\"foo\"//h¿は\n"]
+	json get "\n\t\r /*h¿は*/\r\"foo\"//h¿は\n"
 } -result foo
 #>>>
 test parser/whitespace-1.4 {All whitespace chars and utf-8 char lengths in comments, trailing whitespace between comments and string} -body { #<<<
-	json get [test_parse "\n\t\r /*h¿は*/\"foo\"\r//h¿は\n"]
+	json get "\n\t\r /*h¿は*/\"foo\"\r//h¿は\n"
 } -result foo
 #>>>
 test parser/whitespace-1.5 {All whitespace chars and utf-8 char lengths in comments, leading and trailing whitespace between comments and string} -body { #<<<
-	json get [test_parse "\n\t\r /*h¿は*/\t\"foo\"\r//h¿は\n"]
+	json get "\n\t\r /*h¿は*/\t\"foo\"\r//h¿は\n"
 } -result foo
 #>>>
 test parser/whitespace-1.6 {char offset counting for skipped chars in comments} -body { #<<<
 	list [catch {
-		json get [test_parse "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar"]
+		json get "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -1155,16 +1156,16 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 		3	0x800	0xffff
 	} {
 		test parser/whitespace-2.$bytes.1 "lower bound of $bytes byte chars in // comment" -body { #<<<
-			json get [test_parse [format "//%1\$c%1\$c\nfalse" $lower]]
+			json get [format "//%1\$c%1\$c\nfalse" $lower]
 		} -result 0
 		#>>>
 		test parser/whitespace-2.$bytes.2 "upper bound of $bytes byte chars in // comment" -body { #<<<
-			json get [test_parse [format "//%1\$c%1\$c\nfalse" $upper]]
+			json get [format "//%1\$c%1\$c\nfalse" $upper]
 		} -result 0
 		#>>>
 		test parser/whitespace-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in // comment" -body { #<<<
 			list [catch {
-				json get [test_parse [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f]]
+				json get [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -1172,7 +1173,7 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 		#>>>
 		test parser/whitespace-2.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars in // comment" -body { #<<<
 			list [catch {
-				json get [test_parse [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f]]
+				json get [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -1180,16 +1181,16 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 		#>>>
 
 		test parser/whitespace-3.$bytes.1 "lower bound of $bytes byte chars in /* */ comment" -body { #<<<
-			json get [test_parse [format "/*%1\$c%1\$c*/false" $lower]]
+			json get [format "/*%1\$c%1\$c*/false" $lower]
 		} -result 0
 		#>>>
 		test parser/whitespace-3.$bytes.2 "upper bound of $bytes byte chars in /* */ comment" -body { #<<<
-			json get [test_parse [format "/*%1\$c%1\$c*/false" $upper]]
+			json get [format "/*%1\$c%1\$c*/false" $upper]
 		} -result 0
 		#>>>
 		test parser/whitespace-3.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in /* */ comment" -body { #<<<
 			list [catch {
-				json get [test_parse [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f]]
+				json get [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -1197,7 +1198,7 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 		#>>>
 		test parser/whitespace-3.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars in /* */ comment" -body { #<<<
 			list [catch {
-				json get [test_parse [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f]]
+				json get [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f]
 			} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 		} -cleanup {
 			unset -nocomplain r o
@@ -1210,29 +1211,29 @@ try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (
 #>>>
 test parser/whitespace-4.1 {Half opened // comment sequence} -body { #<<<
 	list [catch {
-		test_parse " /foo"
+		json normalize " /foo"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -result [list 1 {RL JSON PARSE {Illegal character} { /foo} 2} {Error parsing JSON value: Illegal character at offset 2}]
 #>>>
 test parser/whitespace-5.1 {Two comments, no whitespace} -body { #<<<
-	json get [test_parse {/*foo*//*bar*/123}]
+	json get {/*foo*//*bar*/123}
 } -result 123
 #>>>
 test parser/whitespace-6.1 {Two comments, whitespace between} -body { #<<<
-	json get [test_parse {/*foo*/ /*bar*/123}]
+	json get {/*foo*/ /*bar*/123}
 } -result 123
 #>>>
 test parser/whitespace-7.1 {Two // comments} -body { #<<<
-	json get [test_parse "321//foo\n//bar"]
+	json get "321//foo\n//bar"
 } -result 321
 #>>>
 test parser/whitespace-8.1 {// comment, no newline} -body { #<<<
-	json get [test_parse "8.1//bar"]
+	json get "8.1//bar"
 } -result 8.1
 #>>>
 test parser/whitespace-8.2 {// comment, no newline, no value} -body { #<<<
 	list [catch {
-		json get [test_parse {//bar}]
+		json get {//bar}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -1240,7 +1241,7 @@ test parser/whitespace-8.2 {// comment, no newline, no value} -body { #<<<
 #>>>
 test parser/whitespace-9.1 {Unterminated comment} -body { #<<<
 	list [catch {
-		json get [test_parse {9.1/* はhello}]
+		json get {9.1/* はhello}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -1248,7 +1249,7 @@ test parser/whitespace-9.1 {Unterminated comment} -body { #<<<
 #>>>
 test parser/whitespace-9.2 {Unterminated comment} -body { #<<<
 	list [catch {
-		json get [test_parse {9.2/* はhello*}]
+		json get {9.2/* はhello*}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
@@ -1256,14 +1257,14 @@ test parser/whitespace-9.2 {Unterminated comment} -body { #<<<
 #>>>
 test parser/whitespace-9.3 {Unterminated comment} -body { #<<<
 	list [catch {
-		json get [test_parse {9.3/* はhello*x}]
+		json get {9.3/* はhello*x}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result {1 {RL JSON PARSE {Unterminated comment} {9.3/* はhello*x} 3} {Error parsing JSON value: Unterminated comment at offset 3}}
 #>>>
 test parser/whitespace-9.4 {Comment terminated at EOF} -body { #<<<
-	json get [test_parse {9.4/* はhello*/}]
+	json get {9.4/* はhello*/}
 } -result 9.4
 #>>>
 

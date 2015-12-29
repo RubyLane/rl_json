@@ -7,6 +7,8 @@ package require rl_json
 package require yajltcl
 package require json_old
 
+namespace import rl_json::json
+
 bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 	array set a {
 		x		"str\"foo\nbar"
