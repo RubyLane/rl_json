@@ -32,7 +32,7 @@ struct parse_context* push_parse_context(struct parse_context* cx, const int con
 		new = (struct parse_context*)malloc(sizeof(*new));
 	}
 
-	ival = JSON_NewJvalObj2(container, container == JSON_OBJECT  ?  Tcl_NewDictObj()  :  Tcl_NewListObj(0, NULL));
+	ival = JSON_NewJvalObj(container, container == JSON_OBJECT  ?  Tcl_NewDictObj()  :  Tcl_NewListObj(0, NULL));
 	Tcl_IncrRefCount(ival);
 
 	new->prev = last;
@@ -59,7 +59,7 @@ struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 	}
 
 	if (likely(last->val != NULL)) {
-		append_to_cx2(last->prev, last->val);
+		append_to_cx(last->prev, last->val);
 		Tcl_DecrRefCount(last->val);
 		last->val = NULL;
 	}
@@ -537,7 +537,7 @@ int test_parse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const ob
 			case JSON_BOOL:
 			case JSON_NULL:
 			case JSON_NUMBER:
-				append_to_cx2(cx->last, JSON_NewJvalObj2(type, val));
+				append_to_cx(cx->last, JSON_NewJvalObj(type, val));
 				break;
 
 			default:

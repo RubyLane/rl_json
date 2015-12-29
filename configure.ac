@@ -74,8 +74,6 @@ TEA_SETUP_COMPILER
 
 TEA_ADD_SOURCES([parser.c main.c])
 TEA_ADD_HEADERS([])
-#TEA_ADD_INCLUDES([-I/home/cyan/local/include])
-#TEA_ADD_LIBS([-L/home/cyan/local/lib -lyajl])
 TEA_ADD_INCLUDES([])
 TEA_ADD_LIBS([])
 TEA_ADD_CFLAGS([])
@@ -93,10 +91,6 @@ else
 pkg-config is required
 ])
 fi
-
-PKG_CHECK_MODULES([YAJL], [yajl >= 2.1], , AC_MSG_ERROR([
-yajl >= 2.1 is required
-]))
 
 #--------------------------------------------------------------------
 # __CHANGE__

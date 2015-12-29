@@ -155,6 +155,67 @@ test template-3.5 {Non-string key subst: literal} -body { #<<<
 } -result {{"~N:v":"bar"}}
 #>>>
 
+try { # Check string quoting
+	set leading		"fooは"
+	set trailing	"barほ"
+	for {set i 0} {$i <= 0x1F} {incr i} {
+		lappend range	[format 0x%02X $i]
+	}
+	lappend range 0x22 0x5C 0x2F
+	set special	{
+		0x08	{\b}
+		0x09	{\t}
+		0x0A	{\n}
+		0x0C	{\f}
+		0x0D	{\r}
+		0x22	{\"}
+		0x5C	{\\}
+		0x2F	{/}
+	}
+	foreach c $range {
+		set char	[format %c $c]
+		if {[dict exists $special $c]} {
+			set expect	[dict get $special $c]
+		} else {
+			set expect	[format {\u%04X} $c]
+		}
+		test template-4.$c.1 "String quoting: $c -> $expect, no leading, no trailing" -setup { #<<<
+			set str	$char
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$expect\""
+		#>>>
+		test template-4.$c.2 "String quoting: $c -> $expect, leading, no trailing" -setup { #<<<
+			set str	"$leading$char"
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$leading$expect\""
+		#>>>
+		test template-4.$c.3 "String quoting: $c -> $expect, no leading, trailing" -setup { #<<<
+			set str	"$char$trailing"
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$expect$trailing\""
+		#>>>
+		test template-4.$c.4 "String quoting: $c -> $expect, leading, trailing" -setup { #<<<
+			set str	"$leading$char$trailing"
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$leading$expect$trailing\""
+		#>>>
+	}
+} finally {
+	unset -nocomplain c char expect range i special
+}
+
 ::tcltest::cleanupTests
 return
 

@@ -5,10 +5,6 @@
 
 #include <tcl.h>
 #include "tclstuff.h"
-#include <yajl_version.h>
-#include <yajl_common.h>
-#include <yajl_gen.h>
-#include <yajl_parse.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -43,8 +39,7 @@ struct parse_context {
 };
 
 void append_to_cx(struct parse_context* cx, Tcl_Obj* val);
-void append_to_cx2(struct parse_context* cx, Tcl_Obj* val);
-Tcl_Obj* JSON_NewJvalObj2(int type, Tcl_Obj* val);
+Tcl_Obj* JSON_NewJvalObj(int type, Tcl_Obj* val);
 
 Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length);
 
