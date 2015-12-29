@@ -35,6 +35,8 @@ Quick Reference
 * [json get_typed *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns a two element list: the first being the value that would be returned by [json get] and the second being the JSON type of the extracted portion.
 * [json extract *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns the JSON fragment.
 * [json exists *json_val* ?*key* ... ?*modifier*??]  - Tests whether the supplied key path and modifier resolve to something that exists in *json_val*
+* [json set *json_variable_name* ?*key* ...? *value*]  - Updates the JSON value stored in the variable *json_variable_name*, replacing the value referenced by *key* ... with the JSON value *value*.
+* [json unset *json_variable_name* ?*key* ...?]  - Updates the JSON value stored in the variable *json_variable_name*, removing the value referenced by *key* ...
 * [json normalize *json_val*]  - Return a "normalized" version of the input *json_val* - all optional whitespace trimmed.
 * [json template *json_val* ?*dictionary*?]  - Return a JSON value by interpolating the values from *dictionary* into the template, or from variables in the current scope if *dictionary* is not supplied, in the manner described above.
 * [json new *type* *value*]  - Return a JSON fragment of type *type* and value *value*.
@@ -204,11 +206,12 @@ bench/new.bench for the details.
 Under the Hood
 --------------
 
-The yajl c library is used to parse the JSON string, and to generate properly
-quoted strings when serializing JSON values.  JSON values are parsed to an
-internal format using Tcl_Objs and stored as the internal representation for
-a new type of Tcl_Obj.  Subsequent manipulation of that value use the internal
-representation directly.
+Older versions used the yajl c library to parse the JSON string and properly
+quote generated strings when serializing JSON values, but currently a custom
+built parser and string quoter is used, removing the libyajl dependency.  JSON
+values are parsed to an internal format using Tcl_Objs and stored as the
+internal representation for a new type of Tcl_Obj.  Subsequent manipulation of
+that value use the internal representation directly.
 
 License
 -------
