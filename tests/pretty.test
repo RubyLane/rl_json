@@ -1,0 +1,32 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+package require parse_args
+namespace path {::rl_json ::parse_args}
+
+test pretty-1.1 {Basic pretty-print} -body { #<<<
+	json pretty {{"foo":null,"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
+} -result {{
+    "foo":          null,
+    "hello, world": "bar",
+    "This is a much longer key": [
+        "str",
+        123,
+        123.4,
+        true,
+        false,
+        null,
+        {
+            "inner": "obj"
+        }
+    ]
+}}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

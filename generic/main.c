@@ -1969,6 +1969,128 @@ done:
 }
 
 //}}}
+static int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
+{
+	int							type, indent_len, pad_len, next_pad_len, count;
+	const char*					pad_str;
+	const char*					next_pad_str;
+	Tcl_Obj*					next_pad;
+	Tcl_Obj*					val;
+	struct serialize_context	scx;
+
+	scx.ds = ds;
+	scx.serialize_mode = SERIALIZE_NORMAL;
+	scx.fromdict = NULL;
+
+	TEST_OK(JSON_GetJvalFromObj(interp, json, &type, &val));
+
+	Tcl_GetStringFromObj(indent, &indent_len);
+	pad_str = Tcl_GetStringFromObj(pad, &pad_len);
+
+	switch (type) {
+		case JSON_OBJECT: //{{{
+			{
+				int				done, k_len, max=0, size;
+				Tcl_DictSearch	search;
+				Tcl_Obj*		k;
+				Tcl_Obj*		v;
+				const char*		key_pad_buf = "                    ";	// Must be at least 20 chars long (max cap below)
+
+				TEST_OK(Tcl_DictObjSize(interp, val, &size));
+				if (size == 0) {
+					Tcl_DStringAppend(ds, "{}", 2);
+					break;
+				}
+
+				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
+
+				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+					Tcl_GetStringFromObj(k, &k_len);
+					if (k_len <= 20 && k_len > max)
+						max = k_len;
+				}
+				Tcl_DictObjDone(&search);
+
+				if (max > 20)
+					max = 20;		// If this cap is changed be sure to adjust the key_pad_buf length above
+
+				next_pad = Tcl_DuplicateObj(pad);
+				Tcl_AppendObjToObj(next_pad, indent);
+
+				next_pad_str = Tcl_GetStringFromObj(next_pad, &next_pad_len);
+
+				Tcl_DStringAppend(ds, "{\n", 2);
+
+				count = 0;
+				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
+				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+					Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
+					append_json_string(&scx, k);
+					Tcl_DStringAppend(ds, ": ", 2);
+
+					Tcl_GetStringFromObj(k, &k_len);
+					if (k_len < max)
+						Tcl_DStringAppend(ds, key_pad_buf, max-k_len);
+
+					if (json_pretty(interp, v, indent, next_pad, ds) != TCL_OK) {
+						Tcl_DictObjDone(&search);
+						return TCL_ERROR;
+					}
+
+					if (++count < size) {
+						Tcl_DStringAppend(ds, ",\n", 2);
+					} else {
+						Tcl_DStringAppend(ds, "\n", 1);
+					}
+				}
+				Tcl_DictObjDone(&search);
+
+				Tcl_DStringAppend(ds, pad_str, pad_len);
+				Tcl_DStringAppend(ds, "}", 1);
+			}
+			break;
+			//}}}
+
+		case JSON_ARRAY: //{{{
+			{
+				int			i, oc;
+				Tcl_Obj**	ov;
+
+				TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
+
+				next_pad = Tcl_DuplicateObj(pad);
+				Tcl_AppendObjToObj(next_pad, indent);
+				next_pad_str = Tcl_GetStringFromObj(next_pad, &next_pad_len);
+
+				if (oc == 0) {
+					Tcl_DStringAppend(ds, "[]", 2);
+				} else {
+					Tcl_DStringAppend(ds, "[\n", 2);
+					count = 0;
+					for (i=0; i<oc; i++) {
+						Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
+						TEST_OK(json_pretty(interp, ov[i], indent, next_pad, ds));
+						if (++count < oc) {
+							Tcl_DStringAppend(ds, ",\n", 2);
+						} else {
+							Tcl_DStringAppend(ds, "\n", 1);
+						}
+					}
+					Tcl_DStringAppend(ds, pad_str, pad_len);
+					Tcl_DStringAppend(ds, "]", 1);
+				}
+			}
+			break;
+			//}}}
+
+		default:
+			serialize(interp, &scx, json);
+	}
+
+	return TCL_OK;
+}
+
+//}}}
 #if 0
 static int merge(Tcl_Interp* interp, int deep, Tcl_Obj *const orig, Tcl_Obj *const patch, Tcl_Obj **const res) //{{{
 {
@@ -2338,9 +2460,28 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			break;
 			//}}}
 		case M_PRETTY: //{{{
-			if (objc < 3) CHECK_ARGS(2, "pretty json_val");
-			// TODO
-			THROW_ERROR("Not implemented yet");
+			{
+				Tcl_DString	ds;
+				Tcl_Obj*	indent;
+				Tcl_Obj*	pad = Tcl_NewStringObj("", 0);
+
+				if (objc < 3 || objc > 4)
+					CHECK_ARGS(2, "pretty json_val ?indent?");
+
+				if (objc > 3) {
+					indent = objv[3];
+				} else {
+					indent = Tcl_NewStringObj("    ", 4);
+				}
+
+				Tcl_DStringInit(&ds);
+				if (json_pretty(interp, objv[2], indent, pad, &ds) != TCL_OK) {
+					Tcl_DStringFree(&ds);
+					return TCL_ERROR;
+				}
+				Tcl_DStringResult(interp, &ds);
+				Tcl_DStringFree(&ds);
+			}
 			break;
 			//}}}
 			/*
