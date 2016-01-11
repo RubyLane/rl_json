@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
 	set bar	"Bar"
@@ -97,6 +98,16 @@ test template-1.3 {Produce a JSON doc with interpolated values, subst object key
 	}
 } -result {{"Foo":"Ba\"r","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:foo"},{"inner2":"Foo"},"Baz"]}}
 #>>>
+test template-1.4 {Invalid interpolated type key fallthrough} -body { #<<<
+	json template {
+		{
+			"foo": "~S:foo",
+			"bar": "~A:bar"
+		}
+	} {
+	}
+} -result {{"foo":null,"bar":"~A:bar"}}
+#>>>
 test template-2.1 {Test interpolated numeric validation} -body { #<<<
 	json template {
 		{
@@ -108,6 +119,103 @@ test template-2.1 {Test interpolated numeric validation} -body { #<<<
 	}
 } -returnCodes error -result {Error substituting value from "num" into template, not a number: ""}
 #>>>
+test template-3.1 {Non-string key subst: number} -body { #<<<
+	list [catch {
+		json template { {"~N:v":"bar"} } {v 1}
+} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 NONE {Only strings allowed as object keys}]
+#>>>
+test template-3.2 {Non-string key subst: true} -body { #<<<
+	list [catch {
+		json template { {"~B:v":"bar"} } {v 1}
+} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 NONE {Only strings allowed as object keys}]
+#>>>
+test template-3.3 {Non-string key subst: false} -body { #<<<
+	list [catch {
+		json template { {"~B:v":"bar"} } {v 0}
+} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 NONE {Only strings allowed as object keys}]
+#>>>
+test template-3.4 {Non-string key subst: null} -constraints knownBug -body { #<<<
+	list [catch {
+		json template { {"~S:v":"bar"} } {}
+} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
+} -result [list 1 NONE {Only strings allowed as object keys}]
+#>>>
+test template-3.5 {Non-string key subst: literal} -body { #<<<
+	json template { {"~L:~N:v":"bar"} } {}
+} -result {{"~N:v":"bar"}}
+#>>>
+
+try { # Check string quoting
+	set leading		"fooは"
+	set trailing	"barほ"
+	for {set i 0} {$i <= 0x1F} {incr i} {
+		lappend range	[format 0x%02X $i]
+	}
+	lappend range 0x22 0x5C 0x2F
+	set special	{
+		0x08	{\b}
+		0x09	{\t}
+		0x0A	{\n}
+		0x0C	{\f}
+		0x0D	{\r}
+		0x22	{\"}
+		0x5C	{\\}
+		0x2F	{/}
+	}
+	foreach c $range {
+		set char	[format %c $c]
+		if {[dict exists $special $c]} {
+			set expect	[dict get $special $c]
+		} else {
+			set expect	[format {\u%04X} $c]
+		}
+		test template-4.$c.1 "String quoting: $c -> $expect, no leading, no trailing" -setup { #<<<
+			set str	$char
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$expect\""
+		#>>>
+		test template-4.$c.2 "String quoting: $c -> $expect, leading, no trailing" -setup { #<<<
+			set str	"$leading$char"
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$leading$expect\""
+		#>>>
+		test template-4.$c.3 "String quoting: $c -> $expect, no leading, trailing" -setup { #<<<
+			set str	"$char$trailing"
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$expect$trailing\""
+		#>>>
+		test template-4.$c.4 "String quoting: $c -> $expect, leading, trailing" -setup { #<<<
+			set str	"$leading$char$trailing"
+		} -body {
+			json template {"~S:str"}
+		} -cleanup {
+			unset -nocomplain str
+		} -result "\"$leading$expect$trailing\""
+		#>>>
+	}
+} finally {
+	unset -nocomplain c char expect range i special
+}
 
 ::tcltest::cleanupTests
 return

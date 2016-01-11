@@ -13,24 +13,6 @@ Tcl_ObjType json_type = {
 	set_from_any
 };
 
-enum json_types {
-	JSON_UNDEF,
-	JSON_OBJECT,
-	JSON_ARRAY,
-	JSON_STRING,
-	JSON_NUMBER,
-	JSON_BOOL,
-	JSON_NULL,
-
-	/* Dynamic types - placeholders for dynamic values in templates */
-	JSON_DYN_STRING,	// ~S:
-	JSON_DYN_NUMBER,	// ~N:
-	JSON_DYN_BOOL,		// ~B:
-	JSON_DYN_JSON,		// ~J:
-	JSON_DYN_TEMPLATE,	// ~T:
-	JSON_DYN_LITERAL	// ~L:	literal escape - used to quote literal values that start with the above sequences
-};
-
 static const char* dyn_prefix[] = {
 	NULL,	// JSON_UNDEF
 	NULL,	// JSON_OBJECT
@@ -82,7 +64,7 @@ static const char* type_names[] = {
 	"string"		// JSON_DYN_LITERAL
 };
 // These are just for debugging
-static const char* type_names_dbg[] = {
+const char* type_names_dbg[] = {
 	"JSON_UNDEF",
 	"JSON_OBJECT",
 	"JSON_ARRAY",
@@ -101,15 +83,6 @@ static const char* type_names_dbg[] = {
 /*
 */
 
-struct parse_context {
-	struct parse_context*	prev;
-	struct parse_context*	last;
-
-	Tcl_Obj*	val;
-	int			container;
-	Tcl_Obj*	hold_key;
-};
-
 enum serialize_modes {
 	SERIALIZE_NORMAL,		// We're updating the string rep of a json value or template
 	SERIALIZE_TEMPLATE		// We're interpolating values into a template
@@ -117,7 +90,6 @@ enum serialize_modes {
 
 struct serialize_context {
 	Tcl_DString*	ds;
-	yajl_gen		g;
 
 	enum serialize_modes	serialize_mode;
 	Tcl_Obj*				fromdict;	// NULL if no dict supplied
@@ -132,6 +104,126 @@ enum modifiers {
 };
 
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
+
+static int first_free(long long* freemap) //{{{
+{
+	int	i=0, bit, res;
+	while ((bit = ffsll(freemap[i])) == 0) {
+		i++;
+	}
+	res = i * (sizeof(long long)*8) + (bit-1);
+	return res;
+}
+
+//}}}
+static void mark_used(long long* freemap, int idx) //{{{
+{
+	int	i = idx / (sizeof(long long)*8);
+	int bit = idx - (i * (sizeof(long long)*8));
+	freemap[i] &= ~(1LL << bit);
+}
+
+//}}}
+static void mark_free(long long* freemap, int idx) //{{{
+{
+	int	i = idx / (sizeof(long long)*8);
+	int bit = idx - (i * (sizeof(long long)*8));
+	freemap[i] |= 1LL << bit;
+}
+
+//}}}
+static void age_cache(struct interp_cx* l) //{{{
+{
+	Tcl_HashEntry*		he;
+	Tcl_HashSearch		search;
+	struct kc_entry*	e;
+
+	he = Tcl_FirstHashEntry(&l->kc, &search);
+	while (he) {
+		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(he);
+
+		//if (idx >= KC_ENTRIES) Tcl_Panic("age_cache: idx (%ld) is out of bounds, KC_ENTRIES: %d", idx, KC_ENTRIES);
+		e = &l->kc_entries[idx];
+
+		if (e->hits < 1) {
+			Tcl_DeleteHashEntry(he);
+			Tcl_DecrRefCount(e->val);
+			Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
+			mark_free(l->freemap, idx);
+			e->val = NULL;
+		} else {
+			e->hits >>= 1;
+		}
+		he = Tcl_NextHashEntry(&search);
+	}
+	l->kc_count = 0;
+}
+
+//}}}
+Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length) //{{{
+{
+	char				buf[STRING_DEDUP_MAX];
+	const char			*keyname;
+	int					is_new;
+	struct kc_entry*	kce;
+	Tcl_Obj*			out;
+
+	if (length == 0) {
+		return l->tcl_empty;
+	} else if (length < 0) {
+		length = strlen(bytes);
+	}
+
+	if (length > STRING_DEDUP_MAX)
+		return Tcl_NewStringObj(bytes, length);
+
+	if (likely(bytes[length] == 0)) {
+		keyname = bytes;
+	} else {
+		memcpy(buf, bytes, length);
+		buf[length] = 0;
+		keyname = buf;
+	}
+	Tcl_HashEntry* entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
+
+	if (is_new) {
+		ptrdiff_t	idx = first_free(l->freemap);
+
+		if (unlikely(idx >= KC_ENTRIES)) {
+			// Cache overflow
+			Tcl_DeleteHashEntry(entry);
+			age_cache(l);
+			return Tcl_NewStringObj(bytes, length);
+		}
+
+		kce = &l->kc_entries[idx];
+		kce->hits = 0;
+		out = kce->val = Tcl_NewStringObj(bytes, length);;
+		Tcl_IncrRefCount(out);	// Two references - one for the cache table and one on loan to callers' interim processing.
+		Tcl_IncrRefCount(out);	// Without this, values not referenced elsewhere could reach callers with refCount 1, allowing
+								// the value to be mutated in place and corrupt the state of the cache (hash key not matching obj value)
+
+		mark_used(l->freemap, idx);
+
+		Tcl_SetHashValue(entry, (void*)idx);
+		l->kc_count++;
+
+		if (unlikely(l->kc_count > (int)(KC_ENTRIES/2.5))) {
+			kce->hits++; // Prevent the just-created entry from being pruned
+			age_cache(l);
+		}
+	} else {
+		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(entry);
+
+		kce = &l->kc_entries[idx];
+		out = kce->val;
+		if (kce->hits < 255) kce->hits++;
+	}
+
+	return out;
+}
+
+//}}}
 
 static int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, int* type, Tcl_Obj** val) //{{{
 {
@@ -165,21 +257,20 @@ static int JSON_SetIntRep(Tcl_Interp* interp, Tcl_Obj* target, int type, Tcl_Obj
 }
 
 //}}}
-static Tcl_Obj* JSON_NewJvalObj(int type, const void* p, int l) //{{{
+Tcl_Obj* JSON_NewJvalObj(int type, Tcl_Obj* val) //{{{
 {
 	Tcl_Obj*	res = Tcl_NewObj();
-	Tcl_Obj*	val = NULL;
 
 	res->typePtr = &json_type;
 	res->internalRep.ptrAndLongRep.ptr = NULL;
 
 	switch (type) {
-		case JSON_OBJECT: val = Tcl_NewDictObj(); break;
-		case JSON_ARRAY:  val = Tcl_NewListObj(0, NULL); break;
-		case JSON_STRING: val = Tcl_NewStringObj((const char*)p, l); break;
-		case JSON_NUMBER: val = Tcl_NewStringObj((const char*)p, l); break;
-		case JSON_BOOL:   val = Tcl_NewBooleanObj(*(int*)p); break;
-		case JSON_NULL:   val = NULL; break;
+		case JSON_OBJECT:
+		case JSON_ARRAY:
+		case JSON_STRING:
+		case JSON_NUMBER:
+		case JSON_BOOL:
+		case JSON_NULL:
 
 		case JSON_DYN_STRING:
 		case JSON_DYN_NUMBER:
@@ -187,7 +278,6 @@ static Tcl_Obj* JSON_NewJvalObj(int type, const void* p, int l) //{{{
 		case JSON_DYN_JSON:
 		case JSON_DYN_TEMPLATE:
 		case JSON_DYN_LITERAL:
-			val = Tcl_NewStringObj(p, l);
 			break;
 
 		default:
@@ -209,7 +299,7 @@ static int force_json_number(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** forced)
 
 	cmd = Tcl_NewListObj(0, NULL);
 	TEST_OK(Tcl_ListObjAppendElement(interp, cmd, Tcl_NewStringObj("::tcl::mathop::+", -1)));
-	TEST_OK(Tcl_ListObjAppendElement(interp, cmd, Tcl_NewStringObj("0", 1)));
+	TEST_OK(Tcl_ListObjAppendElement(interp, cmd, Tcl_NewIntObj(0)));
 	TEST_OK(Tcl_ListObjAppendElement(interp, cmd, obj));
 
 	Tcl_IncrRefCount(cmd);
@@ -226,11 +316,48 @@ static int force_json_number(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** forced)
 static void append_json_string(const struct serialize_context* scx, Tcl_Obj* obj) //{{{
 {
 	int				len;
-	const char*		str;
+	const char*		chunk;
+	const char*		p;
+	const char*		e;
+	Tcl_DString*	ds = scx->ds;
+	Tcl_UniChar		c;
+	ptrdiff_t		adv;
+	char			ustr[23];		// Actually only need 7 bytes, allocating enough to avoid overrun if Tcl_UniChar somehow holds a 64bit value
 
-	str = Tcl_GetStringFromObj(obj, &len);
-	yajl_gen_reset(scx->g, NULL);
-	yajl_gen_string(scx->g, (const unsigned char*)str, len);
+	Tcl_DStringAppend(ds, "\"", 1);
+
+	p = chunk = Tcl_GetStringFromObj(obj, &len);
+	e = p + len;
+
+	while (p < e) {
+		adv = Tcl_UtfToUniChar(p, &c);
+		if (unlikely(c <= 0x1f || c == '\\' || c == '"')) {
+			Tcl_DStringAppend(ds, chunk, p-chunk);
+			switch (c) {
+				case '"':	Tcl_DStringAppend(ds, "\\\"", 2); break;
+				case '\\':	Tcl_DStringAppend(ds, "\\\\", 2); break;
+				case 0x8:	Tcl_DStringAppend(ds, "\\b", 2); break;
+				case 0xC:	Tcl_DStringAppend(ds, "\\f", 2); break;
+				case 0xA:	Tcl_DStringAppend(ds, "\\n", 2); break;
+				case 0xD:	Tcl_DStringAppend(ds, "\\r", 2); break;
+				case 0x9:	Tcl_DStringAppend(ds, "\\t", 2); break;
+
+				default:
+					snprintf(ustr, 7, "\\u%04X", c);
+					Tcl_DStringAppend(ds, ustr, 6);
+					break;
+			}
+			p += adv;
+			chunk = p;
+		} else {
+			p += adv;
+		}
+	}
+
+	if (likely(p > chunk))
+		Tcl_DStringAppend(ds, chunk, p-chunk);
+
+	Tcl_DStringAppend(ds, "\"", 1);
 }
 
 //}}}
@@ -400,6 +527,7 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 				}
 
 				if (subst_val == NULL) {
+					// TODO: reject a null substitution if we're in an object key context?  Would need an extra flag on the function :(
 					subst_type = JSON_NULL;
 				} else {
 					subst_type = from_dyn[type];
@@ -455,189 +583,36 @@ done:
 
 //}}}
 
-static void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
+void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 {
-	struct parse_context*	tail = cx->last;
-
 	/*
 	fprintf(stderr, "append_to_cx, storing %s: \"%s\"\n",
 			type_names[val->internalRep.ptrAndLongRep.value],
 			val->internalRep.ptrAndLongRep.ptr == NULL ? "NULL" :
 			Tcl_GetString((Tcl_Obj*)val->internalRep.ptrAndLongRep.ptr));
 	*/
-	switch (tail->container) {
+	switch (cx->container) {
 		case JSON_OBJECT:
-			Tcl_DictObjPut(NULL, tail->val->internalRep.ptrAndLongRep.ptr, tail->hold_key, val);
-			tail->hold_key = NULL;
+			//fprintf(stderr, "append_to_cx, cx->hold_key->refCount: %d (%s)\n", cx->hold_key->refCount, Tcl_GetString(cx->hold_key));
+			Tcl_DictObjPut(NULL, cx->val->internalRep.ptrAndLongRep.ptr, cx->hold_key, val);
+			Tcl_InvalidateStringRep(cx->val);
+			Tcl_DecrRefCount(cx->hold_key);
+			cx->hold_key = NULL;
 			break;
 
 		case JSON_ARRAY:
-			Tcl_ListObjAppendElement(NULL, tail->val->internalRep.ptrAndLongRep.ptr, val);
+			//fprintf(stderr, "append_to_cx, appending to list: (%s)\n", Tcl_GetString(val));
+			Tcl_ListObjAppendElement(NULL, cx->val->internalRep.ptrAndLongRep.ptr, val);
+			Tcl_InvalidateStringRep(cx->val);
 			break;
 
 		default:
-			tail->val = val;
-			Tcl_IncrRefCount(tail->val);
+			cx->val = val;
+			Tcl_IncrRefCount(cx->val);
 	}
 }
 
 //}}}
-
-static int parse_null_callback(void* cd) //{{{
-{
-	struct parse_context*	cx = cd;
-	append_to_cx(cx, JSON_NewJvalObj(JSON_NULL, NULL, 0));
-	return 1;
-}
-
-//}}}
-static int parse_boolean_callback(void* cd, int boolean) //{{{
-{
-	struct parse_context*	cx = cd;
-	append_to_cx(cx, JSON_NewJvalObj(JSON_BOOL, &boolean, 0));
-	return 1;
-}
-
-//}}}
-static int parse_number_callback(void* cd, const char* s, size_t l) //{{{
-{
-	struct parse_context*	cx = cd;
-	append_to_cx(cx, JSON_NewJvalObj(JSON_NUMBER, s, l));
-	return 1;
-}
-
-//}}}
-static int parse_string_callback(void* cd, const unsigned char* s, size_t l) //{{{
-{
-	struct parse_context*	cx = cd;
-	int						type;
-
-	if (
-			l >= 3 &&
-			s[0] == '~' &&
-			s[2] == ':'
-	) {
-		switch (s[1]) {
-			case 'S': type = JSON_DYN_STRING; break;
-			case 'N': type = JSON_DYN_NUMBER; break;
-			case 'B': type = JSON_DYN_BOOL; break;
-			case 'J': type = JSON_DYN_JSON; break;
-			case 'T': type = JSON_DYN_TEMPLATE; break;
-			case 'L': type = JSON_DYN_LITERAL; break;
-			default:  type = JSON_UNDEF; break;
-		}
-
-		if (type != JSON_UNDEF) {
-			append_to_cx(cx, JSON_NewJvalObj(type, (const char*)s+3, l-3));
-			return 1;
-		}
-	}
-
-	append_to_cx(cx, JSON_NewJvalObj(JSON_STRING, (const char*)s, l));
-	return 1;
-}
-
-//}}}
-static int parse_start_map_callback(void* cd) //{{{
-{
-	struct parse_context*	cx = cd;
-	struct parse_context*	new;
-
-	if (cx->container == JSON_UNDEF) {
-		new = cx;
-	} else {
-		new = (struct parse_context*)ckalloc(sizeof(struct parse_context));
-		new->prev = cx->last;
-		cx->last = new;
-		new->hold_key = NULL;
-	}
-	new->container = JSON_OBJECT;
-	new->val = JSON_NewJvalObj(JSON_OBJECT, NULL, 0);
-	Tcl_IncrRefCount(new->val);
-
-	return 1;
-}
-
-//}}}
-static int parse_map_key_callback(void* cd, const unsigned char*s, size_t l) //{{{
-{
-	struct parse_context*	cx = cd;
-	struct parse_context*	tail = cx->last;
-
-	tail->hold_key = Tcl_NewStringObj((const char*)s, l);
-	return 1;
-}
-
-//}}}
-static int parse_end_map_callback(void* cd) //{{{
-{
-	struct parse_context*	cx = cd;
-	struct parse_context*	tail = cx->last;
-
-	if (cx->last != cx) {
-		cx->last = tail->prev;
-
-		append_to_cx(cx, tail->val);
-		Tcl_DecrRefCount(tail->val); tail->val = NULL;
-
-		ckfree((char*)tail); tail = NULL;
-	}
-	return 1;
-}
-
-//}}}
-static int parse_start_array_callback(void* cd) //{{{
-{
-	struct parse_context*	cx = cd;
-	struct parse_context*	new;
-
-	if (cx->container == JSON_UNDEF) {
-		new = cx;
-	} else {
-		new = (struct parse_context*)ckalloc(sizeof(struct parse_context));
-		new->prev = cx->last;
-		new->hold_key = NULL;
-		cx->last = new;
-	}
-	new->container = JSON_ARRAY;
-	new->val = JSON_NewJvalObj(JSON_ARRAY, NULL, 0);
-	Tcl_IncrRefCount(new->val);
-
-	return 1;
-}
-
-//}}}
-static int parse_end_array_callback(void* cd) //{{{
-{
-	struct parse_context*	cx = cd;
-	struct parse_context*	tail = cx->last;
-
-	if (cx->last != cx) {
-		cx->last = tail->prev;
-
-		append_to_cx(cx, tail->val);
-		Tcl_DecrRefCount(tail->val); tail->val = NULL;
-
-		ckfree((char*)tail); tail = NULL;
-	}
-	return 1;
-}
-
-//}}}
-
-yajl_callbacks callbacks = {
-	parse_null_callback,
-	parse_boolean_callback,
-	NULL,		// integer
-	NULL,		// double
-	parse_number_callback,
-	parse_string_callback,
-	parse_start_map_callback,
-	parse_map_key_callback,
-	parse_end_map_callback,
-	parse_start_array_callback,
-	parse_end_array_callback
-};
 
 static int serialize(Tcl_Interp* interp, struct serialize_context* scx, Tcl_Obj* obj) //{{{
 {
@@ -646,15 +621,7 @@ static int serialize(Tcl_Interp* interp, struct serialize_context* scx, Tcl_Obj*
 
 	TEST_OK(JSON_GetJvalFromObj(interp, obj, &type, &val));
 
-	scx->g = yajl_gen_alloc(NULL);
-	yajl_gen_config(scx->g, yajl_gen_beautify, 0);
-	yajl_gen_config(scx->g, yajl_gen_validate_utf8, 0);  // Tcl_GetString returns well formed UTF-8
-	//yajl_gen_config(scx->g, yajl_gen_escape_solidus, 0);
-	yajl_gen_config(scx->g, yajl_gen_print_callback, Tcl_DStringAppend, scx->ds);
-
 	res = serialize_json_val(interp, scx, type, val);
-
-	yajl_gen_free(scx->g);
 
 	// The result of the serialization is left in scx->ds.  Once the caller
 	// is done with this value it must be freed with Tcl_DStringFree()
@@ -705,60 +672,202 @@ static void update_string_rep(Tcl_Obj* obj) //{{{
 //}}}
 static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 {
-	const char*	str;
-	int			len;
-	yajl_handle	parseHandle;
-	yajl_status	pstatus;
-	struct parse_context	cx;
+	Tcl_CmdInfo			parse_cmd;
+	struct interp_cx*	l;
+	const unsigned char*	err_at = NULL;
+	const char*				errmsg = "Illegal character";
+	size_t					char_adj = 0;		// Offset addjustment to account for multibyte UTF-8 sequences
+	const unsigned char*	doc;
+	enum json_types			type;
+	Tcl_Obj*				val;
+	const unsigned char*	p;
+	const unsigned char*	e;
+	const unsigned char*	val_start;
+	int						len;
+	struct parse_context	cx[CX_STACK_SIZE];
 
-	cx.prev = NULL;
-	cx.last = &cx;
-	cx.hold_key = NULL;
-	cx.container = JSON_UNDEF;
-	cx.val = NULL;
+	if (Tcl_GetCommandInfo(interp, "::rl_json::json", &parse_cmd) != 1) return TCL_ERROR;
+	l = parse_cmd.objClientData;
 
-	str = Tcl_GetStringFromObj(obj, &len);
+	cx[0].prev = NULL;
+	cx[0].last = cx;
+	cx[0].hold_key = NULL;
+	cx[0].container = JSON_UNDEF;
+	cx[0].val = NULL;
+	cx[0].char_ofs = 0;
+	cx[0].closed = 0;
 
-	parseHandle = yajl_alloc(&callbacks, NULL, &cx);
-	yajl_config(parseHandle, yajl_allow_comments, 1);
-	yajl_config(parseHandle, yajl_dont_validate_strings, 0);
+	p = doc = (const unsigned char*)Tcl_GetStringFromObj(obj, &len);
+	e = p + len;
 
-	pstatus = yajl_parse(parseHandle, (const unsigned char*)str, len);
-	if (pstatus != yajl_status_ok) {
-		unsigned char*	yajl_err = yajl_get_error(parseHandle, 1, (const unsigned char*)str, len);
+	// Skip leading whitespace and comments
+	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0) goto whitespace_err;
 
-		Tcl_SetObjResult(interp,
-				Tcl_NewStringObj((const char*)yajl_err, -1)
-				);
+	while (p < e) {
+		if (cx[0].last->container == JSON_OBJECT) { // Read the key if in object mode {{{
+			const unsigned char*	key_start = p;
+			size_t					key_start_char_adj = char_adj;
 
-		yajl_free_error(parseHandle, yajl_err); yajl_err = NULL;
+			if (value_type(l, doc, p, e, &char_adj, &p, &type, &val) != TCL_OK) goto err;
 
-		goto err;
+			switch (type) {
+				case JSON_DYN_STRING:
+				case JSON_DYN_NUMBER:
+				case JSON_DYN_BOOL:
+				case JSON_DYN_JSON:
+				case JSON_DYN_TEMPLATE:
+				case JSON_DYN_LITERAL:
+					/* Add back the template format prefix, since we can't store the type
+					 * in the dict key.  The template generation code reparses it later.
+					 */
+					// Can do this because val's ref is on loan from new_stringobj_dedup
+					val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
+					// Falls through
+				case JSON_STRING:
+					Tcl_IncrRefCount(cx[0].last->hold_key = val);
+					break;
+
+				default:
+					_parse_error(interp, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
+					goto err;
+			}
+
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+
+			if (unlikely(*p != ':')) {
+				_parse_error(interp, "Expecting : after object key", doc, (p-doc) - char_adj);
+				goto err;
+			}
+			p++;
+
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+		}
+		//}}}
+
+		val_start = p;
+		if (value_type(l, doc, p, e, &char_adj, &p, &type, &val) != TCL_OK) goto err;
+
+		switch (type) {
+			case JSON_OBJECT:
+				push_parse_context(cx, JSON_OBJECT, (val_start - doc) - char_adj);
+				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+
+				if (*p == '}') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				}
+				continue;
+
+			case JSON_ARRAY:
+				push_parse_context(cx, JSON_ARRAY, (val_start - doc) - char_adj);
+				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+
+				if (*p == ']') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				}
+				continue;
+
+			case JSON_DYN_STRING:
+			case JSON_DYN_NUMBER:
+			case JSON_DYN_BOOL:
+			case JSON_DYN_JSON:
+			case JSON_DYN_TEMPLATE:
+			case JSON_DYN_LITERAL:
+			case JSON_STRING:
+			case JSON_BOOL:
+			case JSON_NULL:
+			case JSON_NUMBER:
+				append_to_cx(cx->last, JSON_NewJvalObj(type, val));
+				break;
+
+			default:
+				free_cx(cx);
+				THROW_ERROR("Unexpected json value type: ", Tcl_GetString(Tcl_NewIntObj(type)));
+		}
+
+after_value:	// Yeah, goto.  But the alternative abusing loops was worse
+		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+		if (p >= e) break;
+
+		switch (cx[0].last->container) { // Handle eof and end-of-context or comma for array and object {{{
+			case JSON_OBJECT:
+				if (*p == '}') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				} else if (unlikely(*p != ',')) {
+					_parse_error(interp, "Expecting } or ,", doc, (p-doc) - char_adj);
+					goto err;
+				}
+
+				p++;
+				break;
+
+			case JSON_ARRAY:
+				if (*p == ']') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				} else if (unlikely(*p != ',')) {
+					_parse_error(interp, "Expecting ] or ,", doc, (p-doc) - char_adj);
+					goto err;
+				}
+
+				p++;
+				break;
+
+			default:
+				if (unlikely(p < e)) {
+					_parse_error(interp, "Trailing garbage after value", doc, (p - doc) - char_adj);
+					goto err;
+				}
+		}
+
+		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+		//}}}
 	}
 
-	if (cx.val == NULL) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("No JSON value found", -1));
-		goto err;
-	}
+	if (unlikely(cx != cx[0].last || !cx[0].closed)) { // Unterminated object or array context {{{
+		switch (cx[0].last->container) {
+			case JSON_OBJECT:
+				_parse_error(interp, "Unterminated object", doc, cx[0].last->char_ofs);
+				goto err;
 
-	yajl_free(parseHandle);
+			case JSON_ARRAY:
+				_parse_error(interp, "Unterminated array", doc, cx[0].last->char_ofs);
+				goto err;
+		}
+	}
+	//}}}
+
+	if (unlikely(cx[0].val == NULL)) {
+		err_at = doc;
+		errmsg = "No JSON value found";
+		goto whitespace_err;
+	}
 
 	if (obj->typePtr != NULL && obj->typePtr->freeIntRepProc != NULL)
 		obj->typePtr->freeIntRepProc(obj);
 
 	obj->typePtr = &json_type;
-	obj->internalRep.ptrAndLongRep.value = cx.val->internalRep.ptrAndLongRep.value;
-	obj->internalRep.ptrAndLongRep.ptr = cx.val->internalRep.ptrAndLongRep.ptr;
+	obj->internalRep.ptrAndLongRep.value = cx[0].val->internalRep.ptrAndLongRep.value;
+	obj->internalRep.ptrAndLongRep.ptr = cx[0].val->internalRep.ptrAndLongRep.ptr;
 
-	// We're transferring the ref from cx.val to our intrep
+	// We're transferring the ref from cx[0].val to our intrep
 	//Tcl_IncrRefcount(obj->internalRep.ptrAndLongRep.ptr
-	//Tcl_DecrRefCount(cx.val);
-	cx.val = NULL;
+	//Tcl_DecrRefCount(cx[0].val);
+	cx[0].val = NULL;
 
 	return TCL_OK;
 
+whitespace_err:
+	_parse_error(interp, errmsg, doc, (err_at - doc) - char_adj);
+
 err:
-	yajl_free(parseHandle);
+	free_cx(cx);
 	return TCL_ERROR;
 }
 
@@ -797,7 +906,7 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 
 	src = Tcl_ObjGetVar2(interp, srcvar, NULL, 0);
 	if (src == NULL) {
-		src = Tcl_ObjSetVar2(interp, srcvar, NULL, JSON_NewJvalObj(JSON_OBJECT, NULL, 0), TCL_LEAVE_ERR_MSG);
+		src = Tcl_ObjSetVar2(interp, srcvar, NULL, JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj()), TCL_LEAVE_ERR_MSG);
 	}
 
 	if (Tcl_IsShared(src)) {
@@ -834,7 +943,7 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 				if (target == NULL) {
 					//fprintf(stderr, "Path element %d: \"%s\" doesn't exist creating a new key for it and storing a null\n",
 					//		i, Tcl_GetString(step));
-					target = JSON_NewJvalObj(JSON_NULL, NULL, 0);
+					target = JSON_NewJvalObj(JSON_NULL, NULL);
 					TEST_OK(Tcl_DictObjPut(interp, val, step, target));
 					i++;
 					goto followed_path;
@@ -890,7 +999,7 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 
 					if (index < 0) {
 						// Prepend element to the array
-						target = JSON_NewJvalObj(JSON_NULL, NULL, 0);
+						target = JSON_NewJvalObj(JSON_NULL, NULL);
 						TEST_OK(Tcl_ListObjReplace(interp, val, -1, 0, 1, &target));
 
 						i++;
@@ -899,9 +1008,9 @@ static int set_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[],
 						int			new_i;
 						for (new_i=ac; new_i<index; new_i++) {
 							TEST_OK(Tcl_ListObjAppendElement(interp, val,
-										JSON_NewJvalObj(JSON_NULL, NULL, 0)));
+										JSON_NewJvalObj(JSON_NULL, NULL)));
 						}
-						target = JSON_NewJvalObj(JSON_NULL, NULL, 0);
+						target = JSON_NewJvalObj(JSON_NULL, NULL);
 						TEST_OK(Tcl_ListObjAppendElement(interp, val, target));
 
 						i++;
@@ -973,7 +1082,7 @@ followed_path:
 			TEST_OK(JSON_SetIntRep(interp, target, JSON_OBJECT, val));
 		}
 
-		target = JSON_NewJvalObj(JSON_OBJECT, NULL, 0);
+		target = JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj());
 		//fprintf(stderr, "Adding key \"%s\"\n", Tcl_GetString(pathv[i]));
 		TEST_OK(Tcl_DictObjPut(interp, val, pathv[i], target));
 		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
@@ -1286,11 +1395,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 									break;
 								case JSON_STRING:
 									EXISTS(1);
-									{
-										int len;
-										Tcl_GetStringFromObj(val, &len);
-										*target = Tcl_NewIntObj(len);
-									}
+									*target = Tcl_NewIntObj(Tcl_GetCharLength(val));
 									break;
 								case JSON_DYN_STRING:
 								case JSON_DYN_NUMBER:
@@ -1299,11 +1404,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 								case JSON_DYN_TEMPLATE:
 								case JSON_DYN_LITERAL:
 									EXISTS(1);
-									{
-										int len;
-										Tcl_GetStringFromObj(val, &len);
-										*target = Tcl_NewIntObj(len+3);
-									}
+									*target = Tcl_NewIntObj(Tcl_GetCharLength(val) + 3);
 									break;
 								default:
 									EXISTS(0);
@@ -1430,7 +1531,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 						// Soft error - set target to an NULL object in
 						// keeping with [lindex] behaviour
 						EXISTS(0);
-						*target = JSON_NewJvalObj(JSON_NULL, NULL, 0);
+						*target = JSON_NewJvalObj(JSON_NULL, NULL);
 						//fprintf(stderr, "index %ld is out of range [0, %d], setting target to a synthetic null\n", index, ac);
 					} else {
 						*target = av[index];
@@ -1565,7 +1666,7 @@ static int _new_object(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_
 	if (objc % 2 != 0)
 		THROW_ERROR("json fmt object needs an even number of arguments");
 
-	*res = JSON_NewJvalObj(JSON_OBJECT, NULL, 0);
+	*res = JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj());
 	val = ((Tcl_Obj*)*res)->internalRep.ptrAndLongRep.ptr;
 
 	for (i=0; i<objc; i+=2) {
@@ -1632,11 +1733,11 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 					}
 
 					if (type != JSON_UNDEF) {
-						*res = JSON_NewJvalObj(type, (const char*)s+3, l-3);
+						*res = JSON_NewJvalObj(type, Tcl_NewStringObj((const char*)s+3, l-3));
 						break;
 					}
 				}
-				*res = JSON_NewJvalObj(JSON_STRING, s, l);
+				*res = JSON_NewJvalObj(JSON_STRING, Tcl_NewStringObj(s, l));
 			}
 			break;
 			//}}}
@@ -1661,7 +1762,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 				Tcl_Obj*	elem;
 				Tcl_Obj*	val;
 
-				*res = JSON_NewJvalObj(JSON_ARRAY, NULL, 0);
+				*res = JSON_NewJvalObj(JSON_ARRAY, Tcl_NewListObj(0, NULL));
 				val = ((Tcl_Obj*)*res)->internalRep.ptrAndLongRep.ptr;
 				for (i=1; i<objc; i++) {
 					TEST_OK(Tcl_ListObjGetElements(interp, objv[i], &ac, &av));
@@ -1673,36 +1774,31 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 			//}}}
 		case NEW_NUMBER: //{{{
 			{
-				int			l;
-				const char*	s;
 				Tcl_Obj*	forced;
 
 				CHECK_ARGS(1, "number val");
 				TEST_OK(force_json_number(interp, objv[1], &forced));
-				s = Tcl_GetStringFromObj(forced, &l);
-				*res = JSON_NewJvalObj(JSON_NUMBER, s, l);
+				*res = JSON_NewJvalObj(JSON_NUMBER, forced);
 			}
 			break;
 			//}}}
 		case NEW_TRUE: //{{{
 			{
-				int b = 1;
 				CHECK_ARGS(0, "true");
-				*res = JSON_NewJvalObj(JSON_BOOL, &b, 0);
+				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(1));
 			}
 			break;
 			//}}}
 		case NEW_FALSE: //{{{
 			{
-				int b = 0;
 				CHECK_ARGS(0, "false");
-				*res = JSON_NewJvalObj(JSON_BOOL, &b, 0);
+				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(0));
 			}
 			break;
 			//}}}
 		case NEW_NULL: //{{{
 			CHECK_ARGS(0, "null");
-			*res = JSON_NewJvalObj(JSON_NULL, NULL, 0);
+			*res = JSON_NewJvalObj(JSON_NULL, NULL);
 			break;
 			//}}}
 		case NEW_BOOL: //{{{
@@ -1711,7 +1807,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 
 				CHECK_ARGS(1, "boolean val");
 				TEST_OK(Tcl_GetBooleanFromObj(interp, objv[1], &b));
-				*res = JSON_NewJvalObj(JSON_BOOL, &b, 0);
+				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(b));
 			}
 			break;
 			//}}}
@@ -1754,7 +1850,7 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 		it[i].var_v = NULL;
 	}
 
-	Tcl_IncrRefCount(null = JSON_NewJvalObj(JSON_NULL, NULL, 0));
+	Tcl_IncrRefCount(null = JSON_NewJvalObj(JSON_NULL, NULL));
 
 	for (i=0; i<iterators; i++) {
 		int			loops, type;
@@ -1870,6 +1966,128 @@ done:
 		Tcl_SetObjResult(interp, res);
 
 	return retcode;
+}
+
+//}}}
+static int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
+{
+	int							type, indent_len, pad_len, next_pad_len, count;
+	const char*					pad_str;
+	const char*					next_pad_str;
+	Tcl_Obj*					next_pad;
+	Tcl_Obj*					val;
+	struct serialize_context	scx;
+
+	scx.ds = ds;
+	scx.serialize_mode = SERIALIZE_NORMAL;
+	scx.fromdict = NULL;
+
+	TEST_OK(JSON_GetJvalFromObj(interp, json, &type, &val));
+
+	Tcl_GetStringFromObj(indent, &indent_len);
+	pad_str = Tcl_GetStringFromObj(pad, &pad_len);
+
+	switch (type) {
+		case JSON_OBJECT: //{{{
+			{
+				int				done, k_len, max=0, size;
+				Tcl_DictSearch	search;
+				Tcl_Obj*		k;
+				Tcl_Obj*		v;
+				const char*		key_pad_buf = "                    ";	// Must be at least 20 chars long (max cap below)
+
+				TEST_OK(Tcl_DictObjSize(interp, val, &size));
+				if (size == 0) {
+					Tcl_DStringAppend(ds, "{}", 2);
+					break;
+				}
+
+				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
+
+				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+					Tcl_GetStringFromObj(k, &k_len);
+					if (k_len <= 20 && k_len > max)
+						max = k_len;
+				}
+				Tcl_DictObjDone(&search);
+
+				if (max > 20)
+					max = 20;		// If this cap is changed be sure to adjust the key_pad_buf length above
+
+				next_pad = Tcl_DuplicateObj(pad);
+				Tcl_AppendObjToObj(next_pad, indent);
+
+				next_pad_str = Tcl_GetStringFromObj(next_pad, &next_pad_len);
+
+				Tcl_DStringAppend(ds, "{\n", 2);
+
+				count = 0;
+				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
+				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+					Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
+					append_json_string(&scx, k);
+					Tcl_DStringAppend(ds, ": ", 2);
+
+					Tcl_GetStringFromObj(k, &k_len);
+					if (k_len < max)
+						Tcl_DStringAppend(ds, key_pad_buf, max-k_len);
+
+					if (json_pretty(interp, v, indent, next_pad, ds) != TCL_OK) {
+						Tcl_DictObjDone(&search);
+						return TCL_ERROR;
+					}
+
+					if (++count < size) {
+						Tcl_DStringAppend(ds, ",\n", 2);
+					} else {
+						Tcl_DStringAppend(ds, "\n", 1);
+					}
+				}
+				Tcl_DictObjDone(&search);
+
+				Tcl_DStringAppend(ds, pad_str, pad_len);
+				Tcl_DStringAppend(ds, "}", 1);
+			}
+			break;
+			//}}}
+
+		case JSON_ARRAY: //{{{
+			{
+				int			i, oc;
+				Tcl_Obj**	ov;
+
+				TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
+
+				next_pad = Tcl_DuplicateObj(pad);
+				Tcl_AppendObjToObj(next_pad, indent);
+				next_pad_str = Tcl_GetStringFromObj(next_pad, &next_pad_len);
+
+				if (oc == 0) {
+					Tcl_DStringAppend(ds, "[]", 2);
+				} else {
+					Tcl_DStringAppend(ds, "[\n", 2);
+					count = 0;
+					for (i=0; i<oc; i++) {
+						Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
+						TEST_OK(json_pretty(interp, ov[i], indent, next_pad, ds));
+						if (++count < oc) {
+							Tcl_DStringAppend(ds, ",\n", 2);
+						} else {
+							Tcl_DStringAppend(ds, "\n", 1);
+						}
+					}
+					Tcl_DStringAppend(ds, pad_str, pad_len);
+					Tcl_DStringAppend(ds, "]", 1);
+				}
+			}
+			break;
+			//}}}
+
+		default:
+			serialize(interp, &scx, json);
+	}
+
+	return TCL_OK;
 }
 
 //}}}
@@ -2242,9 +2460,28 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			break;
 			//}}}
 		case M_PRETTY: //{{{
-			if (objc < 3) CHECK_ARGS(2, "pretty json_val");
-			// TODO
-			THROW_ERROR("Not implemented yet");
+			{
+				Tcl_DString	ds;
+				Tcl_Obj*	indent;
+				Tcl_Obj*	pad = Tcl_NewStringObj("", 0);
+
+				if (objc < 3 || objc > 4)
+					CHECK_ARGS(2, "pretty json_val ?indent?");
+
+				if (objc > 3) {
+					indent = objv[3];
+				} else {
+					indent = Tcl_NewStringObj("    ", 4);
+				}
+
+				Tcl_DStringInit(&ds);
+				if (json_pretty(interp, objv[2], indent, pad, &ds) != TCL_OK) {
+					Tcl_DStringFree(&ds);
+					return TCL_ERROR;
+				}
+				Tcl_DStringResult(interp, &ds);
+				Tcl_DStringFree(&ds);
+			}
 			break;
 			//}}}
 			/*
@@ -2317,14 +2554,66 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 }
 
 //}}}
+void free_interp_cx(ClientData cdata) //{{{
+{
+	struct interp_cx* l = cdata;
+	Tcl_HashEntry*		he;
+	Tcl_HashSearch		search;
+	struct kc_entry*	e;
+
+	l->interp = NULL;
+
+	Tcl_DecrRefCount(l->tcl_true);  l->tcl_true = NULL;
+	Tcl_DecrRefCount(l->tcl_false); l->tcl_false = NULL;
+
+	Tcl_DecrRefCount(l->tcl_empty);
+	Tcl_DecrRefCount(l->tcl_empty); l->tcl_empty = NULL;
+
+	he = Tcl_FirstHashEntry(&l->kc, &search);
+	while (he) {
+		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(he);
+
+		e = &l->kc_entries[idx];
+
+		Tcl_DeleteHashEntry(he);
+		Tcl_DecrRefCount(e->val);
+		Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
+		mark_free(l->freemap, idx);
+		e->val = NULL;
+
+		he = Tcl_NextHashEntry(&search);
+	}
+	l->kc_count = 0;
+
+	Tcl_DeleteHashTable(&l->kc);
+	free(l); l = NULL;
+}
+
+//}}}
 int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
+	struct interp_cx*	l = NULL;
+
 	if (Tcl_InitStubs(interp, "8.5", 0) == NULL)
 		return TCL_ERROR;
 
 	Tcl_RegisterObjType(&json_type);
 
-	NEW_CMD("json", jsonObjCmd);
+	l = (struct interp_cx*)malloc(sizeof *l);
+	l->interp = interp;
+	Tcl_IncrRefCount(l->tcl_true  = Tcl_NewStringObj("1", 1));
+	Tcl_IncrRefCount(l->tcl_false = Tcl_NewStringObj("0", 1));
+	Tcl_IncrRefCount(l->tcl_empty = Tcl_NewStringObj("", 0));
+
+	// Ensure the empty string rep is considered "shared"
+	Tcl_IncrRefCount(l->tcl_empty);
+
+	Tcl_InitHashTable(&l->kc, TCL_STRING_KEYS);
+	l->kc_count = 0;
+	memset(&l->freemap, 0xFF, sizeof(l->freemap));
+
+	Tcl_CreateObjCommand(interp, "::rl_json::json", jsonObjCmd, (ClientData)l, free_interp_cx);
+	TEST_OK(Tcl_EvalEx(interp, "namespace eval ::rl_json {namespace export *}", -1, TCL_EVAL_DIRECT | TCL_EVAL_GLOBAL));
 
 	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
 

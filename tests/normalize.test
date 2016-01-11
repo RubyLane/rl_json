@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test normalize-1.1 {Normalize a JSON value} -body { #<<<
 	json normalize {

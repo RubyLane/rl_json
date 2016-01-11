@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test to_tcl-1.1 {Parse JSON and convert to closest Tcl value, object} -body { #<<<
 	set json	{

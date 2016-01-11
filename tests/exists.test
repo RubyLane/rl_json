@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test exists-1.1 {exists a value from an object} -body { #<<<
 	json exists {

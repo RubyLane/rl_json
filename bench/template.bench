@@ -5,6 +5,8 @@ if {"bench" ni [info commands bench]} {
 
 package require rl_json
 
+namespace import rl_json::json
+
 bench template-1.1 {Basic templated document creation} -setup { #<<<
 	set tmpl {
 		{
