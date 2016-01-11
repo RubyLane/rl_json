@@ -173,12 +173,6 @@ test set-2.1 {Do Nothing Gracefully (sort of - don't blow up if an empty path is
 	unset -nocomplain json
 } -result match
 #>>>
-test set-3.1 {array append} -body { #<<<
-	set jsobj [json new array]
-	json set jsobj end [json new string asdf]
-	set jsobj
-} -result {["asdf"]}
-#>>>
 
 test set-3.1 {Create missing objects in path} -setup { #<<<
 	set json {
@@ -339,6 +333,14 @@ test set-6.1 {Set an existing element in an array, end} -setup { #<<<
 } -cleanup {
 	unset -nocomplain json
 } -result {{"foo":["a","b","updated"]}}
+#>>>
+test set-6.1.2 {Set a new element in an empty array, end} -body { #<<<
+	set json	[json new array]
+	json set json end [json new string asdf]
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {["asdf"]}
 #>>>
 test set-6.2 {Prepend an element in an array, end-relative} -setup { #<<<
 	set json {
