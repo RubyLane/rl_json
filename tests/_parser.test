@@ -1267,6 +1267,12 @@ test parser/whitespace-9.4 {Comment terminated at EOF} -body { #<<<
 	json get {9.4/* はhello*/}
 } -result 9.4
 #>>>
+test parser/whitespace-9.5 {Multiline comment} -body { #<<<
+	json get {9.5/* はhello
+					"foo"
+				  */}
+} -result 9.5
+#>>>
 
 ::tcltest::cleanupTests
 return

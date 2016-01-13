@@ -177,7 +177,7 @@ consume_space_or_comment:
 			p++;
 
 			while (likely(p < e-2 && *p != '*')) {
-				if (unlikely(*p <= 0x1f)) goto err_illegal_char;
+				if (unlikely(*p <= 0x1f && !is_whitespace(*p))) goto err_illegal_char;
 				char_advance(&p, char_adj);
 			}
 
