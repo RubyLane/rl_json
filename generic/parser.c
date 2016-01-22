@@ -171,7 +171,7 @@ consume_space_or_comment:
 		if (*p == '/') {
 			p++;
 
-			while (likely(p < e && *p != '\n' && (*p > 0x1f || is_whitespace(*p))))
+			while (likely(p < e && (*p > 0x1f || *p == 0x09)))
 				char_advance(&p, char_adj);
 		} else if (*p == '*') {
 			p++;
