@@ -1273,6 +1273,13 @@ test parser/whitespace-9.5 {Multiline comment} -body { #<<<
 				  */}
 } -result 9.5
 #>>>
+test parser/whitespace-9.6 {Commented object key} -body { #<<<
+	json template {
+		{
+			//"foo":	{}
+		}
+	}
+} -result "{}"
 
 ::tcltest::cleanupTests
 return
