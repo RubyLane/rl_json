@@ -8,6 +8,7 @@ autom4te.cache
 config.log
 config.status
 Makefile
+pkgIndex.tcl
 cachegrind.out*
 perf.data
 perf.data.old
