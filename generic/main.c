@@ -1827,6 +1827,7 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 		int				data_i;
 		int				var_c;
 		Tcl_Obj**		var_v;
+		int				is_array;
 
 		// Dict search related state - when iterating over JSON objects
 		Tcl_DictSearch	search;
@@ -1847,6 +1848,7 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 	for (i=0; i<iterators; i++) {
 		it[i].search.dictionaryPtr = NULL;
 		it[i].data_v = NULL;
+		it[i].is_array = 0;
 		it[i].var_v = NULL;
 	}
 
@@ -1862,12 +1864,16 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 
 		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, varlist, &it[i].var_c, &it[i].var_v));
 
+		if (it[i].var_c == 0)
+			THROW_ERROR_LABEL(done, retcode, "foreach varlist is empty");
+
 		TEST_OK_LABEL(done, retcode, JSON_GetJvalFromObj(interp, objv[i*2+1], &type, &val));
 		switch (type) {
 			case JSON_ARRAY:
 				TEST_OK_LABEL(done, retcode,
 						Tcl_ListObjGetElements(interp, val, &it[i].data_c, &it[i].data_v));
 				it[i].data_i = 0;
+				it[i].is_array = 1;
 				loops = (int)ceil(it[i].data_c / (double)it[i].var_c);
 
 				break;
@@ -1878,6 +1884,14 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 
 				TEST_OK_LABEL(done, retcode, Tcl_DictObjSize(interp, val, &loops));
 				TEST_OK_LABEL(done, retcode, Tcl_DictObjFirst(interp, val, &it[i].search, &it[i].k, &it[i].v, &it[i].done));
+				break;
+
+			case JSON_NULL:
+				it[i].data_c = 0;
+				it[i].data_v = NULL;
+				it[i].data_i = 0;
+				it[i].is_array = 1;
+				loops = 0;
 				break;
 
 			default:
@@ -1897,7 +1911,7 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 		for (j=0; j<iterators; j++) {
 			struct iterator* this_it = &it[j];
 
-			if (this_it->data_v) { // Iterating over a JSON array
+			if (this_it->is_array) { // Iterating over a JSON array
 				//fprintf(stderr, "Array iteration, data_i: %d, length %d\n", this_it->data_i, this_it->data_c);
 				for (k=0; k<this_it->var_c; k++) {
 					Tcl_Obj* it_val;

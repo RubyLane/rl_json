@@ -6,6 +6,10 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
+test foreach-1.0 {Single iterator, no vars, over array} -body { #<<<
+	json foreach {} {["a", "b", "other var", null, true, false, {"x": 42}]} {}
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
 test foreach-1.1 {Single iterator, single var, over array} -setup { #<<<
 	set i	0
 	set res	{}
@@ -15,7 +19,7 @@ test foreach-1.1 {Single iterator, single var, over array} -setup { #<<<
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res elem
 } -result [list \
 	"1(\"a\")(a)" \
 	"2(\"b\")(b)" \
@@ -37,7 +41,7 @@ test foreach-2.1 {Single iterator, multi vars, over array} -setup { #<<<
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res x y
 } -result [list \
 	"1(\"a\")(a)(\"b\")(b)" \
 	"2(\"other var\")(other var)(null)()" \
@@ -45,6 +49,15 @@ test foreach-2.1 {Single iterator, multi vars, over array} -setup { #<<<
 	"4({\"x\":42})(x 42)(42.1)(42.1)" \
 	"5(\"last\")(last)(null)()" \
 ]
+#>>>
+test foreach-3.0 {Multiple iterators, no vars, over array} -body { #<<<
+	json foreach \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		{}    {["A", "B", "OTHER VAR", null, true, {"X": 42}]} \
+	{}
+} -cleanup {
+	unset -nocomplain elem
+} -returnCodes error -result "foreach varlist is empty"
 #>>>
 test foreach-3.1 {Multiple iterators, single var, over array} -setup { #<<<
 	set i	0
@@ -58,7 +71,7 @@ test foreach-3.1 {Multiple iterators, single var, over array} -setup { #<<<
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res elem elem2
 } -result [list \
 	1("a")(a)/("A")(A) \
 	2("b")(b)/("B")(B) \
@@ -86,7 +99,7 @@ test foreach-4.1 {Multiple iterators, multi vars, over array} -setup { #<<<
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res x y a b
 } -result [list \
 	"1(\"a\")(a)(\"b\")(b)/(\"A\")(A)(\"B\")(B)" \
 	"2(\"other var\")(other var)(null)()/(\"OTHER VAR\")(OTHER VAR)(null)()" \
@@ -104,7 +117,7 @@ test foreach-5.1 {Single iterator, single var, over array, continue} -setup { #<
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res elem
 } -result [list \
 	"1(\"a\")(a)" \
 	"2(\"b\")(b)" \
@@ -124,7 +137,7 @@ test foreach-5.2 {Single iterator, single var, over array, continue on final ite
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res elem
 } -result [list \
 	"1(\"a\")(a)" \
 	"2(\"b\")(b)" \
@@ -141,11 +154,84 @@ test foreach-6.1 {Single iterator, single var, over array, break} -setup { #<<<
 	}
 	set res
 } -cleanup {
-	unset -nocomplain i res
+	unset -nocomplain i res elem
 } -result [list \
 	"1(\"a\")(a)" \
 	"2(\"b\")(b)" \
 	"3(\"other var\")(other var)" \
+]
+#>>>
+test foreach-7.1 {Single iterator, single var, over null} -setup { #<<<
+	set i	0
+} -body {
+	json foreach elem null { incr i }
+	set i
+} -cleanup {
+	unset -nocomplain i elem
+} -result 0
+#>>>
+test foreach-7.2 {Single iterator, single var, over empty array} -setup { #<<<
+	set i	0
+} -body {
+	json foreach elem {[]} { incr i }
+	set i
+} -cleanup {
+	unset -nocomplain i elem
+} -result 0
+#>>>
+test foreach-7.3 {Single iterator, multi vars, over null} -setup { #<<<
+	set i	0
+} -body {
+	json foreach {x y} null { incr i }
+	set i
+} -cleanup {
+	unset -nocomplain i x y
+} -result 0
+#>>>
+test foreach-8.1 {Multiple iterators, single var, over null} -setup { #<<<
+	set i	0
+	set res	{}
+} -body {
+	json foreach \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {null} \
+	{
+		lappend res	[string cat [incr i]($elem)([json get $elem])/($elem2)([json get $elem2])]
+	}
+	set res
+} -cleanup {
+	unset -nocomplain i res elem elem2
+} -result [list \
+	1("a")(a)/(null)() \
+	2("b")(b)/(null)() \
+	{3("other var")(other var)/(null)()} \
+	4(null)()/(null)() \
+	5(true)(1)/(null)() \
+	"6(false)(0)/(null)()" \
+	"7({\"x\":42})(x 42)/(null)()" \
+]
+#>>>
+test foreach-8.2 {Multiple iterators, single var, over empty array} -setup { #<<<
+	set i	0
+	set res	{}
+} -body {
+	json foreach \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {[]} \
+	{
+		lappend res	[string cat [incr i]($elem)([json get $elem])/($elem2)([json get $elem2])]
+	}
+	set res
+} -cleanup {
+	unset -nocomplain i res elem elem2
+} -result [list \
+	1("a")(a)/(null)() \
+	2("b")(b)/(null)() \
+	{3("other var")(other var)/(null)()} \
+	4(null)()/(null)() \
+	5(true)(1)/(null)() \
+	"6(false)(0)/(null)()" \
+	"7({\"x\":42})(x 42)/(null)()" \
 ]
 #>>>
 
