@@ -537,13 +537,13 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 				if (subst_type == JSON_DYN_JSON) {
 					if (subst_val != NULL) Tcl_DecrRefCount(subst_val);
 					res = JSON_GetJvalFromObj(interp, subst_val, &subst_type, &subst_val);
-					Tcl_IncrRefCount(subst_val);
+					if (subst_val != NULL) Tcl_IncrRefCount(subst_val);
 					scx->serialize_mode = SERIALIZE_NORMAL;
 					reset_mode = 1;
 				} else if (subst_type == JSON_DYN_TEMPLATE) {
 					if (subst_val != NULL) Tcl_DecrRefCount(subst_val);
 					res = JSON_GetJvalFromObj(interp, subst_val, &subst_type, &subst_val);
-					Tcl_IncrRefCount(subst_val);
+					if (subst_val != NULL) Tcl_IncrRefCount(subst_val);
 				} else if (subst_type == JSON_NUMBER) {
 					Tcl_Obj*	forced;
 
