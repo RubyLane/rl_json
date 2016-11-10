@@ -2187,7 +2187,7 @@ done:
 #endif
 static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	int method;
+	int method, retcode=TCL_OK;
 	static const char *methods[] = {
 		"parse",
 		"normalize",
@@ -2460,14 +2460,14 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			if (objc < 5 || (objc-3) % 2 != 0)
 				CHECK_ARGS(5, "foreach varlist datalist ?varlist datalist ...? script");
 
-			TEST_OK(foreach(interp, objc-2, objv+2, 0));
+			retcode = foreach(interp, objc-2, objv+2, 0);
 			break;
 			//}}}
 		case M_LMAP: //{{{
 			if (objc < 5 || (objc-3) % 2 != 0)
 				CHECK_ARGS(5, "lmap varlist datalist ?varlist datalist ...? script");
 
-			TEST_OK(foreach(interp, objc-2, objv+2, 1));
+			retcode = foreach(interp, objc-2, objv+2, 1);
 			break;
 			//}}}
 		case M_NOP: //{{{
@@ -2564,7 +2564,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 			THROW_ERROR("Invalid method");
 	}
 
-	return TCL_OK;
+	return retcode;
 }
 
 //}}}
