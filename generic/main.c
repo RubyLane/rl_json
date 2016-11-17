@@ -198,7 +198,7 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 
 		kce = &l->kc_entries[idx];
 		kce->hits = 0;
-		out = kce->val = Tcl_NewStringObj(bytes, length);;
+		out = kce->val = Tcl_NewStringObj(bytes, length);
 		Tcl_IncrRefCount(out);	// Two references - one for the cache table and one on loan to callers' interim processing.
 		Tcl_IncrRefCount(out);	// Without this, values not referenced elsewhere could reach callers with refCount 1, allowing
 								// the value to be mutated in place and corrupt the state of the cache (hash key not matching obj value)
