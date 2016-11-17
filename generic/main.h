@@ -9,7 +9,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <math.h>
-#include <malloc.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include "parser.h"
