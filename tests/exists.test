@@ -70,6 +70,34 @@ test exists-6.1 {exists of a toplevel value} -body { #<<<
 	}
 } -result 1
 #>>>
+test exists-7.1 {exists for invalid value - empty string} -body { #<<<
+	json exists {} foo
+} -result 0
+#>>>
+test exists-7.2 {exists for invalid value - truncated object} -body { #<<<
+	json exists "\{\"foo\":\"bar\"" foo
+} -result 0
+#>>>
+test exists-7.3 {exists for invalid value - truncated array} -body { #<<<
+	json exists {["foo", "bar"} 1
+} -result 0
+#>>>
+test exists-7.4 {exists for invalid value - truncated string} -body { #<<<
+	json exists {"foo} foo
+} -result 0
+#>>>
+test exists-7.5 {exists for invalid value - truncated boolean: true} -body { #<<<
+	json exists {tru} foo
+} -result 0
+#>>>
+test exists-7.6 {exists for invalid value - truncated boolean: false} -body { #<<<
+	json exists {fals} foo
+} -result 0
+#>>>
+test exists-7.7 {exists for invalid value - truncated null} -body { #<<<
+	json exists {nul} foo
+} -result 0
+#>>>
 
 # Modifiers - ?type
 test exists-20.1 {type modifier, string} -body { #<<<

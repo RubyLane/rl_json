@@ -69,6 +69,34 @@ test get_typed-6.1 {get_typed of a toplevel value} -body { #<<<
 	}
 } -result [list [dict create foo bar baz [list str 123 123.4 1 0 "" [dict create inner obj]]] object]
 #>>>
+test get_typed-7.1 {get_typed for invalid value - empty string} -body { #<<<
+	json get_typed {} foo
+} -returnCodes error -result {Error parsing JSON value: No JSON value found at offset 0}
+#>>>
+test get_typed-7.2 {get_typed for invalid value - truncated object} -body { #<<<
+	json get_typed "\{\"foo\":\"bar\"" foo
+} -returnCodes error -result {Error parsing JSON value: Unterminated object at offset 0}
+#>>>
+test get_typed-7.3 {get_typed for invalid value - truncated array} -body { #<<<
+	json get_typed {["foo", "bar"} 1
+} -returnCodes error -result {Error parsing JSON value: Unterminated array at offset 0}
+#>>>
+test get_typed-7.4 {get_typed for invalid value - truncated string} -body { #<<<
+	json get_typed {"foo} foo
+} -returnCodes error -result {Error parsing JSON value: Document truncated at offset 4}
+#>>>
+test get_typed-7.5 {get_typed for invalid value - truncated boolean: true} -body { #<<<
+	json get_typed {tru} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
+test get_typed-7.6 {get_typed for invalid value - truncated boolean: false} -body { #<<<
+	json get_typed {fals} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
+test get_typed-7.7 {get_typed for invalid value - truncated null} -body { #<<<
+	json get_typed {nul} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
 
 # Modifiers - ?type
 test get_typed-20.1 {type modifier, string} -body { #<<<

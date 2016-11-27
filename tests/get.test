@@ -69,6 +69,34 @@ test get-6.1 {get of a toplevel value} -body { #<<<
 	}
 } -result [dict create foo bar baz [list str 123 123.4 1 0 "" [dict create inner obj]]]
 #>>>
+test get-7.1 {get for invalid value - empty string} -body { #<<<
+	json get {} foo
+} -returnCodes error -result {Error parsing JSON value: No JSON value found at offset 0}
+#>>>
+test get-7.2 {get for invalid value - truncated object} -body { #<<<
+	json get "\{\"foo\":\"bar\"" foo
+} -returnCodes error -result {Error parsing JSON value: Unterminated object at offset 0}
+#>>>
+test get-7.3 {get for invalid value - truncated array} -body { #<<<
+	json get {["foo", "bar"} 1
+} -returnCodes error -result {Error parsing JSON value: Unterminated array at offset 0}
+#>>>
+test get-7.4 {get for invalid value - truncated string} -body { #<<<
+	json get {"foo} foo
+} -returnCodes error -result {Error parsing JSON value: Document truncated at offset 4}
+#>>>
+test get-7.5 {get for invalid value - truncated boolean: true} -body { #<<<
+	json get {tru} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
+test get-7.6 {get for invalid value - truncated boolean: false} -body { #<<<
+	json get {fals} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
+test get-7.7 {get for invalid value - truncated null} -body { #<<<
+	json get {nul} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
 
 # Modifiers - ?type
 test get-20.1 {type modifier, string} -body { #<<<

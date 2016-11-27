@@ -1364,7 +1364,15 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 
 	*target = src;
 
-	TEST_OK(JSON_GetJvalFromObj(interp, *target, &type, &val));
+	if (unlikely(JSON_GetJvalFromObj(interp, *target, &type, &val) != TCL_OK)) {
+		if (exists) {
+			Tcl_ResetResult(interp);
+			// [dict exists] considers any test to be false when applied to an invalid value, so we do the same
+			EXISTS(0);
+			return TCL_OK;
+		}
+		return TCL_ERROR;
+	}
 
 	//fprintf(stderr, "resolve_path, initial type %s\n", type_names[type]);
 	for (i=0; i<pathc; i++) {

@@ -75,6 +75,34 @@ test extract-6.1 {extract of a toplevel value} -body { #<<<
 		}
 	}
 #>>>
+test extract-7.1 {extract for invalid value - empty string} -body { #<<<
+	json extract {} foo
+} -returnCodes error -result {Error parsing JSON value: No JSON value found at offset 0}
+#>>>
+test extract-7.2 {extract for invalid value - truncated object} -body { #<<<
+	json extract "\{\"foo\":\"bar\"" foo
+} -returnCodes error -result {Error parsing JSON value: Unterminated object at offset 0}
+#>>>
+test extract-7.3 {extract for invalid value - truncated array} -body { #<<<
+	json extract {["foo", "bar"} 1
+} -returnCodes error -result {Error parsing JSON value: Unterminated array at offset 0}
+#>>>
+test extract-7.4 {extract for invalid value - truncated string} -body { #<<<
+	json extract {"foo} foo
+} -returnCodes error -result {Error parsing JSON value: Document truncated at offset 4}
+#>>>
+test extract-7.5 {extract for invalid value - truncated boolean: true} -body { #<<<
+	json extract {tru} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
+test extract-7.6 {extract for invalid value - truncated boolean: false} -body { #<<<
+	json extract {fals} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
+test extract-7.7 {extract for invalid value - truncated null} -body { #<<<
+	json extract {nul} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0}
+#>>>
 
 # Modifiers - ?type
 test extract-20.1 {type modifier, string} -body { #<<<
