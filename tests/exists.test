@@ -24,6 +24,16 @@ test exists-2.1 {exists a value from an object} -body { #<<<
 	} baz
 } -result 1
 #>>>
+test exists-2.2 {exists on a key in an object containing null} -body { #<<<
+	json exists {
+		{
+			"foo": "bar",
+			"bar": null,
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} bar
+} -result 0
+#>>>
 test exists-3.1 {exists a value from a nested object} -body { #<<<
 	json exists {
 		{
@@ -45,6 +55,10 @@ test exists-4.4 {exists an index from an array relative to the end} -body { #<<<
 #>>>
 test exists-4.5 {exists an index from an array relative to the end} -body { #<<<
 	json exists {["a", null, "c", "d"]} end-2
+} -result 0
+#>>>
+test exists-4.5 {exists an index from an array relative to the end} -body { #<<<
+	json exists {["a", null, "c", "d"]} end-3
 } -result 1
 #>>>
 test exists-4.6 {exists an index from an array relative to the end} -body { #<<<

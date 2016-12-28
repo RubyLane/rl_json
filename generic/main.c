@@ -1573,7 +1573,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 	}
 
 	//fprintf(stderr, "Returning target: (%s)\n", Tcl_GetString(*target));
-	EXISTS(1);
+	EXISTS(type != JSON_NULL);
 	return TCL_OK;
 }
 
