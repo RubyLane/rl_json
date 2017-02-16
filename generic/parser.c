@@ -131,26 +131,26 @@ static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 
 	(*p)++;
 	if (unlikely(first >= 0xC0)) {
-		// Advance to next UTF-8 character
-		// TODO: detect invalid sequences?
-		if (first < 0b11100000) {
-			eat = 1;
+	    // Advance to next UTF-8 character
+	    // TODO: detect invalid sequences?
+	    if (first < 0xe0 /*0b11100000*/) {
+		eat = 1;
 #if TCL_UTF_MAX == 3
-		} else {
-			eat = 2;
+	    } else {
+		eat = 2;
 #else
-		} else if (first < 0b11110000) {
-			eat = 2;
-		} else if (first < 0b11111000) {
-			eat = 3;
-		} else if (first < 0b11111100) {
-			eat = 4;
-		} else {
-			eat = 5;
+	    } else if (first < 0xf0 /*0b11110000*/) {
+		eat = 2;
+	    } else if (first < 0xf8 /* 0b11111000*/) {
+		eat = 3;
+	    } else if (first < 0xfc /*0b11111100*/) {
+		eat = 4;
+	    } else {
+		eat = 5;
 #endif
-		}
-		*p += eat;
-		*char_adj += eat;
+	    }
+	    *p += eat;
+	    *char_adj += eat;
 	}
 }
 
@@ -391,7 +391,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 					if (unlikely(p == t)) goto err;	// No integer part after the decimal point
 				}
 
-				if (unlikely((*p | 0b100000) == 'e')) {	// p could point at the NULL terminator at this point
+				if (unlikely((*p | 0x20 /*0b100000*/) == 'e')) {	// p could point at the NULL terminator at this point
 					p++;
 					if (*p == '+' || *p == '-') p++;
 					t = p;

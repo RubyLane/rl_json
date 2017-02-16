@@ -1,5 +1,10 @@
 #include "main.h"
 
+#if defined(_WIN32)
+#define alloca(x) _alloca(x)
+#define snprintf _snprintf
+#endif
+
 static void free_internal_rep(Tcl_Obj* obj);
 static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest);
 static void update_string_rep(Tcl_Obj* obj);
@@ -108,7 +113,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 static int first_free(long long* freemap) //{{{
 {
 	int	i=0, bit, res;
-	while ((bit = ffsll(freemap[i])) == 0) {
+	while ((bit = /*ffsll*/(unsigned long long)(freemap[i])) == 0) {
 		i++;
 	}
 	res = i * (sizeof(long long)*8) + (bit-1);
@@ -162,11 +167,12 @@ static void age_cache(struct interp_cx* l) //{{{
 //}}}
 Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length) //{{{
 {
-	char				buf[STRING_DEDUP_MAX];
-	const char			*keyname;
-	int					is_new;
-	struct kc_entry*	kce;
-	Tcl_Obj*			out;
+	char buf[STRING_DEDUP_MAX];
+	const char *keyname;
+	int is_new;
+	struct kc_entry* kce;
+	Tcl_Obj* out;
+	Tcl_HashEntry* entry = NULL;
 
 	if (length == 0) {
 		return l->tcl_empty;
@@ -184,7 +190,7 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 		buf[length] = 0;
 		keyname = buf;
 	}
-	Tcl_HashEntry* entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
+	entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
 
 	if (is_new) {
 		ptrdiff_t	idx = first_free(l->freemap);
@@ -1829,165 +1835,173 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 //}}}
 static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int collecting) //{{{
 {
-	struct iterator {
-		int				data_c;
-		Tcl_Obj**		data_v;
-		int				data_i;
-		int				var_c;
-		Tcl_Obj**		var_v;
-		int				is_array;
+    struct iterator {
+	int			data_c;
+	Tcl_Obj**		data_v;
+	int			data_i;
+	int			var_c;
+	Tcl_Obj**		var_v;
+	int			is_array;
+	
+	// Dict search related state - when iterating over JSON objects
+	Tcl_DictSearch	search;
+	Tcl_Obj*		k;
+	Tcl_Obj*		v;
+	int			done;
+    };
 
-		// Dict search related state - when iterating over JSON objects
-		Tcl_DictSearch	search;
-		Tcl_Obj*		k;
-		Tcl_Obj*		v;
-		int				done;
-	};
+    // Caller must ensure that objc is valid
+    int		i, j, k, iterators=(objc-1)/2, max_loops=0, retcode=TCL_OK;
+    Tcl_Obj*	script = objv[objc-1];
+    Tcl_Obj*	null;
+    Tcl_Obj*	res = NULL;
+#if defined(__GNUC__)
+    struct iterator	it[iterators];
+#else
+    /*struct iterator *it = (struct iterator*)malloc(iterators*sizeof(struct iterator));*/
+    struct iterator *it = (struct iterator*)alloca(iterators*sizeof(struct iterator));
+#endif
+    Tcl_IncrRefCount(script);
+    
+    for (i=0; i<iterators; i++) {
+	it[i].search.dictionaryPtr = NULL;
+	it[i].data_v = NULL;
+	it[i].is_array = 0;
+	it[i].var_v = NULL;
+    }
+    
+    Tcl_IncrRefCount(null = JSON_NewJvalObj(JSON_NULL, NULL));
+    
+    for (i=0; i<iterators; i++) {
+	int		loops, type;
+	Tcl_Obj*	val;
+	Tcl_Obj*	varlist = objv[i*2];
+	
+	if (Tcl_IsShared(varlist))
+	    varlist = Tcl_DuplicateObj(varlist);
+	
+	TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, varlist, &it[i].var_c, &it[i].var_v));
+	
+	if (it[i].var_c == 0)
+	    THROW_ERROR_LABEL(done, retcode, "foreach varlist is empty");
 
-	// Caller must ensure that objc is valid
-	int			i, j, k, iterators=(objc-1)/2, max_loops=0, retcode=TCL_OK;
-	Tcl_Obj*	script = objv[objc-1];
-	Tcl_Obj*	null;
-	Tcl_Obj*	res = NULL;
-	struct iterator	it[iterators];
+	TEST_OK_LABEL(done, retcode, JSON_GetJvalFromObj(interp, objv[i*2+1], &type, &val));
+	switch (type) {
+	  case JSON_ARRAY:
+	    TEST_OK_LABEL(done, retcode,
+			  Tcl_ListObjGetElements(interp, val, &it[i].data_c, &it[i].data_v));
+	    it[i].data_i = 0;
+	    it[i].is_array = 1;
+	    loops = (int)ceil(it[i].data_c / (double)it[i].var_c);
 
-	Tcl_IncrRefCount(script);
+	    break;
 
-	for (i=0; i<iterators; i++) {
-		it[i].search.dictionaryPtr = NULL;
-		it[i].data_v = NULL;
-		it[i].is_array = 0;
-		it[i].var_v = NULL;
+	  case JSON_OBJECT:
+	    if (it[i].var_c != 2)
+		THROW_ERROR_LABEL(done, retcode, "When iterating over a JSON object, varlist must be a pair of varnames (key value)");
+
+	    TEST_OK_LABEL(done, retcode, Tcl_DictObjSize(interp, val, &loops));
+	    TEST_OK_LABEL(done, retcode, Tcl_DictObjFirst(interp, val, &it[i].search, &it[i].k, &it[i].v, &it[i].done));
+	    break;
+
+	  case JSON_NULL:
+	    it[i].data_c = 0;
+	    it[i].data_v = NULL;
+	    it[i].data_i = 0;
+	    it[i].is_array = 1;
+	    loops = 0;
+	    break;
+
+	  default:
+	    THROW_ERROR_LABEL(done, retcode, "Cannot iterate over JSON type ", type_names[type]);
 	}
 
-	Tcl_IncrRefCount(null = JSON_NewJvalObj(JSON_NULL, NULL));
+	if (loops > max_loops)
+	    max_loops = loops;
+    }
 
-	for (i=0; i<iterators; i++) {
-		int			loops, type;
-		Tcl_Obj*	val;
-		Tcl_Obj*	varlist = objv[i*2];
+    if (collecting)
+	res = Tcl_NewListObj(0, NULL);
 
-		if (Tcl_IsShared(varlist))
-			varlist = Tcl_DuplicateObj(varlist);
+    for (i=0; i<max_loops; i++) {
+	//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
+	// Set the iterator variables
+	for (j=0; j<iterators; j++) {
+	    struct iterator* this_it = &it[j];
 
-		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, varlist, &it[i].var_c, &it[i].var_v));
+	    if (this_it->is_array) { // Iterating over a JSON array
+		//fprintf(stderr, "Array iteration, data_i: %d, length %d\n", this_it->data_i, this_it->data_c);
+		for (k=0; k<this_it->var_c; k++) {
+		    Tcl_Obj* it_val;
 
-		if (it[i].var_c == 0)
-			THROW_ERROR_LABEL(done, retcode, "foreach varlist is empty");
-
-		TEST_OK_LABEL(done, retcode, JSON_GetJvalFromObj(interp, objv[i*2+1], &type, &val));
-		switch (type) {
-			case JSON_ARRAY:
-				TEST_OK_LABEL(done, retcode,
-						Tcl_ListObjGetElements(interp, val, &it[i].data_c, &it[i].data_v));
-				it[i].data_i = 0;
-				it[i].is_array = 1;
-				loops = (int)ceil(it[i].data_c / (double)it[i].var_c);
-
-				break;
-
-			case JSON_OBJECT:
-				if (it[i].var_c != 2)
-					THROW_ERROR_LABEL(done, retcode, "When iterating over a JSON object, varlist must be a pair of varnames (key value)");
-
-				TEST_OK_LABEL(done, retcode, Tcl_DictObjSize(interp, val, &loops));
-				TEST_OK_LABEL(done, retcode, Tcl_DictObjFirst(interp, val, &it[i].search, &it[i].k, &it[i].v, &it[i].done));
-				break;
-
-			case JSON_NULL:
-				it[i].data_c = 0;
-				it[i].data_v = NULL;
-				it[i].data_i = 0;
-				it[i].is_array = 1;
-				loops = 0;
-				break;
-
-			default:
-				THROW_ERROR_LABEL(done, retcode, "Cannot iterate over JSON type ", type_names[type]);
+		    if (this_it->data_i < this_it->data_c) {
+			//fprintf(stderr, "Pulling next element %d off the data list (length %d)\n", this_it->data_i, this_it->data_c);
+			it_val = this_it->data_v[this_it->data_i++];
+		    } else {
+			//fprintf(stderr, "Ran out of elements in this data list, setting null\n");
+			it_val = null;
+		    }
+		    //fprintf(stderr, "pre  Iteration %d, this_it: %p, setting var %p, varname ref: %d\n",
+		    //		i, this_it, this_it->var_v[k]/*, Tcl_GetString(this_it->var_v[k])*/, this_it->var_v[k]->refCount);
+		    //fprintf(stderr, "varname: \"%s\"\n", Tcl_GetString(it[j].var_v[k]));
+		    //Tcl_ObjSetVar2(interp, this_it->var_v[k], NULL, it_val, 0);
+		    Tcl_ObjSetVar2(interp, this_it->var_v[k], NULL, it_val, 0);
+		    //Tcl_ObjSetVar2(interp, Tcl_NewStringObj("elem", 4), NULL, it_val, 0);
+		    //fprintf(stderr, "post Iteration %d, this_it: %p, setting var %p, varname ref: %d\n",
+		    //		i, this_it, this_it->var_v[k]/*, Tcl_GetString(this_it->var_v[k])*/, this_it->var_v[k]->refCount);
 		}
-
-		if (loops > max_loops)
-			max_loops = loops;
+	    } else { // Iterating over a JSON object
+		//fprintf(stderr, "Object iteration\n");
+		if (!this_it->done) {
+		    // We check that this_it->var_c == 2 in the setup
+		    Tcl_ObjSetVar2(interp, this_it->var_v[0], NULL, this_it->k, 0);
+		    Tcl_ObjSetVar2(interp, this_it->var_v[1], NULL, this_it->v, 0);
+		    Tcl_DictObjNext(&this_it->search, &this_it->k, &this_it->v, &this_it->done);
+		}
+	    }
 	}
 
-	if (collecting)
-		res = Tcl_NewListObj(0, NULL);
+	// TODO: NRE enable
+	retcode = Tcl_EvalObjEx(interp, script, 0);
 
-	for (i=0; i<max_loops; i++) {
-		//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
-		// Set the iterator variables
-		for (j=0; j<iterators; j++) {
-			struct iterator* this_it = &it[j];
+	switch (retcode) {
+	  case TCL_OK:
+	    if (collecting)
+		TEST_OK_LABEL(done, retcode, Tcl_ListObjAppendElement(interp, res, Tcl_GetObjResult(interp)));
+	    break;
 
-			if (this_it->is_array) { // Iterating over a JSON array
-				//fprintf(stderr, "Array iteration, data_i: %d, length %d\n", this_it->data_i, this_it->data_c);
-				for (k=0; k<this_it->var_c; k++) {
-					Tcl_Obj* it_val;
+	  case TCL_CONTINUE:
+	    retcode = TCL_OK;
+	    break;
 
-					if (this_it->data_i < this_it->data_c) {
-						//fprintf(stderr, "Pulling next element %d off the data list (length %d)\n", this_it->data_i, this_it->data_c);
-						it_val = this_it->data_v[this_it->data_i++];
-					} else {
-						//fprintf(stderr, "Ran out of elements in this data list, setting null\n");
-						it_val = null;
-					}
-					//fprintf(stderr, "pre  Iteration %d, this_it: %p, setting var %p, varname ref: %d\n",
-					//		i, this_it, this_it->var_v[k]/*, Tcl_GetString(this_it->var_v[k])*/, this_it->var_v[k]->refCount);
-					//fprintf(stderr, "varname: \"%s\"\n", Tcl_GetString(it[j].var_v[k]));
-					//Tcl_ObjSetVar2(interp, this_it->var_v[k], NULL, it_val, 0);
-					Tcl_ObjSetVar2(interp, this_it->var_v[k], NULL, it_val, 0);
-					//Tcl_ObjSetVar2(interp, Tcl_NewStringObj("elem", 4), NULL, it_val, 0);
-					//fprintf(stderr, "post Iteration %d, this_it: %p, setting var %p, varname ref: %d\n",
-					//		i, this_it, this_it->var_v[k]/*, Tcl_GetString(this_it->var_v[k])*/, this_it->var_v[k]->refCount);
-				}
-			} else { // Iterating over a JSON object
-				//fprintf(stderr, "Object iteration\n");
-				if (!this_it->done) {
-					// We check that this_it->var_c == 2 in the setup
-					Tcl_ObjSetVar2(interp, this_it->var_v[0], NULL, this_it->k, 0);
-					Tcl_ObjSetVar2(interp, this_it->var_v[1], NULL, this_it->v, 0);
-					Tcl_DictObjNext(&this_it->search, &this_it->k, &this_it->v, &this_it->done);
-				}
-			}
-		}
-
-		// TODO: NRE enable
-		retcode = Tcl_EvalObjEx(interp, script, 0);
-
-		switch (retcode) {
-			case TCL_OK:
-				if (collecting)
-					TEST_OK_LABEL(done, retcode, Tcl_ListObjAppendElement(interp, res, Tcl_GetObjResult(interp)));
-				break;
-
-			case TCL_CONTINUE:
-				retcode = TCL_OK;
-				break;
-
-			case TCL_BREAK:
-				retcode = TCL_OK;
-				// falls through
-			default:
-				goto done;
-		}
+	  case TCL_BREAK:
+	    retcode = TCL_OK;
+	    // falls through
+	  default:
+	    goto done;
 	}
+    }
 
 done:
-	//fprintf(stderr, "done\n");
+    //fprintf(stderr, "done\n");
 
-	Tcl_DecrRefCount(script);
+    Tcl_DecrRefCount(script);
 
-	// Close any pending searches
-	for (i=0; i<iterators; i++)
-		if (it[i].search.dictionaryPtr != NULL)
-			Tcl_DictObjDone(&it[i].search);
+    // Close any pending searches
+    for (i=0; i<iterators; i++)
+	if (it[i].search.dictionaryPtr != NULL)
+	    Tcl_DictObjDone(&it[i].search);
+#if defined(__gcc)
+#else
+    /* alloca usage !!!! */
+    /*free(it);*/
+#endif
+    Tcl_DecrRefCount(null);
 
-	Tcl_DecrRefCount(null);
+    if (retcode == TCL_OK && collecting)
+	Tcl_SetObjResult(interp, res);
 
-	if (retcode == TCL_OK && collecting)
-		Tcl_SetObjResult(interp, res);
-
-	return retcode;
+    return retcode;
 }
 
 //}}}
@@ -2612,6 +2626,9 @@ void free_interp_cx(ClientData cdata) //{{{
 }
 
 //}}}
+#if defined(_WIN32)
+__declspec(dllexport)
+#endif
 int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
 	struct interp_cx*	l = NULL;

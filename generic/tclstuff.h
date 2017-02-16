@@ -10,7 +10,7 @@
 			(Tcl_ObjCmdProc *) c_cmd, \
 			(ClientData *) NULL, NULL );
 
-#define THROW_ERROR( msg... )		\
+#define THROW_ERROR( msg,... )						\
 	{								\
 		Tcl_Obj		*res;			\
 		res = Tcl_GetObjResult( interp ); \
@@ -18,7 +18,7 @@
 		return TCL_ERROR;			\
 	}
 
-#define THROW_ERROR_LABEL( label, var, msg... )		\
+#define THROW_ERROR_LABEL( label, var, msg,... )			\
 	{								\
 		Tcl_Obj		*res;			\
 		res = Tcl_GetObjResult( interp ); \
