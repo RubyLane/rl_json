@@ -110,10 +110,24 @@ enum modifiers {
 
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
 
+#if !defined(__GNUC__)
+static int ffsll(long long x)
+{
+    int i=0;
+    long long mask = 1;
+    for(i=0; i<sizeof(long long)*CHAR_BIT; ++i, mask <<= 1) {
+	if(x & mask) {
+	    return i+1;
+	}
+    }
+    return 0;
+}
+#endif
+
 static int first_free(long long* freemap) //{{{
 {
 	int	i=0, bit, res;
-	while ((bit = /*ffsll*/(unsigned long long)(freemap[i])) == 0) {
+	while ((bit = ffsll(freemap[i])) == 0) {
 		i++;
 	}
 	res = i * (sizeof(long long)*8) + (bit-1);
