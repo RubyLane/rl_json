@@ -10,34 +10,29 @@
 			(Tcl_ObjCmdProc *) c_cmd, \
 			(ClientData *) NULL, NULL );
 
-#define THROW_ERROR( ... )		\
-	{								\
-		Tcl_Obj		*res;			\
-		res = Tcl_GetObjResult( interp ); \
-		Tcl_AppendStringsToObj( res, ##__VA_ARGS__, NULL ); \
-		return TCL_ERROR;			\
+#define THROW_ERROR( ... )								\
+	{													\
+		Tcl_AppendResult(interp, ##__VA_ARGS__, NULL);	\
+		return TCL_ERROR;								\
 	}
 
-#define THROW_ERROR_LABEL( label, var, ... )		\
-	{								\
-		Tcl_Obj		*res;			\
-		res = Tcl_GetObjResult( interp ); \
-		Tcl_AppendStringsToObj( res, ##__VA_ARGS__, NULL ); \
-		var = TCL_ERROR; \
-		goto label; \
+#define THROW_ERROR_LABEL( label, var, ... )				\
+	{														\
+		Tcl_AppendResult(interp, ##__VA_ARGS__, NULL);		\
+		var = TCL_ERROR;									\
+		goto label;											\
 	}
 
 // convenience macro to check the number of arguments passed to a function
 // implementing a tcl command against the number expected, and to throw
 // a tcl error if they don't match.  Note that the value of expected does
 // not include the objv[0] object (the function itself)
-#define CHECK_ARGS(expected, msg)	\
-	if (objc != expected + 1) {		\
-		Tcl_Obj		*res;			\
-		res = Tcl_GetObjResult( interp ); \
-		Tcl_AppendStringsToObj( res, "Wrong # of arguments.  Must be \"", \
-				msg, "\"", NULL );	\
-		return TCL_ERROR;			\
+#define CHECK_ARGS(expected, msg)										\
+	if (objc != expected + 1) {											\
+		Tcl_ResetResult( interp );										\
+		Tcl_AppendResult( interp, "Wrong # of arguments.  Must be \"",	\
+						  msg, "\"", NULL );							\
+		return TCL_ERROR;												\
 	}
 
 
