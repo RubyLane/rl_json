@@ -10,19 +10,19 @@
 			(Tcl_ObjCmdProc *) c_cmd, \
 			(ClientData *) NULL, NULL );
 
-#define THROW_ERROR( msg,... )						\
+#define THROW_ERROR( ... )								\
 	{								\
 		Tcl_Obj		*res;			\
 		res = Tcl_GetObjResult( interp ); \
-		Tcl_AppendStringsToObj( res, msg, NULL ); \
+		Tcl_AppendStringsToObj( res, __VA_ARGS__, NULL ); \
 		return TCL_ERROR;			\
 	}
 
-#define THROW_ERROR_LABEL( label, var, msg,... )			\
+#define THROW_ERROR_LABEL( label, var, ... )				\
 	{								\
 		Tcl_Obj		*res;			\
 		res = Tcl_GetObjResult( interp ); \
-		Tcl_AppendStringsToObj( res, msg, NULL ); \
+		Tcl_AppendStringsToObj( res, __VA_ARGS__, NULL ); \
 		var = TCL_ERROR; \
 		goto label; \
 	}
@@ -64,3 +64,9 @@
 		goto label; \
 	}
 #endif
+
+/* Local Variables: */
+/* tab-width: 4 */
+/* c-basic-offset: 4 */
+/* End: */
+// vim: foldmethod=marker foldmarker={{{,}}} ts=4 shiftwidth=4
