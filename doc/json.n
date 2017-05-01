@@ -1,0 +1,232 @@
+'\"
+'\" Copyright (c) 2015 Ruby Lane
+'\"
+'\" See the file "LICENSE" for information on usage and redistribution
+'\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+'\"
+.TH json n 0.9.7 rl_json "RubyLane/JSON Package Commands"
+.so man.macros
+.BS
+'\" Note:  do not modify the .SH NAME line immediately below!
+.SH NAME
+json \- Parse and manipulate JSON documents 
+.SH SYNOPSIS
+.nf
+\fBpackage require rl_json\fR ?\fB0.9.7\fR? 
+
+\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson foreach \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson get \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson get_typed \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson lmap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson new \fItype value\fR
+\fBjson normalize \fIjsonValue\fR
+\fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
+\fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
+\fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
+.fi
+.BE
+.SH DESCRIPTION
+.PP
+This package adds a command \fBjson\fR to the interpreter, and defines a new
+Tcl_Obj type to store the parsed JSON document.  The \fBjson\fR command
+directly manipulates values whose string representation is valid JSON, in a
+similar way to how the \fBdict\fR command directly manipulates values whose
+string representation is a valid dictionary.  It is similar to \fBdict\fR in
+performance.
+.TP
+\fBjson get \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+.
+Extract the value of a portion of the \fIjsonValue\fR, returns the closest
+native Tcl type (other than JSON) for the extracted portion. The \fIkey ...\fR
+arguments are a path, as described in \fBPATHS\fR below.
+'\" TODO: describe what happens with a null
+.TP
+\fBjson get_typed \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+.
+Extract the value of a portion of the \fIjsonValue\fR, returning a two element
+list: the first element is the value that would be returned by \fBjson get\fR
+and the second element is the JSON type of the extracted portion.  The
+\fIkey ...\fR arguments are a path, as described in \fBPATHS\fR below.
+.TP
+\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+.
+Extract the value of a portion of the \fIjsonValue\fR, returns the JSON
+fragment. The \fIkey ...\fR arguments are a path, as described in \fBPATHS\fR
+below.
+.TP
+\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+.
+Tests whether the supplied key path (see \fBPATHS\fR below) and modifier
+resolve to something that exists in \fIjsonValue\fR (i.e., that it can be
+used with \fBjson get\fR without error).
+.TP
+\fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
+.
+Updates the JSON value stored in the variable \fIjsonVariableName\fR,
+replacing the value referenced by \fIkey ...\fR (a path as described in
+\fBPATHS\fR below) with the JSON value \fIvalue\fR.
+.TP
+\fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
+.
+Updates the JSON value stored in the variable \fIjsonVariableName\fR, removing
+the value referenced by \fIkey ...\fR, a path as described in \fBPATHS\fR
+below.
+.TP
+\fBjson normalize \fIjsonValue\fR
+.
+Return a
+.QW normalized
+version of the input \fIjsonValue\fR, i.e., with all optional whitespace
+trimmed.
+.TP
+\fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
+.
+Return a JSON value by interpolating the values from \fIdictionary\fR into the
+template, or from variables in the current scope if \fIdictionary\fR is not
+supplied, in the manner described in the section \fBTEMPLATES\fR.
+.TP
+\fBjson new \fItype value\fR
+.
+Return a JSON fragment of type \fItype\fR and value \fIvalue\fR.
+.TP
+\fBjson foreach \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
+.
+Evaluate \fIscript\fR in a loop in a similar way to the \fBforeach\fR command.
+In each iteration, the values stored in the iterator variables in each
+\fIvarList\fR are the JSON fragments from \fIjsonValue\fR. This command
+supports iterating over JSON arrays and JSON objects.  In the JSON object
+case, the corresponding \fIvarList\fR must be a two element list, with the
+first specifiying the variable to hold the key and the second the value.  In
+the JSON array case, the rules are the same as the \fBforeach\fR command.
+.TP
+\fBjson lmap \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
+.
+As for \fBjson foreach\fR, except that it is collecting; the result from each
+evaluation of \fIscript\fR is added to a Tcl list and returned as the result
+of the \fBjson lmap\fR command.  If the \fIscript\fR results in a TCL_CONTINUE
+code (e.g., the script does \fBcontinue\fR), that iteration is skipped and no
+element is added to the result list.  If it results in TCL_BREAK (e.g., the
+script does \fBbreak\fR) the iterations are stopped and the results
+accumulated so far are returned.
+.SH PATHS
+.PP
+Several of the commands (e.g., \fBjson get\fR, \fBjson exists\fR, \fBjson
+set\fR and \fBjson unset\fR) accept a path specification that names some
+subset of the supplied \fIjsonValue\fR.  The rules are similar to the
+equivalent concept in the \fBdict\fR command, except that the paths used by
+\fBjson\fR allow indexing into JSON arrays by the integer key (or a string
+matching the regex
+.QW "^end(-[0-9]+)?$" ).
+.PP
+Some of the commands also accept an optional modifier at the end of the path,
+which is defined to be one of the following:
+.TP
+\fB?type\fR
+.
+Returns the type of the named fragment.
+.TP
+\fB?length\fR
+.
+When the path refers to an array, this returns the length of the array.  When
+the path refers to a string, this returns the number of characters in the
+string.  All other types throw an error.
+.TP
+\fB?size\fR
+.
+Valid only for objects, returns the number of keys defined in the object.
+.TP
+\fB?keys\fR
+.
+Valid only for objects, returns a list of the keys in the object.
+.PP
+A literal value that would match one of the above modifiers can be used as the
+last element in the path by doubling the \fB?\fR. For example:
+.PP
+.CS
+\fBjson get\fR {
+    {
+        "foo": {
+            "?size": "quite big"
+        }
+    }
+} foo ??size
+.CE
+.PP
+Returns
+.QW "quite big" .
+.SH TEMPLATES
+.PP
+The command \fBjson template\fR generates JSON documents by interpolating
+values into a template from a supplied dictionary or variables in the current
+call frame, a flexible mechanism for generating complex documents.  The
+templates are valid JSON documents containing string values which match the
+regex
+.QW "^~[SNBJTL]:.+$" .
+The second
+character determines what the resulting type of the substituted value will be:
+.RS 3
+.IP \fBS\fR 3
+A string.
+.IP \fBN\fR 3
+A number.
+.IP \fBB\fR 3
+A boolean.
+.IP \fBJ\fR 3
+A JSON fragment.
+.IP \fBT\fR 3
+A JSON template (substitutions are performed on the inserted fragment).
+.IP \fBL\fR 3
+A literal. The resulting string is simply everything from the fourth character
+onwards (this allows literal strings to be included in the template that would
+otherwise be interpreted as the substitutions above).
+.RE
+.PP
+None of the first three characters for a template may be escaped.
+.PP
+The value inserted is determined by the characters following the substitution
+type prefix.  When interpolating values from a dictionary they name keys in the
+dictionary which hold the values to interpolate.  When interpolating from
+variables in the current scope, they name scalar or array variables which hold
+the values to interpolate.  In either case if the named key or variable doesn't
+exist, a JSON null is interpolated in its place.
+.SH EXAMPLES
+.PP
+Produce a JSON value from a template:
+.PP
+.CS
+\fBjson template\fR {
+    {
+        "thing1": "~S:val1",
+        "thing2": ["a", "~N:val2", "~S:val2", "~B:val2",
+                   "~S:val3", "~L:~S:val1"],
+        "subdoc1": "~J:subdoc",
+        "subdoc2": "~T:subdoc"
+    }
+} {
+    val1   hello
+    val2   1e6
+    subdoc {
+        { "thing3": "~S:val1" }
+    }
+}
+.CE
+.PP
+The result (with formatting for readability):
+.PP
+.CS
+{
+    "thing1":"hello",
+    "thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],
+    "subdoc1":{"thing3":"~S:val1"},
+    "subdoc2":{"thing3":"hello"}
+}
+.CE
+'\" .SH "SEE ALSO"
+'\" dict(n), list(n)
+.SH KEYWORDS
+json, parsing, formatting
+'\" Local Variables:
+'\" mode: nroff
+'\" End:
