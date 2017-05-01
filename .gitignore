@@ -15,3 +15,6 @@ perf.data.old
 *.gcda
 *.gcno
 *.gcov
+.cproject
+.project
+.settings
