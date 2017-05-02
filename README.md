@@ -203,6 +203,14 @@ bench/new.bench for the details.
     yajltcl_dict |    7.530
 ```
 
+Build Instructions
+------------------
+
+Use the familiar configure/make sequence. The configurations supports the
+build process for Windows platforms using VisualStudio as compiler but uses
+cygwin to be able to run configure/make.
+
+
 Under the Hood
 --------------
 

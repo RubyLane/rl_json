@@ -2872,16 +2872,16 @@ TEA version not specified.])
     fi
 
     case "`uname -s`" in
-	*win32*|*WIN32*|*MINGW32_*)
+	*win32*|*WIN32*|*MINGW32_*|CYGWIN_NT-*)
 	    AC_CHECK_PROG(CYGPATH, cygpath, cygpath -w, echo)
 	    EXEEXT=".exe"
 	    TEA_PLATFORM="windows"
 	    ;;
-	*CYGWIN_*)
-	    CYGPATH=echo
-	    EXEEXT=".exe"
-	    # TEA_PLATFORM is determined later in LOAD_TCLCONFIG
-	    ;;
+#	*CYGWIN_*)
+#	    CYGPATH=echo
+#	    EXEEXT=".exe"
+#	    # TEA_PLATFORM is determined later in LOAD_TCLCONFIG
+#	    ;;
 	*)
 	    CYGPATH=echo
 	    # Maybe we are cross-compiling....
