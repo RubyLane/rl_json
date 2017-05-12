@@ -1700,6 +1700,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 		"false",
 		"null",
 		"boolean",
+		"json",
 		(char*)NULL
 	};
 	enum {
@@ -1710,7 +1711,8 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 		NEW_TRUE,
 		NEW_FALSE,
 		NEW_NULL,
-		NEW_BOOL
+		NEW_BOOL,
+		NEW_JSON
 	};
 
 	if (objc < 1) CHECK_ARGS(0, "type ?val?");
@@ -1815,6 +1817,18 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 				CHECK_ARGS(1, "boolean val");
 				TEST_OK(Tcl_GetBooleanFromObj(interp, objv[1], &b));
 				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(b));
+			}
+			break;
+			//}}}
+		case NEW_JSON: //{{{
+			{
+				int _type;
+				Tcl_Obj *_val;
+
+				CHECK_ARGS(1, "json val");
+				TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &_type, &_val));
+				*res = objv[1];
+				Tcl_IncrRefCount(objv[1]);
 			}
 			break;
 			//}}}
@@ -2694,4 +2708,8 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 
 //}}}
 
+/* Local Variables: */
+/* tab-width: 4 */
+/* c-basic-offset: 4 */
+/* End: */
 // vim: foldmethod=marker foldmarker={{{,}}} ts=4 shiftwidth=4
