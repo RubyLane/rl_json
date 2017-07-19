@@ -112,9 +112,7 @@ enum modifiers {
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
 static int NRforeach_next_loop_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode);
 
-#ifdef _GNU_SOURCE
-#define FFSLL	ffsll
-#else
+#ifdef WIN32
 #define FFSLL	ffsll_polyfill
 static int ffsll_polyfill(long long x) //{{{
 {
@@ -129,6 +127,8 @@ static int ffsll_polyfill(long long x) //{{{
 }
 
 //}}}
+#else
+#define FFSLL   ffsll
 #endif
 
 static int first_free(long long* freemap) //{{{
@@ -1867,7 +1867,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 //}}}
 static void foreach_state_free(struct foreach_state* state) //{{{
 {
-	unsigned int i;
+	unsigned i;
 
 	Tcl_DecrRefCount(state->script);
 	state->script = NULL;
@@ -1891,7 +1891,8 @@ static void foreach_state_free(struct foreach_state* state) //{{{
 //}}}
 static int NRforeach_next_loop_top(Tcl_Interp* interp, struct foreach_state* state) //{{{
 {
-	unsigned int j, k;
+	unsigned j;
+	int k;
 
 	//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
 	// Set the iterator variables

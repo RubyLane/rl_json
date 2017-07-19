@@ -1,8 +1,6 @@
 #ifndef _JSON_MAIN_H
 #define _JSON_MAIN_H
 
-#define _GNU_SOURCE
-
 #include <tcl.h>
 #include "tclstuff.h"
 #include <string.h>

@@ -7,6 +7,8 @@
 # Copyright (c) 1998-2000 by Scriptics Corporation.
 # All rights reserved.
 
+encoding system utf-8
+
 if {[lsearch [namespace children] ::tcltest] == -1} {
     package require tcltest
     namespace import ::tcltest::*

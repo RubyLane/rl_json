@@ -2,6 +2,7 @@
 *.swo
 *.o
 *.so
+*.dll
 core
 vgcore.*
 autom4te.cache
