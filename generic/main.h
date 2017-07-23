@@ -11,7 +11,6 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/time.h>
 #include "parser.h"
 
 #define STRING_DEDUP_MAX	16

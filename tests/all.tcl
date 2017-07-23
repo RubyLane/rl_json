@@ -59,7 +59,7 @@ puts $chan "Tests began at [eval $timeCmd]"
 foreach file [lsort [::tcltest::getMatchingFiles]] {
     set tail [file tail $file]
     puts $chan $tail
-    if {[catch {source $file} msg]} {
+    if {[catch {source -encoding utf-8 $file} msg]} {
 	puts $chan $msg
     }
 }

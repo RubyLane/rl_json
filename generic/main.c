@@ -5,6 +5,12 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest);
 static void update_string_rep(Tcl_Obj* obj);
 static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj);
 
+#ifdef WIN32
+#define _DLLEXPORT extern DLLEXPORT
+#else
+#define _DLLEXPORT
+#endif
+
 Tcl_ObjType json_type = {
 	"JSON",
 	free_internal_rep,
@@ -106,10 +112,29 @@ enum modifiers {
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
 static int NRforeach_next_loop_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode);
 
+#ifdef _GNU_SOURCE
+#define FFSLL	ffsll
+#else
+#define FFSLL	ffsll_polyfill
+static int ffsll_polyfill(long long x) //{{{
+{
+	int i=0;
+	long long mask = 1;
+	for(i=0; i<sizeof(long long)*8;++i, mask <<= 1) {
+		if(x & mask) {
+			return i+1;
+		}
+	}
+	return 0;
+}
+
+//}}}
+#endif
+
 static int first_free(long long* freemap) //{{{
 {
 	int	i=0, bit, res;
-	while ((bit = ffsll(freemap[i])) == 0) {
+	while ((bit = FFSLL(freemap[i])) == 0) {
 		i++;
 	}
 	res = i * (sizeof(long long)*8) + (bit-1);
@@ -1842,7 +1867,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 //}}}
 static void foreach_state_free(struct foreach_state* state) //{{{
 {
-	int	i;
+	unsigned int i;
 
 	Tcl_DecrRefCount(state->script);
 	state->script = NULL;
@@ -1866,7 +1891,7 @@ static void foreach_state_free(struct foreach_state* state) //{{{
 //}}}
 static int NRforeach_next_loop_top(Tcl_Interp* interp, struct foreach_state* state) //{{{
 {
-	int j, k;
+	unsigned int j, k;
 
 	//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
 	// Set the iterator variables
@@ -1958,7 +1983,8 @@ done:
 static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int collecting) //{{{
 {
 	// Caller must ensure that objc is valid
-	int			i, retcode=TCL_OK;
+	unsigned int			i;
+	int						retcode=TCL_OK;
 	struct foreach_state*	state = NULL;
 
 	state = (struct foreach_state*)Tcl_Alloc(sizeof(*state));
@@ -2673,12 +2699,15 @@ void free_interp_cx(ClientData cdata) //{{{
 }
 
 //}}}
+_DLLEXPORT
 int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
 	struct interp_cx*	l = NULL;
 
+#ifdef USE_TCL_STUBS
 	if (Tcl_InitStubs(interp, "8.5", 0) == NULL)
 		return TCL_ERROR;
+#endif // USE_TCL_STUBS
 
 	Tcl_RegisterObjType(&json_type);
 
