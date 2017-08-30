@@ -1,0 +1,173 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+proc my_rss {} { # Linux only!  Need alternatives for Mac, Win <<<
+	set h	[open /proc/self/statm r]
+	try {
+		read $h
+	} on ok statm {
+		expr {
+			[lindex $statm 1] * 4
+		}
+	} finally {
+		close $h
+	}
+}
+
+#>>>
+
+test memory-1.1 {memory leak with static object} -setup { #<<<
+	proc test_memory-1.1 it {
+		for {set i 0} {$i < $it} {incr i} {
+			set doc "{}"
+			json set doc foo null
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.1 10000
+	set before	[my_rss]
+} -body {
+	test_memory-1.1 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.1 {}
+} -result 0
+#>>>
+test memory-1.2 {memory leak with object parsing} -setup { #<<<
+	proc test_memory-1.2 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim "{} "] ?size
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.2 2000
+	set before	[my_rss]
+} -body {
+	test_memory-1.2 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.2 {}
+} -result 0
+#>>>
+test memory-1.3 {memory leak with array parsing} -setup { #<<<
+	proc test_memory-1.3 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim {[] }] ?length
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.3 10000
+	set before	[my_rss]
+} -body {
+	test_memory-1.3 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.3 {}
+} -result 0
+#>>>
+test memory-1.4 {memory leak with string parsing} -setup { #<<<
+	proc test_memory-1.4 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim {"foo" }] ?length
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.4 2000
+	set before	[my_rss]
+} -body {
+	test_memory-1.4 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.4 {}
+} -result 0
+#>>>
+test memory-1.5 {memory leak with number parsing} -setup { #<<<
+	proc test_memory-1.5 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim {1234 }] ?type
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.5 2000
+	set before	[my_rss]
+} -body {
+	test_memory-1.5 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.5 {}
+} -result 0
+#>>>
+test memory-1.6 {memory leak with boolean true parsing} -setup { #<<<
+	proc test_memory-1.6 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim {true }] ?type
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.6 2000
+	set before	[my_rss]
+} -body {
+	test_memory-1.6 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.6 {}
+} -result 0
+#>>>
+test memory-1.7 {memory leak with boolean false parsing} -setup { #<<<
+	proc test_memory-1.7 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim {false }] ?type
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.7 2000
+	set before	[my_rss]
+} -body {
+	test_memory-1.7 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.7 {}
+} -result 0
+#>>>
+test memory-1.8 {memory leak with null parsing} -setup { #<<<
+	proc test_memory-1.8 it {
+		for {set i 0} {$i < $it} {incr i} {
+			json get [string trim {null }] ?type
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-1.8 2000
+	set before	[my_rss]
+} -body {
+	test_memory-1.8 10000
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-1.8 {}
+} -result 0
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

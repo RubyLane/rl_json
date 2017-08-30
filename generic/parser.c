@@ -74,19 +74,6 @@ void free_cx(struct parse_context* cx) //{{{
 {
 	struct parse_context*	tail = cx->last;
 
-	{
-		struct parse_context*	t = cx;
-		struct parse_context*	next;
-
-		while (1) {
-			if (t == cx->last) break;
-
-			next = cx->last;
-			while (next->prev != t && next->prev != NULL) next = next->prev;
-			t = next;
-		}
-	}
-
 	while (1) {
 		if (tail->hold_key != NULL) {
 			Tcl_DecrRefCount(tail->hold_key);

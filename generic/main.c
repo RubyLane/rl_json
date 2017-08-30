@@ -881,8 +881,12 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 	obj->internalRep.ptrAndLongRep.ptr = cx[0].val->internalRep.ptrAndLongRep.ptr;
 
 	// We're transferring the ref from cx[0].val to our intrep
-	//Tcl_IncrRefcount(obj->internalRep.ptrAndLongRep.ptr
-	//Tcl_DecrRefCount(cx[0].val);
+	if (obj->internalRep.ptrAndLongRep.ptr != NULL) {
+		// NULL signals a JSON null type
+		Tcl_IncrRefCount((Tcl_Obj*)obj->internalRep.ptrAndLongRep.ptr);
+	}
+
+	Tcl_DecrRefCount(cx[0].val);
 	cx[0].val = NULL;
 
 	return TCL_OK;
@@ -2663,7 +2667,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 }
 
 //}}}
-void free_interp_cx(ClientData cdata) //{{{
+void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 {
 	struct interp_cx* l = cdata;
 	Tcl_HashEntry*		he;
@@ -2725,9 +2729,9 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 	l->kc_count = 0;
 	memset(&l->freemap, 0xFF, sizeof(l->freemap));
 
-	Tcl_SetAssocData(interp, "rl_json", NULL, l);
+	Tcl_SetAssocData(interp, "rl_json", free_interp_cx, l);
 
-	Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObjCmd, jsonNRObjCmd, NULL, free_interp_cx);
+	Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObjCmd, jsonNRObjCmd, NULL, NULL);
 	TEST_OK(Tcl_EvalEx(interp, "namespace eval ::rl_json {namespace export *}", -1, TCL_EVAL_DIRECT | TCL_EVAL_GLOBAL));
 
 	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
