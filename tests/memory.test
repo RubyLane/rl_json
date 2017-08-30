@@ -166,6 +166,32 @@ test memory-1.8 {memory leak with null parsing} -setup { #<<<
 	rename test_memory-1.8 {}
 } -result 0
 #>>>
+test memory-2.1 {json foreach} -setup { #<<<
+	proc test_memory-2.1 {} {
+		set h	[open /tmp/es_results r]
+		try {
+			chan configure $h -encoding utf-8
+			while {![set result [gets $h]; eof $h]} {
+				json foreach {op item} $result {
+					#if {[string match 2* [json get $item status]]} continue
+					#break
+				}
+			}
+		} finally {
+			close $h
+		}
+	}
+
+	# Warm caches, overhead, etc
+	test_memory-2.1
+	set before	[my_rss]
+} -body {
+	test_memory-2.1
+	expr {[my_rss] - $before}
+} -cleanup {
+	unset -nocomplain before
+	rename test_memory-2.1 {}
+} -result 0
 
 ::tcltest::cleanupTests
 return

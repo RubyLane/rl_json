@@ -1871,15 +1871,22 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 //}}}
 static void foreach_state_free(struct foreach_state* state) //{{{
 {
-	unsigned int i;
+	unsigned int i, j;
 
 	Tcl_DecrRefCount(state->script);
 	state->script = NULL;
 
 	// Close any pending searches
-	for (i=0; i<state->iterators; i++)
+	for (i=0; i<state->iterators; i++) {
 		if (state->it[i].search.dictionaryPtr != NULL)
 			Tcl_DictObjDone(&state->it[i].search);
+
+		for (j=0; j < state->it[i].var_c; j++)
+			Tcl_DecrRefCount(state->it[i].var_v[j]);
+
+		if (state->it[i].varlist != NULL)
+			Tcl_DecrRefCount(state->it[i].varlist);
+	}
 
 	if (state->it != NULL) {
 		Tcl_Free((char*)state->it);
@@ -1895,6 +1902,7 @@ static void foreach_state_free(struct foreach_state* state) //{{{
 //}}}
 static int NRforeach_next_loop_top(Tcl_Interp* interp, struct foreach_state* state) //{{{
 {
+	struct interp_cx* l = Tcl_GetAssocData(interp, "rl_json", NULL);
 	unsigned int j, k;
 
 	//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
@@ -1911,7 +1919,6 @@ static int NRforeach_next_loop_top(Tcl_Interp* interp, struct foreach_state* sta
 					//fprintf(stderr, "Pulling next element %d off the data list (length %d)\n", this_it->data_i, this_it->data_c);
 					it_val = this_it->data_v[this_it->data_i++];
 				} else {
-					struct interp_cx* l = Tcl_GetAssocData(interp, "rl_json", NULL);
 					//fprintf(stderr, "Ran out of elements in this data list, setting null\n");
 					it_val = l->json_null;
 				}
@@ -2010,17 +2017,22 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], int coll
 		state->it[i].data_v = NULL;
 		state->it[i].is_array = 0;
 		state->it[i].var_v = NULL;
+		state->it[i].varlist = NULL;
 	}
 
 	for (i=0; i<state->iterators; i++) {
-		int			loops, type;
+		int			loops, type, j;
 		Tcl_Obj*	val;
 		Tcl_Obj*	varlist = objv[i*2];
 
 		if (Tcl_IsShared(varlist))
 			varlist = Tcl_DuplicateObj(varlist);
 
-		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, varlist, &state->it[i].var_c, &state->it[i].var_v));
+		Tcl_IncrRefCount(state->it[i].varlist = varlist);
+
+		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, state->it[i].varlist, &state->it[i].var_c, &state->it[i].var_v));
+		for (j=0; j < state->it[i].var_c; j++)
+			Tcl_IncrRefCount(state->it[i].var_v[j]);
 
 		if (state->it[i].var_c == 0)
 			THROW_ERROR_LABEL(done, retcode, "foreach varlist is empty");

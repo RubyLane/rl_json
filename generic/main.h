@@ -41,6 +41,7 @@ struct foreach_iterator {
 	int				data_c;
 	Tcl_Obj**		data_v;
 	int				data_i;
+	Tcl_Obj*		varlist;
 	int				var_c;
 	Tcl_Obj**		var_v;
 	int				is_array;
