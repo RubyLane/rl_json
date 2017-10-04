@@ -1,5 +1,9 @@
 #include "main.h"
 
+#if defined(_WIN32)
+#define snprintf _snprintf
+#endif
+
 static void free_internal_rep(Tcl_Obj* obj);
 static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest);
 static void update_string_rep(Tcl_Obj* obj);
