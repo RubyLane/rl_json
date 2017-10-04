@@ -193,6 +193,7 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 	int					is_new;
 	struct kc_entry*	kce;
 	Tcl_Obj*			out;
+	Tcl_HashEntry*		entry = NULL;
 
 	if (length == 0) {
 		return l->tcl_empty;
@@ -210,7 +211,7 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 		buf[length] = 0;
 		keyname = buf;
 	}
-	Tcl_HashEntry* entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
+	entry = Tcl_CreateHashEntry(&l->kc, keyname, &is_new);
 
 	if (is_new) {
 		ptrdiff_t	idx = first_free(l->freemap);
