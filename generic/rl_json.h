@@ -1,7 +1,9 @@
 #ifndef _JSON_MAIN_H
 #define _JSON_MAIN_H
 
+#if !defined(_WIN32)
 #define _GNU_SOURCE
+#endif
 
 #include <tcl.h>
 #include "tclstuff.h"

@@ -9,7 +9,7 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest);
 static void update_string_rep(Tcl_Obj* obj);
 static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj);
 
-#ifdef WIN32
+#if defined(_WIN32)
 #define _DLLEXPORT extern DLLEXPORT
 #else
 #define _DLLEXPORT
