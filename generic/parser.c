@@ -1,4 +1,4 @@
-#include "main.h"
+#include "rl_json.h"
 
 void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
 {

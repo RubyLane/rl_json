@@ -20,7 +20,7 @@ dnl	to configure the system for the local environment.
 #-----------------------------------------------------------------------
 
 AC_PREREQ(2.61)
-AC_INIT([rl_json], [0.9.11])
+AC_INIT([rl_json], [0.9.12])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -72,25 +72,13 @@ TEA_SETUP_COMPILER
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c main.c])
-TEA_ADD_HEADERS([])
+TEA_ADD_SOURCES([parser.c rl_json.c rl_jsonStubInit.c])
+TEA_ADD_HEADERS([generic/rl_jsonDecls.h])
 TEA_ADD_INCLUDES([])
 TEA_ADD_LIBS([])
 TEA_ADD_CFLAGS([])
-TEA_ADD_STUB_SOURCES([])
+TEA_ADD_STUB_SOURCES([rl_jsonStubLib.c])
 TEA_ADD_TCL_SOURCES([])
-
-dnl Check for pkg-config
-AC_MSG_CHECKING([pkg-config m4 macros])
-if test m4_ifdef([PKG_CHECK_MODULES], [yes], [no]) == yes
-then
-	AC_MSG_RESULT([yes])
-else
-	AC_MSG_RESULT([no])
-	AC_MSG_ERROR([
-pkg-config is required
-])
-fi
 
 #--------------------------------------------------------------------
 # __CHANGE__
@@ -190,10 +178,16 @@ TEA_MAKE_LIB
 TEA_PROG_TCLSH
 #TEA_PROG_WISH
 
+TEAX_SDX
+
+TEAX_CONFIG_INCLUDE_LINE(RL_JSON_INCLUDE_SPEC, [${includedir}])
+TEAX_CONFIG_LINK_LINE(RL_JSON_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}])
+TEAX_CONFIG_LINK_LINE(RL_JSON_STUB_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}stub])
+
 #--------------------------------------------------------------------
 # Finally, substitute all of the various values into the Makefile.
 # You may alternatively have a special pkgIndex.tcl.in or other files
 # which require substituting th AC variables in.  Include these here.
 #--------------------------------------------------------------------
 
-AC_OUTPUT([Makefile pkgIndex.tcl])
+AC_OUTPUT([Makefile pkgIndex.tcl rl_jsonConfig.sh])

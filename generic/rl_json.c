@@ -1,4 +1,4 @@
-#include "main.h"
+#include "rl_json.h"
 
 #if defined(_WIN32)
 #define snprintf _snprintf
@@ -256,7 +256,7 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 
 //}}}
 
-static int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, int* type, Tcl_Obj** val) //{{{
+int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, int* type, Tcl_Obj** val) //{{{
 {
 	if (obj->typePtr != &json_type)
 		TEST_OK(set_from_any(interp, obj));
@@ -2719,6 +2719,7 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 }
 
 //}}}
+extern Rl_jsonStubs rl_jsonStubs;
 _DLLEXPORT
 int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
@@ -2750,7 +2751,7 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 	Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObjCmd, jsonNRObjCmd, NULL, NULL);
 	TEST_OK(Tcl_EvalEx(interp, "namespace eval ::rl_json {namespace export *}", -1, TCL_EVAL_DIRECT | TCL_EVAL_GLOBAL));
 
-	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
+	TEST_OK(Tcl_PkgProvideEx(interp, PACKAGE_NAME, PACKAGE_VERSION, &rl_jsonStubs));
 
 	return TCL_OK;
 }

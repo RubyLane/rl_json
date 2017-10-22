@@ -2,6 +2,7 @@
 *.swo
 *.o
 *.so
+*.a
 core
 vgcore.*
 autom4te.cache
@@ -9,6 +10,7 @@ config.log
 config.status
 Makefile
 pkgIndex.tcl
+rl_jsonConfig.sh
 cachegrind.out*
 perf.data
 perf.data.old

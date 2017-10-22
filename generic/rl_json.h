@@ -62,10 +62,9 @@ struct foreach_state {
 	Tcl_Obj*					res;
 };
 
-void append_to_cx(struct parse_context* cx, Tcl_Obj* val);
-Tcl_Obj* JSON_NewJvalObj(int type, Tcl_Obj* val);
+void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
 
-Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length);
+Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, int length);
 
 
 // Taken from tclInt.h:
@@ -88,5 +87,6 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 #   endif
 #endif
 
+#include "rl_jsonDecls.h"
 
 #endif
