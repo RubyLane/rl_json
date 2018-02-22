@@ -1,0 +1,40 @@
+#------------------------------------------------------------- -*- makefile -*-
+#
+# Makefile for building rl_json
+#
+# Basic build, test and install
+#   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl
+#   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl test
+#   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl install
+#
+# For other build options (debug, static etc.)
+# See TIP 477 (https://core.tcl.tk/tips/doc/trunk/tip/477.md) for
+# detailed documentation.
+# 
+#------------------------------------------------------------------------------
+
+# The name of the package
+PROJECT = rl_json
+
+!include "rules-ext.vc"
+
+PRJ_OBJS = \
+	$(TMP_DIR)\main.obj \
+	$(TMP_DIR)\parser.obj
+
+# Define any additional compiler flags that might be required for the project
+PRJ_DEFINES = -D_CRT_SECURE_NO_WARNINGS
+
+# Define the standard targets
+!include "$(_RULESDIR)\targets.vc"
+
+# We must define a pkgindex target that will create a pkgIndex.tcl
+# file in the $(OUT_DIR) directory. We can just redirect to the
+# default-pkgindex target for our sample extension.
+pkgindex: default-pkgindex-tea
+
+# The default install target only installs binaries and scripts so add
+# an additional target for our documentation. Note this *adds* a target
+# since no commands are listed after it. The original targets for
+# install (from targets.vc) will remain.
+install: default-install-docs-n
