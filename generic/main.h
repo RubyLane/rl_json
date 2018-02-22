@@ -1,7 +1,9 @@
 #ifndef _JSON_MAIN_H
 #define _JSON_MAIN_H
 
+#ifndef _MSC_VER
 #define _GNU_SOURCE
+#endif
 
 #include <tcl.h>
 #include "tclstuff.h"
