@@ -120,6 +120,14 @@ static int NRforeach_next_loop_bottom(ClientData cdata[], Tcl_Interp* interp, in
 #define FFSLL	ffsll
 #else
 #define FFSLL	ffsll_polyfill
+#ifdef _MSC_VER
+static int ffsll_polyfill(long long x)
+{
+    unsigned long ix;
+    /* _BitScanForward64 numbers bits starting with 0, ffsll starts with 1 */
+    return _BitScanForward64(&ix, x) ? ix+1 : 0;
+}
+#else
 static int ffsll_polyfill(long long x) //{{{
 {
 	int i=0;
@@ -131,7 +139,7 @@ static int ffsll_polyfill(long long x) //{{{
 	}
 	return 0;
 }
-
+#endif
 //}}}
 #endif
 
