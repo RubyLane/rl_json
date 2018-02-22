@@ -1,0 +1,255 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="resource-type" content="document">
+<link rel="stylesheet" href="rbc.css" type="text/css" media="all">
+<title>
+json(n)</title>
+</head>
+<body>
+<div class="mandoc">
+<table summary="Document Header" class="head" width="100%">
+<col width="30%">
+<col width="30%">
+<col width="30%">
+<tbody>
+<tr>
+<td class="head-ltitle">
+json(n)</td>
+<td class="head-vol" align="center">
+RubyLane/JSON Package Commands</td>
+<td class="head-rtitle" align="right">
+json(n)</td>
+</tr>
+</tbody>
+</table>
+<br>
+<br>
+<div class="section">
+<h1>NAME</h1> json &#45; Parse and manipulate JSON documents</div>
+<div class="section">
+<h1>SYNOPSIS</h1><br>
+<b>package require rl_json</b> ?<b>0.9.7</b>? <p>
+<br>
+<b>json exists </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??<br>
+<b>json extract </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??<br>
+<b>json foreach </b><i>varlist1 jsonValue1</i> ?<i>varlist2 jsonValue2 ...</i>? <i>script</i><br>
+<b>json get </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??<br>
+<b>json get_typed </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??<br>
+<b>json lmap </b><i>varlist1 jsonValue1</i> ?<i>varlist2 jsonValue2 ...</i>? <i>script</i><br>
+<b>json new </b><i>type value</i><br>
+<b>json normalize </b><i>jsonValue</i><br>
+<b>json pretty </b><i>jsonValue</i><br>
+<b>json set </b><i>jsonVariableName</i> ?<i>key ...</i>? <i>value</i><br>
+<b>json template </b><i>jsonValue</i> ?<i>dictionary</i>?<br>
+<b>json unset </b><i>jsonVariableName</i> ?<i>key ...</i>?<br>
+<br>
+<br>
+<div style="height: 0.00em;">
+&#160;</div>
+</div>
+<div class="section">
+<h1>DESCRIPTION</h1> This package adds a command  <b>json</b> to the interpreter, and defines a new Tcl_Obj type to store the parsed JSON document.  The  <b>json</b> command directly manipulates values whose string representation is valid JSON, in a similar way to how the  <b>dict</b> command directly manipulates values whose string representation is a valid dictionary.  It is similar to  <b>dict</b> in performance.<dl>
+<dt>
+<b>json get </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??</dt>
+<dd>
+Extract the value of a portion of the <i>jsonValue</i>, returns the closest native Tcl type (other than JSON) for the extracted portion. The  <i>key ...</i> arguments are a path, as described in  <b>PATHS</b> below.</dd>
+</dl>
+<dl>
+<dt>
+<b>json get_typed </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??</dt>
+<dd>
+Extract the value of a portion of the <i>jsonValue</i>, returning a two element list: the first element is the value that would be returned by  <b>json get</b> and the second element is the JSON type of the extracted portion.  The  <i>key ...</i> arguments are a path, as described in <b>PATHS</b> below.</dd>
+</dl>
+<dl>
+<dt>
+<b>json extract </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??</dt>
+<dd>
+Extract the value of a portion of the <i>jsonValue</i>, returns the JSON fragment. The  <i>key ...</i> arguments are a path, as described in <b>PATHS</b> below.</dd>
+</dl>
+<dl>
+<dt>
+<b>json exists </b><i>jsonValue</i> ?<i>key ...</i> ?<i>modifier</i>??</dt>
+<dd>
+Tests whether the supplied key path (see <b>PATHS</b> below) and modifier resolve to something that exists in  <i>jsonValue</i> (i.e., that it can be used with  <b>json get</b> without error).</dd>
+</dl>
+<dl>
+<dt>
+<b>json set </b><i>jsonVariableName</i> ?<i>key ...</i>? <i>value</i></dt>
+<dd>
+Updates the JSON value stored in the variable <i>jsonVariableName</i>, replacing the value referenced by  <i>key ...</i> (a path as described in  <b>PATHS</b> below) with the JSON value <i>value</i>.</dd>
+</dl>
+<dl>
+<dt>
+<b>json unset </b><i>jsonVariableName</i> ?<i>key ...</i>?</dt>
+<dd>
+Updates the JSON value stored in the variable <i>jsonVariableName</i>, removing the value referenced by  <i>key ...</i>, a path as described in <b>PATHS</b> below.</dd>
+</dl>
+<dl>
+<dt>
+<b>json normalize </b><i>jsonValue</i></dt>
+<dd>
+Return a &#8220;normalized&#8221; version of the input  <i>jsonValue</i>, i.e., with all optional whitespace trimmed.</dd>
+</dl>
+<dl>
+<dt>
+<b>json template </b><i>jsonValue</i> ?<i>dictionary</i>?</dt>
+<dd>
+Return a JSON value by interpolating the values from <i>dictionary</i> into the template, or from variables in the current scope if  <i>dictionary</i> is not supplied, in the manner described in the section  <b>TEMPLATES</b>.</dd>
+</dl>
+<dl>
+<dt>
+<b>json new </b><i>type value</i></dt>
+<dd>
+Return a JSON fragment of type <i>type</i> and value <i>value</i>.</dd>
+</dl>
+<dl>
+<dt>
+<b>json foreach </b><i>varList1 jsonValue1</i> ?<i>varList2 jsonValue2 ...</i>? <i>script</i></dt>
+<dd>
+Evaluate <i>script</i> in a loop in a similar way to the <b>foreach</b> command. In each iteration, the values stored in the iterator variables in each  <i>varList</i> are the JSON fragments from <i>jsonValue</i>. This command supports iterating over JSON arrays and JSON objects.  In the JSON object case, the corresponding  <i>varList</i> must be a two element list, with the first specifiying the variable to hold the key and the second the value.  In the JSON array case, the rules are the same as the  <b>foreach</b> command.</dd>
+</dl>
+<dl>
+<dt>
+<b>json lmap </b><i>varList1 jsonValue1</i> ?<i>varList2 jsonValue2 ...</i>? <i>script</i></dt>
+<dd>
+As for <b>json foreach</b>, except that it is collecting; the result from each evaluation of  <i>script</i> is added to a Tcl list and returned as the result of the  <b>json lmap</b> command.  If the <i>script</i> results in a TCL_CONTINUE code (e.g., the script does  <b>continue</b>), that iteration is skipped and no element is added to the result list.  If it results in TCL_BREAK (e.g., the script does  <b>break</b>) the iterations are stopped and the results accumulated so far are returned.</dd>
+</dl>
+<dl>
+<dt>
+<b>json pretty </b><i>jsonValue</i></dt>
+<dd>
+Returns a pretty-printed string representation of <i>jsonValue</i>.  Useful for debugging or inspecting the structure of JSON data.</dd>
+</dl>
+</div>
+<div class="section">
+<h1>PATHS</h1> Several of the commands (e.g.,  <b>json get</b>, <b>json exists</b>, <b>json</b>  <b>set</b> and <b>json unset</b>) accept a path specification that names some subset of the supplied  <i>jsonValue</i>.  The rules are similar to the equivalent concept in the  <b>dict</b> command, except that the paths used by  <b>json</b> allow indexing into JSON arrays by the integer key (or a string matching the regex &#8220;^end(-[0-9]+)?$&#8221;).<p>
+Some of the commands also accept an optional modifier at the end of the path, which is defined to be one of the following:<dl>
+<dt>
+<b>?type</b></dt>
+<dd>
+Returns the type of the named fragment.</dd>
+</dl>
+<dl>
+<dt>
+<b>?length</b></dt>
+<dd>
+When the path refers to an array, this returns the length of the array.  When the path refers to a string, this returns the number of characters in the string.  All other types throw an error.</dd>
+</dl>
+<dl>
+<dt>
+<b>?size</b></dt>
+<dd>
+Valid only for objects, returns the number of keys defined in the object.</dd>
+</dl>
+<dl>
+<dt>
+<b>?keys</b></dt>
+<dd>
+Valid only for objects, returns a list of the keys in the object.</dd>
+</dl>
+<p>
+A literal value that would match one of the above modifiers can be used as the last element in the path by doubling the  <b>?</b>. For example:<p>
+<div style="margin-left: 5.00ex;">
+<br>
+<b>json get</b> {<br>
+    {<br>
+        &quot;foo&quot;: {<br>
+            &quot;?size&quot;: &quot;quite big&quot;<br>
+        }<br>
+    }<br>
+} foo ??size<br>
+</div>
+<p>
+Returns &#8220;quite big&#8221;.</div>
+<div class="section">
+<h1>TEMPLATES</h1> The command  <b>json template</b> generates JSON documents by interpolating values into a template from a supplied dictionary or variables in the current call frame, a flexible mechanism for generating complex documents.  The templates are valid JSON documents containing string values which match the regex &#8220;^~[SNBJTL]:.+$&#8221;. The second character determines what the resulting type of the substituted value will be:<div style="margin-left: 3.00ex;">
+<dl>
+<dt>
+<b>S</b></dt>
+<dd>
+A string.</dd>
+</dl>
+<dl>
+<dt>
+<b>N</b></dt>
+<dd>
+A number.</dd>
+</dl>
+<dl>
+<dt>
+<b>B</b></dt>
+<dd>
+A boolean.</dd>
+</dl>
+<dl>
+<dt>
+<b>J</b></dt>
+<dd>
+A JSON fragment.</dd>
+</dl>
+<dl>
+<dt>
+<b>T</b></dt>
+<dd>
+A JSON template (substitutions are performed on the inserted fragment).</dd>
+</dl>
+<dl>
+<dt>
+<b>L</b></dt>
+<dd>
+A literal. The resulting string is simply everything from the fourth character onwards (this allows literal strings to be included in the template that would otherwise be interpreted as the substitutions above).</dd>
+</dl>
+</div>
+<p>
+None of the first three characters for a template may be escaped.<p>
+The value inserted is determined by the characters following the substitution type prefix.  When interpolating values from a dictionary they name keys in the dictionary which hold the values to interpolate.  When interpolating from variables in the current scope, they name scalar or array variables which hold the values to interpolate.  In either case if the named key or variable doesn't exist, a JSON null is interpolated in its place.</div>
+<div class="section">
+<h1>EXAMPLES</h1> Produce a JSON value from a template:<p>
+<div style="margin-left: 5.00ex;">
+<br>
+<b>json template</b> {<br>
+    {<br>
+        &quot;thing1&quot;: &quot;~S:val1&quot;,<br>
+        &quot;thing2&quot;: [&quot;a&quot;, &quot;~N:val2&quot;, &quot;~S:val2&quot;, &quot;~B:val2&quot;,<br>
+                   &quot;~S:val3&quot;, &quot;~L:~S:val1&quot;],<br>
+        &quot;subdoc1&quot;: &quot;~J:subdoc&quot;,<br>
+        &quot;subdoc2&quot;: &quot;~T:subdoc&quot;<br>
+    }<br>
+} {<br>
+    val1   hello<br>
+    val2   1e6<br>
+    subdoc {<br>
+        { &quot;thing3&quot;: &quot;~S:val1&quot; }<br>
+    }<br>
+}<br>
+</div>
+<p>
+The result (with formatting for readability):<p>
+<div style="margin-left: 5.00ex;">
+<br>
+{<br>
+    &quot;thing1&quot;:&quot;hello&quot;,<br>
+    &quot;thing2&quot;:[&quot;a&quot;,1000000.0,&quot;1e6&quot;,true,null,&quot;~S:val1&quot;],<br>
+    &quot;subdoc1&quot;:{&quot;thing3&quot;:&quot;~S:val1&quot;},<br>
+    &quot;subdoc2&quot;:{&quot;thing3&quot;:&quot;hello&quot;}<br>
+}<br>
+</div>
+</div>
+<div class="section">
+<h1>KEYWORDS</h1> json, parsing, formatting</div>
+<table summary="Document Footer" class="foot" width="100%">
+<col width="50%">
+<col width="50%">
+<tr>
+<td class="foot-date">
+0.9.7</td>
+<td class="foot-os" align="right">
+rl_json</td>
+</tr>
+</table>
+</div>
+</body>
+</html>
+
