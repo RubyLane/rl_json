@@ -120,7 +120,7 @@ static int NRforeach_next_loop_bottom(ClientData cdata[], Tcl_Interp* interp, in
 #define FFSLL	ffsll
 #else
 #define FFSLL	ffsll_polyfill
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && defined(_WIN64) && _MSC_VER >= 1400
 static int ffsll_polyfill(long long x)
 {
     unsigned long ix;
