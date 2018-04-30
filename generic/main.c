@@ -1862,7 +1862,6 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 				CHECK_ARGS(1, "json val");
 				TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &_type, &_val));
 				*res = objv[1];
-				Tcl_IncrRefCount(objv[1]);
 			}
 			break;
 			//}}}
