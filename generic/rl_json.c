@@ -3607,7 +3607,6 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 	Tcl_DecrRefCount(l->json_true);          l->json_true = NULL;
 	Tcl_DecrRefCount(l->json_false);         l->json_false = NULL;
 	Tcl_DecrRefCount(l->json_null);          l->json_null = NULL;
-	Tcl_DecrRefCount(l->tcl_empty); l->tcl_empty = NULL;
 
 	he = Tcl_FirstHashEntry(&l->kc, &search);
 	while (he) {
