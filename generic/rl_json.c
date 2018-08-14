@@ -3723,6 +3723,14 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 }
 
 //}}}
+_DLLEXPORT
+int Rl_json_SafeInit(Tcl_Interp* interp) //{{{
+{
+	// No unsafe features
+	return Rl_json_Init(interp);
+}
+
+//}}}
 
 /* Local Variables: */
 /* tab-width: 4 */
