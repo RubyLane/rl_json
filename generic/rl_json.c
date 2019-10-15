@@ -1437,7 +1437,7 @@ bad_path:
 }
 
 //}}}
-static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, int exists) //{{{
+static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers) //{{{
 {
 	int				type, i, modstrlen;
 	const char*		modstr;
@@ -1469,7 +1469,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 
 		if (i == pathc-1) {
 			modstr = Tcl_GetStringFromObj(step, &modstrlen);
-			if (modstrlen >= 1 && modstr[0] == '?') {
+			if (modifiers && modstrlen >= 1 && modstr[0] == '?') {
 				// Allow escaping the modifier char by doubling it
 				if (modstrlen >= 2 && modstr[1] == '?') {
 					step = Tcl_GetRange(step, 1, modstrlen-1);
@@ -3269,8 +3269,20 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			{
 				int			type;
 				Tcl_Obj*	val;
-				CHECK_ARGS(2, "type json_val");
-				TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
+				Tcl_Obj*	target = NULL;
+
+				if (objc < 3) CHECK_ARGS(2, "type json_val ?path ...?");
+
+				if (objc >= 4) {
+					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
+				} else {
+					int			type;
+					Tcl_Obj*	val;
+					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
+					target = objv[2];
+				}
+
+				TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
 				Tcl_SetObjResult(interp, Tcl_NewStringObj(type_names[type], -1));
 			}
 			break;
@@ -3282,7 +3294,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc < 3) CHECK_ARGS(2, "exists json_val ?path ...?");
 
 				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 1));
+					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 1, 1));
 					// resolve_path sets the interp result in exists mode
 				} else {
 					int			type;
@@ -3301,7 +3313,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc < 3) CHECK_ARGS(2, "get json_val ?path ...?");
 
 				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0));
+					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 1));
 				} else {
 					int			type;
 					Tcl_Obj*	val;
@@ -3328,7 +3340,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc < 3) CHECK_ARGS(2, "get_typed json_val ?path ...?");
 
 				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0));
+					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 1));
 				} else {
 					int			type;
 					Tcl_Obj*	val;
@@ -3362,7 +3374,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc < 3) CHECK_ARGS(2, "extract json_val ?path ...?");
 
 				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0));
+					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
 					int			type;
 					Tcl_Obj*	val;
@@ -3406,7 +3418,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc < 3) CHECK_ARGS(2, "isnull json_val ?path ...?");
 
 				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0));
+					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
 					int			type;
 					Tcl_Obj*	val;
