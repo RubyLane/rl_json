@@ -63,7 +63,8 @@ below.
 .
 Tests whether the supplied key path (see \fBPATHS\fR below) and modifier
 resolve to something that exists in \fIjsonValue\fR (i.e., that it can be
-used with \fBjson get\fR without error).
+used with \fBjson get\fR without error).  Returns false if the value named
+by the path \fIkey ...\fR is null.
 .TP
 \fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
 .
@@ -163,17 +164,16 @@ A literal value that would match one of the above modifiers can be used as the
 last element in the path by doubling the \fB?\fR. For example:
 .PP
 .CS
-\fBjson get\fR {
-    {
-        "foo": {
-            "?size": "quite big"
-        }
-    }
-} foo ??size
+ \fBjson get\fR {
+     {
+         "foo": {
+             "?size": "quite big"
+         }
+     }
+ } foo ??size
 .CE
 .PP
-Returns
-.QW "quite big" .
+Returns "quite big"
 .SH TEMPLATES
 .PP
 The command \fBjson template\fR generates JSON documents by interpolating
@@ -256,6 +256,51 @@ The result (with formatting for readability):
      "subdoc1":{"thing3":"~S:val1"},
      "subdoc2":{"thing3":"hello"}
  }
+.CE
+.PP
+Incrementally append an element to an array (similar to \fBdict lappend\fR):
+.PP
+.CS
+ set doc {{"foo":[]}}
+ for {set i 0} {$i < 4} {incr i} {
+     json set doc foo end+1 [json new string "elem: $i"]
+ }
+ # $doc is {"foo":["elem 0","elem 1","elem 2","elem 3"]}
+.CE
+.PP
+Similar to the above, but prepend the elements instead:
+.PP
+.CS
+ set doc {{"foo":[]}}
+ for {set i 0} {$i < 4} {incr i} {
+     json set doc foo -1 [json new string "elem: $i"]
+ }
+ # $doc is {"foo":["elem 3","elem 2","elem 1","elem 0"]}
+.CE
+.PP
+Trim an element out of an array:
+.PP
+.CS
+ set doc {["a","b","c"]}
+ json unset doc 1
+ # $doc is {["a","c"]}
+.CE
+.PP
+Implicitly create objects when setting a path that doesn't exist:
+.PP
+.CS
+ set doc {{"foo":1}}
+ json set doc bar baz {"hello, new obj"}
+ # $doc is {"foo":1,"bar":{"baz":"hello, new obj"}}
+.CE
+.PP
+Index through objects and arrays (the path elements are unambiguous because the
+json types they index into are known at resolve time):
+.PP
+.CS
+ set doc {{"foo":["a",{"primes":[2,3,5,7,11,13,17,19]},"c"]}}
+ json get $doc foo 1 primes end-1
+ # returns 17
 .CE
 .PP
 Handle a parse error and display a helpful message indicating the character
