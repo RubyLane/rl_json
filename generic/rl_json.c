@@ -722,14 +722,24 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest) //{{{
 	Tcl_Obj* src_intrep_obj = (Tcl_Obj*)src->internalRep.ptrAndLongRep.ptr;
 
 	dest->typePtr = src->typePtr;
-	Tcl_IncrRefCount((Tcl_Obj*)(dest->internalRep.ptrAndLongRep.ptr = Tcl_DuplicateObj((Tcl_Obj*)src->internalRep.ptrAndLongRep.ptr)));
+
+	if (src == src_intrep_obj) {
+		int			len;
+		const char*	str = Tcl_GetStringFromObj(src_intrep_obj, &len);
+		// Don't know how this happens yet, but it's bad news - we get into an endless recursion of duplicateobj calls until the stack blows up
+
+		// Panic and go via the string rep
+		Tcl_IncrRefCount((Tcl_Obj*)(dest->internalRep.ptrAndLongRep.ptr = Tcl_NewStringObj(str, len)));
+	} else {
+		Tcl_IncrRefCount((Tcl_Obj*)(dest->internalRep.ptrAndLongRep.ptr = Tcl_DuplicateObj(src_intrep_obj)));
+		if (src_intrep_obj->typePtr && src_intrep_obj->internalRep.ptrAndLongRep.value == JSON_ARRAY) {
+			// List intreps are themselves shared - this horrible hack is to ensure that the intrep is unshared
+			//fprintf(stderr, "forcing dedup of list intrep\n");
+			Tcl_ListObjReplace(NULL, (Tcl_Obj*)dest->internalRep.ptrAndLongRep.ptr, 0, 0, 0, NULL);
+		}
+	}
 	dest->internalRep.ptrAndLongRep.value = src->internalRep.ptrAndLongRep.value;
 
-	if (src_intrep_obj->typePtr && src_intrep_obj->internalRep.ptrAndLongRep.value == JSON_ARRAY) {
-		// List intreps are themselves shared - this horrible hack is to ensure that the intrep is unshared
-		//fprintf(stderr, "forcing dedup of list intrep\n");
-		Tcl_ListObjReplace(NULL, (Tcl_Obj*)dest->internalRep.ptrAndLongRep.ptr, 0, 0, 0, NULL);
-	}
 }
 
 //}}}
