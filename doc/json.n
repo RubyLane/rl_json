@@ -317,7 +317,7 @@ that caused the failure:
      } foo bar
  } trap {RL JSON PARSE} {errmsg options} {
      lassign [lrange [dict get $options -errorcode] 4 5] doc char_ofs
-     puts stderr "$errmsg\n[string range $doc 0 $char_ofs-1](here -->)[string range $doc $char_ofs end]"
+     puts stderr "$errmsg\\n[string range $doc 0 $char_ofs-1](here -->)[string range $doc $char_ofs end]"
  }
 .CE
 .PP
