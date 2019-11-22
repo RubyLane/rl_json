@@ -33,10 +33,12 @@ Quick Reference
 * [json get *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns the closest native Tcl type (other than JSON) for the extracted portion.
 * [json parse *json_val*]  - A deprecated synonym for [json get *json_val*].
 * [json get_typed *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns a two element list: the first being the value that would be returned by [json get] and the second being the JSON type of the extracted portion.
-* [json extract *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns the JSON fragment.
+* [json extract *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the JSON fragment.
 * [json exists *json_val* ?*key* ... ?*modifier*??]  - Tests whether the supplied key path and modifier resolve to something that exists in *json_val*
 * [json set *json_variable_name* ?*key* ...? *value*]  - Updates the JSON value stored in the variable *json_variable_name*, replacing the value referenced by *key* ... with the JSON value *value*.
 * [json unset *json_variable_name* ?*key* ...?]  - Updates the JSON value stored in the variable *json_variable_name*, removing the value referenced by *key* ...
+* [json isnull *json_val* ?*key* ...?]  - Return a boolean indicating whether the named JSON value is null.
+* [json type *json_val* ?*key* ...?]  - Return the type of the named JSON value, one of "object", "array", "string", "number", "boolean" or "null".
 * [json normalize *json_val*]  - Return a "normalized" version of the input *json_val* - all optional whitespace trimmed.
 * [json template *json_val* ?*dictionary*?]  - Return a JSON value by interpolating the values from *dictionary* into the template, or from variables in the current scope if *dictionary* is not supplied, in the manner described above.
 * [json new *type* *value*]  - Return a JSON fragment of type *type* and value *value*.
@@ -217,4 +219,4 @@ that value use the internal representation directly.
 License
 -------
 
-Copyright 2015 Ruby Lane.  Licensed under the same terms as the Tcl core.
+Copyright 2015-2019 Ruby Lane.  Licensed under the same terms as the Tcl core.

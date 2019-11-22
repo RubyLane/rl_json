@@ -26,6 +26,8 @@ json \- Parse and manipulate JSON documents
 \fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
 \fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
 \fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
+\fBjson isnull \fIjsonValue\fR \fIkey ...\fR?
+\fBjson type \fIjsonValue\fR \fIkey ...\fR?
 .fi
 .BE
 .SH DESCRIPTION
@@ -51,7 +53,7 @@ list: the first element is the value that would be returned by \fBjson get\fR
 and the second element is the JSON type of the extracted portion.  The
 \fIkey ...\fR arguments are a path, as described in \fBPATHS\fR below.
 .TP
-\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Extract the value of a portion of the \fIjsonValue\fR, returns the JSON
 fragment. The \fIkey ...\fR arguments are a path, as described in \fBPATHS\fR
@@ -61,7 +63,8 @@ below.
 .
 Tests whether the supplied key path (see \fBPATHS\fR below) and modifier
 resolve to something that exists in \fIjsonValue\fR (i.e., that it can be
-used with \fBjson get\fR without error).
+used with \fBjson get\fR without error).  Returns false if the value named
+by the path \fIkey ...\fR is null.
 .TP
 \fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
 .
@@ -104,6 +107,9 @@ the JSON array case, the rules are the same as the \fBforeach\fR command.
 .TP
 \fBjson lmap \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
 .
+Updates the JSON value stored in the variable \fIjsonVariableName\fR,
+replacing the value referenced by \fIkey ...\fR (a path as described in
+\fBPATHS\fR below) with the JSON value \fIvalue\fR.
 As for \fBjson foreach\fR, except that it is collecting; the result from each
 evaluation of \fIscript\fR is added to a Tcl list and returned as the result
 of the \fBjson lmap\fR command.  If the \fIscript\fR results in a TCL_CONTINUE
@@ -111,6 +117,14 @@ code (e.g., the script does \fBcontinue\fR), that iteration is skipped and no
 element is added to the result list.  If it results in TCL_BREAK (e.g., the
 script does \fBbreak\fR) the iterations are stopped and the results
 accumulated so far are returned.
+.TP
+\fBjson isnull \fIjsonVariableName\fR ?\fIkey ...\fR?
+.
+Return a boolean indicating whether the named JSON value is null.
+.TP
+\fBjson type \fIjsonVariableName\fR ?\fIkey ...\fR?
+.
+Return the type of the named JSON value, one of "object", "array", "string", "number", "boolean" or "null".
 .TP
 \fBjson pretty \fIjsonValue\fR
 .
@@ -150,17 +164,16 @@ A literal value that would match one of the above modifiers can be used as the
 last element in the path by doubling the \fB?\fR. For example:
 .PP
 .CS
-\fBjson get\fR {
-    {
-        "foo": {
-            "?size": "quite big"
-        }
-    }
-} foo ??size
+ \fBjson get\fR {
+     {
+         "foo": {
+             "?size": "quite big"
+         }
+     }
+ } foo ??size
 .CE
 .PP
-Returns
-.QW "quite big" .
+Returns "quite big"
 .SH TEMPLATES
 .PP
 The command \fBjson template\fR generates JSON documents by interpolating
@@ -196,37 +209,128 @@ dictionary which hold the values to interpolate.  When interpolating from
 variables in the current scope, they name scalar or array variables which hold
 the values to interpolate.  In either case if the named key or variable doesn't
 exist, a JSON null is interpolated in its place.
+.SH EXCEPTIONS
+.PP
+Exceptions are thrown when attempting to parse a string which isn't valid JSON,
+or when a named path is invalid or doesn't exist:
+.TP
+\fBRL JSON PARSE \fIerrormessage\fR \fIstring\fR \fIcharOfs\fR
+.
+Thrown when trying to parse a string that isn't valid JSON.  The \fIstring\fR
+element contains the string that failed to parse, and the first invalid character
+is at offset \fIcharOfs\fR within that string, using 0 based offsets.
+.TP
+\fBRL JSON BAD_PATH \fIpath\fR
+.
+Thrown when indexing into a JSON value and the specified path isn't valid.
+\fIpath\fR is the left subset of the path up to first element that caused the
+failure.
 .SH EXAMPLES
 .PP
 Produce a JSON value from a template:
 .PP
 .CS
-\fBjson template\fR {
-    {
-        "thing1": "~S:val1",
-        "thing2": ["a", "~N:val2", "~S:val2", "~B:val2",
-                   "~S:val3", "~L:~S:val1"],
-        "subdoc1": "~J:subdoc",
-        "subdoc2": "~T:subdoc"
-    }
-} {
-    val1   hello
-    val2   1e6
-    subdoc {
-        { "thing3": "~S:val1" }
-    }
-}
+ \fBjson template\fR {
+     {
+         "thing1": "~S:val1",
+         "thing2": ["a", "~N:val2", "~S:val2", "~B:val2",
+                    "~S:val3", "~L:~S:val1"],
+         "subdoc1": "~J:subdoc",
+         "subdoc2": "~T:subdoc"
+     }
+ } {
+     val1   hello
+     val2   1e6
+     subdoc {
+         { "thing3": "~S:val1" }
+     }
+ }
 .CE
 .PP
 The result (with formatting for readability):
 .PP
 .CS
-{
-    "thing1":"hello",
-    "thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],
-    "subdoc1":{"thing3":"~S:val1"},
-    "subdoc2":{"thing3":"hello"}
-}
+ {
+     "thing1":"hello",
+     "thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],
+     "subdoc1":{"thing3":"~S:val1"},
+     "subdoc2":{"thing3":"hello"}
+ }
+.CE
+.PP
+Incrementally append an element to an array (similar to \fBdict lappend\fR):
+.PP
+.CS
+ set doc {{"foo":[]}}
+ for {set i 0} {$i < 4} {incr i} {
+     json set doc foo end+1 [json new string "elem: $i"]
+ }
+ # $doc is {"foo":["elem 0","elem 1","elem 2","elem 3"]}
+.CE
+.PP
+Similar to the above, but prepend the elements instead:
+.PP
+.CS
+ set doc {{"foo":[]}}
+ for {set i 0} {$i < 4} {incr i} {
+     json set doc foo -1 [json new string "elem: $i"]
+ }
+ # $doc is {"foo":["elem 3","elem 2","elem 1","elem 0"]}
+.CE
+.PP
+Trim an element out of an array:
+.PP
+.CS
+ set doc {["a","b","c"]}
+ json unset doc 1
+ # $doc is {["a","c"]}
+.CE
+.PP
+Implicitly create objects when setting a path that doesn't exist:
+.PP
+.CS
+ set doc {{"foo":1}}
+ json set doc bar baz {"hello, new obj"}
+ # $doc is {"foo":1,"bar":{"baz":"hello, new obj"}}
+.CE
+.PP
+Index through objects and arrays (the path elements are unambiguous because the
+json types they index into are known at resolve time):
+.PP
+.CS
+ set doc {{"foo":["a",{"primes":[2,3,5,7,11,13,17,19]},"c"]}}
+ json get $doc foo 1 primes end-1
+ # returns 17
+.CE
+.PP
+Handle a parse error and display a helpful message indicating the character
+that caused the failure:
+.PP
+.CS
+ try {
+     json get {
+         {
+             "foo": {
+                 "bar": true,
+             }
+         }
+     } foo bar
+ } trap {RL JSON PARSE} {errmsg options} {
+     lassign [lrange [dict get $options -errorcode] 4 5] doc char_ofs
+     puts stderr "$errmsg\\n[string range $doc 0 $char_ofs-1](here -->)[string range $doc $char_ofs end]"
+ }
+.CE
+.PP
+Produces:
+.PP
+.CS
+ Error parsing JSON value: Illegal character at offset 37
+ 
+ 		{
+ 			"foo": {
+ 				"bar": true,
+ 			(here -->)}
+ 		}
 .CE
 '\" .SH "SEE ALSO"
 '\" dict(n), list(n)

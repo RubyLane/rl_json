@@ -2,179 +2,121 @@
 # Include the TEA standard macro set
 #
 
+AC_PREREQ(2.50)
 builtin(include,tclconfig/tcl.m4)
 
-# generated automatically by aclocal 1.14.1 -*- Autoconf -*-
+dnl: aclocal.m4 --
+dnl:
+dnl:	Macros used for controlling output of autoconf. Some are general
+dnl:	library macros, others are things that are probably eventually going
+dnl:	to end up in TEA. All have the prefix of TEAX (TEA eXtension).
+dnl:
+dnl: Copyright (c) 2007-2008 by Donal K. Fellows
+dnl:
+dnl: See the file "license.terms" for information on usage and redistribution
+dnl: of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-# Copyright (C) 1996-2013 Free Software Foundation, Inc.
+dnl Helper macros
+AC_DEFUN([TEAX_LAPPEND], [$1="[$]{$1} $2"])
+AC_DEFUN([TEAX_FOREACH], [for $1 in $2; do $3; done])
+AC_DEFUN([TEAX_IFEQ], [AS_IF([test "x$1" = "x$2"], [$3])])
+AC_DEFUN([TEAX_IFNEQ], [AS_IF([test "x$1" != "x$2"], [$3])])
+AC_DEFUN([TEAX_SWITCH], [case "$1" in TEAX_SWITCH_Cases(m4_shift($@)) esac])
+AC_DEFUN([TEAX_SWITCH_Cases], [m4_if([$#],0,,[$#],1,,[TEAX_SWITCH_OneCase([$1],[$2])TEAX_SWITCH_Cases(m4_shift(m4_shift($@)))])])
+AC_DEFUN([TEAX_SWITCH_OneCase],[ $1) $2;;])
+AC_DEFUN([CygPath],[`${CYGPATH} $1`])
 
-# This file is free software; the Free Software Foundation
-# gives unlimited permission to copy and/or distribute it,
-# with or without modifications, as long as this notice is preserved.
+dnl Interesting macros
+AC_DEFUN([TEAX_INCLUDE_DIR], [
+    TEAX_LAPPEND(TeaXIncludeDirs, $1)
+    TEA_ADD_INCLUDES([-I\"]CygPath($1)[\"])])
+AC_DEFUN([TEAX_SUBST_RESOURCE], [
+    AC_REQUIRE([TEA_CONFIG_CFLAGS])dnl
+    TEAX_IFEQ($TEA_PLATFORM, windows, [
+	AC_CHECK_PROGS(RC_, 'windres -o' 'rc -nologo -fo', none)
+	TEAX_SWITCH($RC_,
+	    windres*, [
+		rcdef_inc="--include "
+		rcdef_start="--define "
+		rcdef_q='\"'
+		AC_SUBST(RES_SUFFIX, [res.o])
+		TEAX_LAPPEND(PKG_OBJECTS, ${PACKAGE_NAME}.res.o)],
+	    rc*, [
+dnl		rcdef_inc="-i "
+dnl		rcdef_start="-d "
+dnl		rcdef_q='"'
+dnl		AC_SUBST(RES_SUFFIX, [res])
+dnl		TEAX_LAPPEND(PKG_OBJECTS, ${PACKAGE_NAME}.res)
+		AC_MSG_WARN([resource compiler problems; skipping...])
+		RC_=: ],
+	    *, [
+		AC_MSG_WARN([could not find resource compiler])
+		RC_=: ])])
+    # This next line is because of the brokenness of TEA...
+    AC_SUBST(RC, $RC_)
+    TEAX_FOREACH(i, $TeaXIncludeDirs, [
+	TEAX_LAPPEND(RES_DEFS, ${rcdef_inc}\"CygPath($i)\")])
+    TEAX_FOREACH(i, $1, [
+	TEAX_LAPPEND(RES_DEFS, ${rcdef_start}$i='${rcdef_q}\$($i)${rcdef_q}')])
+    AC_SUBST(RES_DEFS)])
+AC_DEFUN([TEAX_ADD_PRIVATE_HEADERS], [
+    TEAX_FOREACH(i, $@, [
+	# check for existence, be strict because it should be present!
+	AS_IF([test ! -f "${srcdir}/$i"], [
+	    AC_MSG_ERROR([could not find header file '${srcdir}/$i'])])
+	TEAX_LAPPEND(PKG_PRIVATE_HEADERS, $i)])
+    AC_SUBST(PKG_PRIVATE_HEADERS)])
+dnl Extra magic to make things work with Vista and VC
+AC_DEFUN([TEAX_VC_MANIFEST], [
+    CC_OUT="-o [\$]@"
+    AC_SUBST(CC_OUT)
+    AS_IF([test ${TEA_PLATFORM} = windows \
+	    -a "$GCC" != yes \
+	    -a "${SHARED_BUILD}" = 1], [
+	# This refers to "Manifest Tool" not "Magnetic Tape utility"
+	AC_CHECK_PROGS(MT, "mt -nologo", none)
+	TEAX_IFNEQ($MT, none, [
+	    CC_OUT="-Fo[\$]@"
+	    ADD_MANIFEST="${MT} -manifest [\$]@.manifest -outputresource:[\$]@\;2"
+	    AC_SUBST(ADD_MANIFEST)
+	    TEAX_LAPPEND(CLEANFILES, ${PKG_LIB_FILE}.manifest)])])])
+AC_DEFUN([TEAX_SDX], [
+    AC_ARG_WITH([sdx], [AS_HELP_STRING([--with-sdx],
+[where to find the Starkit Developer Extensions (default: search path)])], [:],
+[with_sdx=search])
+    TEAX_SWITCH($with_sdx,
+	no, [
+	    AC_MSG_NOTICE([configured without sdx; building starkits will fail])
+	    AC_MSG_NOTICE([building as a normal library still supported])],
+	search, [
+	    AC_PATH_PROG([SDX], [sdx], [none])
+	    TEAX_IFEQ($SDX, none, [
+		AC_PATH_PROG(SDX_KIT, sdx.kit, none)
+		TEAX_IFNEQ($SDX_KIT, none, [
+		    # We assume that sdx.kit is on the path, and that the
+		    # default tclsh is activetcl
+		    SDX="tclsh '${SDX_KIT}'"])])
+	    TEAX_IFEQ($SDX, none, [
+		AC_MSG_WARN([cannot find sdx; building starkits will fail])
+		AC_MSG_NOTICE([building as a normal library still supported])])],
+	*, [
+	    AC_PATH_PROG(SDX, $with_sdx, none)
+	    TEAX_IFEQ($SDX, none, [
+		AC_MSG_WARN([cannot find $with_sdx; building starkits may fail])
+		AC_MSG_NOTICE([building as a normal library still supported])])])])
+dnl TODO: Adapt this for OSX Frameworks...
+dnl This next bit is a bit ugly, but it makes things for tclooConfig.sh...
+AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [
+    eval "$1=\"-I[]CygPath($2)\""
+    AC_SUBST($1)])
+AC_DEFUN([TEAX_CONFIG_LINK_LINE], [
+    AS_IF([test ${TCL_LIB_VERSIONS_OK} = nodots], [
+	eval "$1=\"-L[]CygPath($2) -l$3${TCL_TRIM_DOTS}\""
+    ], [
+	eval "$1=\"-L[]CygPath($2) -l$3${PACKAGE_VERSION}\""
+    ])
+    AC_SUBST($1)])
 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
-# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-# PARTICULAR PURPOSE.
-
-m4_ifndef([AC_CONFIG_MACRO_DIRS], [m4_defun([_AM_CONFIG_MACRO_DIRS], [])m4_defun([AC_CONFIG_MACRO_DIRS], [_AM_CONFIG_MACRO_DIRS($@)])])
-# pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
-# serial 1 (pkg-config-0.24)
-# 
-# Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-#
-# As a special exception to the GNU General Public License, if you
-# distribute this file as part of a program that contains a
-# configuration script generated by Autoconf, you may include it under
-# the same distribution terms that you use for the rest of that program.
-
-# PKG_PROG_PKG_CONFIG([MIN-VERSION])
-# ----------------------------------
-AC_DEFUN([PKG_PROG_PKG_CONFIG],
-[m4_pattern_forbid([^_?PKG_[A-Z_]+$])
-m4_pattern_allow([^PKG_CONFIG(_(PATH|LIBDIR|SYSROOT_DIR|ALLOW_SYSTEM_(CFLAGS|LIBS)))?$])
-m4_pattern_allow([^PKG_CONFIG_(DISABLE_UNINSTALLED|TOP_BUILD_DIR|DEBUG_SPEW)$])
-AC_ARG_VAR([PKG_CONFIG], [path to pkg-config utility])
-AC_ARG_VAR([PKG_CONFIG_PATH], [directories to add to pkg-config's search path])
-AC_ARG_VAR([PKG_CONFIG_LIBDIR], [path overriding pkg-config's built-in search path])
-
-if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
-	AC_PATH_TOOL([PKG_CONFIG], [pkg-config])
-fi
-if test -n "$PKG_CONFIG"; then
-	_pkg_min_version=m4_default([$1], [0.9.0])
-	AC_MSG_CHECKING([pkg-config is at least version $_pkg_min_version])
-	if $PKG_CONFIG --atleast-pkgconfig-version $_pkg_min_version; then
-		AC_MSG_RESULT([yes])
-	else
-		AC_MSG_RESULT([no])
-		PKG_CONFIG=""
-	fi
-fi[]dnl
-])# PKG_PROG_PKG_CONFIG
-
-# PKG_CHECK_EXISTS(MODULES, [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
-#
-# Check to see whether a particular set of modules exists.  Similar
-# to PKG_CHECK_MODULES(), but does not set variables or print errors.
-#
-# Please remember that m4 expands AC_REQUIRE([PKG_PROG_PKG_CONFIG])
-# only at the first occurence in configure.ac, so if the first place
-# it's called might be skipped (such as if it is within an "if", you
-# have to call PKG_CHECK_EXISTS manually
-# --------------------------------------------------------------
-AC_DEFUN([PKG_CHECK_EXISTS],
-[AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
-if test -n "$PKG_CONFIG" && \
-    AC_RUN_LOG([$PKG_CONFIG --exists --print-errors "$1"]); then
-  m4_default([$2], [:])
-m4_ifvaln([$3], [else
-  $3])dnl
-fi])
-
-# _PKG_CONFIG([VARIABLE], [COMMAND], [MODULES])
-# ---------------------------------------------
-m4_define([_PKG_CONFIG],
-[if test -n "$$1"; then
-    pkg_cv_[]$1="$$1"
- elif test -n "$PKG_CONFIG"; then
-    PKG_CHECK_EXISTS([$3],
-                     [pkg_cv_[]$1=`$PKG_CONFIG --[]$2 "$3" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes ],
-		     [pkg_failed=yes])
- else
-    pkg_failed=untried
-fi[]dnl
-])# _PKG_CONFIG
-
-# _PKG_SHORT_ERRORS_SUPPORTED
-# -----------------------------
-AC_DEFUN([_PKG_SHORT_ERRORS_SUPPORTED],
-[AC_REQUIRE([PKG_PROG_PKG_CONFIG])
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi[]dnl
-])# _PKG_SHORT_ERRORS_SUPPORTED
-
-
-# PKG_CHECK_MODULES(VARIABLE-PREFIX, MODULES, [ACTION-IF-FOUND],
-# [ACTION-IF-NOT-FOUND])
-#
-#
-# Note that if there is a possibility the first call to
-# PKG_CHECK_MODULES might not happen, you should be sure to include an
-# explicit call to PKG_PROG_PKG_CONFIG in your configure.ac
-#
-#
-# --------------------------------------------------------------
-AC_DEFUN([PKG_CHECK_MODULES],
-[AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
-AC_ARG_VAR([$1][_CFLAGS], [C compiler flags for $1, overriding pkg-config])dnl
-AC_ARG_VAR([$1][_LIBS], [linker flags for $1, overriding pkg-config])dnl
-
-pkg_failed=no
-AC_MSG_CHECKING([for $1])
-
-_PKG_CONFIG([$1][_CFLAGS], [cflags], [$2])
-_PKG_CONFIG([$1][_LIBS], [libs], [$2])
-
-m4_define([_PKG_TEXT], [Alternatively, you may set the environment variables $1[]_CFLAGS
-and $1[]_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.])
-
-if test $pkg_failed = yes; then
-   	AC_MSG_RESULT([no])
-        _PKG_SHORT_ERRORS_SUPPORTED
-        if test $_pkg_short_errors_supported = yes; then
-	        $1[]_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "$2" 2>&1`
-        else 
-	        $1[]_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "$2" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$$1[]_PKG_ERRORS" >&AS_MESSAGE_LOG_FD
-
-	m4_default([$4], [AC_MSG_ERROR(
-[Package requirements ($2) were not met:
-
-$$1_PKG_ERRORS
-
-Consider adjusting the PKG_CONFIG_PATH environment variable if you
-installed software in a non-standard prefix.
-
-_PKG_TEXT])[]dnl
-        ])
-elif test $pkg_failed = untried; then
-     	AC_MSG_RESULT([no])
-	m4_default([$4], [AC_MSG_FAILURE(
-[The pkg-config script could not be found or is too old.  Make sure it
-is in your PATH or set the PKG_CONFIG environment variable to the full
-path to pkg-config.
-
-_PKG_TEXT
-
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.])[]dnl
-        ])
-else
-	$1[]_CFLAGS=$pkg_cv_[]$1[]_CFLAGS
-	$1[]_LIBS=$pkg_cv_[]$1[]_LIBS
-        AC_MSG_RESULT([yes])
-	$3
-fi[]dnl
-])# PKG_CHECK_MODULES
-
+dnl Local Variables:
+dnl mode: autoconf
+dnl End:

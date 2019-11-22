@@ -1,0 +1,409 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+test type-1.1 {type: object, no path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	}
+} -result object
+#>>>
+test type-1.2 {type: array, no path} -body { #<<<
+	json type {
+		[1,2,3]
+	}
+} -result array
+#>>>
+test type-1.3 {type: string, no path} -body { #<<<
+	json type {
+		"foo"
+	}
+} -result string
+#>>>
+test type-1.4 {type: number, no path} -body { #<<<
+	json type {
+		1234
+	}
+} -result number
+#>>>
+test type-1.5 {type: boolean true, no path} -body { #<<<
+	json type {
+		true
+	}
+} -result boolean
+#>>>
+test type-1.6 {type: boolean false, no path} -body { #<<<
+	json type {
+		false
+	}
+} -result boolean
+#>>>
+test type-1.7 {type: null, no path} -body { #<<<
+	json type {
+		null
+	}
+} -result null
+#>>>
+test type-2.1 {type: object, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz end
+} -result object
+#>>>
+test type-2.2 {type: array, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz
+} -result array
+#>>>
+test type-2.3 {type: string, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} foo
+} -result string
+#>>>
+test type-2.4 {type: number, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz 2
+} -result number
+#>>>
+test type-2.5 {type: boolean true, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz 3
+} -result boolean
+#>>>
+test type-2.6 {type: boolean false, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz 4
+} -result boolean
+#>>>
+test type-2.7 {type: null, path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz 5
+} -result null
+#>>>
+test type-3.1 {type: invalid path} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} baz 5
+} -result null
+#>>>
+
+# Invalid paths
+test type-60.1 {invalid path: missing key} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} blah
+} -returnCodes error -result {Path element 2: "blah" not found}
+#>>>
+test type-60.2 {invalid path: subscribed atomic: string} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.3 {invalid path: subscribed atomic: number} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 1 blah
+} -returnCodes error -result {Cannot descend into atomic type "number" with path element 3: "blah"}
+#>>>
+test type-60.4 {invalid path: subscribed atomic: boolean} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 3 blah
+} -returnCodes error -result {Cannot descend into atomic type "boolean" with path element 3: "blah"}
+#>>>
+test type-60.5 {invalid path: subscribed atomic: null} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 5 blah
+} -returnCodes error -result {Cannot descend into atomic type "null" with path element 3: "blah"}
+#>>>
+test type-60.6 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz blah
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got blah}
+#>>>
+test type-60.7 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-12
+} -result null
+#>>>
+test type-60.8 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 100
+} -result null
+#>>>
+test type-60.9 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz -2
+} -result null
+#>>>
+test type-60.10 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-2foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-2foo}
+#>>>
+test type-60.11 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-foo}
+#>>>
+test type-60.12 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end2
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end2}
+#>>>
+test type-60.13 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end+2
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end+2}
+#>>>
+test type-60.14 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz "end- 2"
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end- 2}
+#>>>
+test type-60.15 {invalid path: invalid array index} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-}
+#>>>
+test type-60.16 {invalid path: subscribed atomic: template string} -body { #<<<
+	json type {
+		{
+			"foo": "~S:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.17 {invalid path: subscribed atomic: template number} -body { #<<<
+	json type {
+		{
+			"foo": "~N:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.18 {invalid path: subscribed atomic: template boolean} -body { #<<<
+	json type {
+		{
+			"foo": "~B:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.19 {invalid path: subscribed atomic: template json doc} -body { #<<<
+	json type {
+		{
+			"foo": "~J:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.20 {invalid path: subscribed atomic: template json template} -body { #<<<
+	json type {
+		{
+			"foo": "~T:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.21 {invalid path: subscribed atomic: template literal} -body { #<<<
+	json type {
+		{
+			"foo": "~L:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+test type-60.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json type {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+
+test type-70.1 {Path tail element isn't interpreted as a modifier - no need to escape} -body { #<<<
+	json type {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} something ?type
+} -result string
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

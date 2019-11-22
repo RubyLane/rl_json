@@ -16,7 +16,9 @@ enum json_types {
 	JSON_DYN_BOOL,		// ~B:
 	JSON_DYN_JSON,		// ~J:
 	JSON_DYN_TEMPLATE,	// ~T:
-	JSON_DYN_LITERAL	// ~L:	literal escape - used to quote literal values that start with the above sequences
+	JSON_DYN_LITERAL,	// ~L:	literal escape - used to quote literal values that start with the above sequences
+
+	JSON_TYPE_MAX		// Not an actual type - records the number of types
 };
 
 #define KC_ENTRIES		384		// Must be an integer multiple of 8*sizeof(long long)
@@ -26,12 +28,41 @@ struct kc_entry {
 	unsigned int	hits;
 };
 
+enum action_opcode {
+	NOP,
+	ALLOCATE_SLOTS,
+	ALLOCATE_STACK,
+	FETCH_VALUE,
+	JVAL_LITERAL,
+	JVAL_STRING,
+	JVAL_NUMBER,
+	JVAL_BOOLEAN,
+	JVAL_JSON,
+	FILL_SLOT,
+	EVALUATE_TEMPLATE,
+	CX_OBJ_KEY,
+	CX_ARR_IDX,
+	POP_CX,
+	REPLACE_VAL,
+	REPLACE_KEY,
+
+	TEMPLATE_ACTIONS_END
+};
+
 struct interp_cx {
 	Tcl_Interp*		interp;
 	Tcl_Obj*		tcl_true;
 	Tcl_Obj*		tcl_false;
 	Tcl_Obj*		tcl_empty;
+	Tcl_Obj*		tcl_one;
+	Tcl_Obj*		json_true;
+	Tcl_Obj*		json_false;
 	Tcl_Obj*		json_null;
+	Tcl_Obj*		json_empty_string;
+	Tcl_Obj*		action[TEMPLATE_ACTIONS_END];
+	Tcl_Obj*		force_num_cmd[3];
+	Tcl_Obj*		type[JSON_TYPE_MAX];
+	Tcl_Obj*		templates;
 	Tcl_HashTable	kc;
 	int				kc_count;
 	long long		freemap[(KC_ENTRIES / (8*sizeof(long long)))+1];	// long long for ffsll

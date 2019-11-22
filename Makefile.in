@@ -60,7 +60,7 @@ PKG_HEADERS	= @PKG_HEADERS@
 PKG_LIB_FILE	= @PKG_LIB_FILE@
 PKG_STUB_LIB_FILE = @PKG_STUB_LIB_FILE@
 
-lib_BINARIES	= $(PKG_LIB_FILE)
+lib_BINARIES	= $(PKG_LIB_FILE) $(PKG_STUB_LIB_FILE)
 BINARIES	= $(lib_BINARIES)
 
 SHELL		= @SHELL@
@@ -356,6 +356,14 @@ dist: dist-clean
 	done
 
 	(cd $(DIST_ROOT); $(COMPRESS);)
+
+#========================================================================
+# How to rebuild the package's stub table.
+#========================================================================
+
+genstubs:
+		@echo $(TCLSH_PROGRAM) $(srcdir)/tools/genStubs.tcl $(srcdir)/generic $(srcdir)/generic/rl_json.decls
+		@$(TCLSH) `@CYGPATH@ $(srcdir)/tools/genStubs.tcl` `@CYGPATH@ $(srcdir)/generic` `@CYGPATH@ $(srcdir)/generic/rl_json.decls`
 
 #========================================================================
 # End of user-definable section

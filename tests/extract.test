@@ -112,7 +112,7 @@ test extract-20.1 {type modifier, string} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} foo ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.2 {type modifier, array} -body { #<<<
 	json extract {
@@ -121,7 +121,7 @@ test extract-20.2 {type modifier, array} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz ?type
-} -result array
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got ?type}
 #>>>
 test extract-20.3 {type modifier, number} -body { #<<<
 	json extract {
@@ -130,7 +130,7 @@ test extract-20.3 {type modifier, number} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 1 ?type
-} -result number
+} -returnCodes error -result {Cannot descend into atomic type "number" with path element 3: "?type"}
 #>>>
 test extract-20.4 {type modifier, boolean} -body { #<<<
 	json extract {
@@ -139,7 +139,7 @@ test extract-20.4 {type modifier, boolean} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 3 ?type
-} -result boolean
+} -returnCodes error -result {Cannot descend into atomic type "boolean" with path element 3: "?type"}
 #>>>
 test extract-20.5 {type modifier, null} -body { #<<<
 	json extract {
@@ -148,7 +148,7 @@ test extract-20.5 {type modifier, null} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 5 ?type
-} -result null
+} -returnCodes error -result {Cannot descend into atomic type "null" with path element 3: "?type"}
 #>>>
 test extract-20.6 {type modifier, object} -body { #<<<
 	json extract {
@@ -157,7 +157,7 @@ test extract-20.6 {type modifier, object} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 6 ?type
-} -result object
+} -returnCodes error -result {Path element 4: "?type" not found}
 #>>>
 test extract-20.7 {type modifier, template subst: string} -body { #<<<
 	json extract {
@@ -167,7 +167,7 @@ test extract-20.7 {type modifier, template subst: string} -body { #<<<
 			"something": "~S:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.8 {type modifier, template subst: number} -body { #<<<
 	json extract {
@@ -177,7 +177,7 @@ test extract-20.8 {type modifier, template subst: number} -body { #<<<
 			"something": "~N:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.9 {type modifier, template subst: number} -body { #<<<
 	json extract {
@@ -187,7 +187,7 @@ test extract-20.9 {type modifier, template subst: number} -body { #<<<
 			"something": "~B:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.10 {type modifier, template subst: literal} -body { #<<<
 	json extract {
@@ -197,7 +197,7 @@ test extract-20.10 {type modifier, template subst: literal} -body { #<<<
 			"something": "~L:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.11 {type modifier, template subst: json doc} -body { #<<<
 	json extract {
@@ -207,7 +207,7 @@ test extract-20.11 {type modifier, template subst: json doc} -body { #<<<
 			"something": "~J:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.12 {type modifier, template subst: json template} -body { #<<<
 	json extract {
@@ -217,7 +217,7 @@ test extract-20.12 {type modifier, template subst: json template} -body { #<<<
 			"something": "~T:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 test extract-20.13 {type modifier, template subst: invalid} -body { #<<<
 	json extract {
@@ -227,7 +227,7 @@ test extract-20.13 {type modifier, template subst: invalid} -body { #<<<
 			"something": "~X:dynamic"
 		}
 	} something ?type
-} -result string
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?type"}
 #>>>
 
 # Modifiers - ?length
@@ -238,7 +238,7 @@ test extract-21.1 {length modifier, string} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} foo ?length
-} -result 3
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.2 {length modifier, array} -body { #<<<
 	json extract {
@@ -247,7 +247,7 @@ test extract-21.2 {length modifier, array} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz ?length
-} -result 7
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got ?length}
 #>>>
 test extract-21.3 {length modifier, number} -body { #<<<
 	json extract {
@@ -256,7 +256,7 @@ test extract-21.3 {length modifier, number} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 1 ?length
-} -returnCodes error -result {?length modifier is not supported for type number}
+} -returnCodes error -result {Cannot descend into atomic type "number" with path element 3: "?length"}
 #>>>
 test extract-21.4 {length modifier, boolean} -body { #<<<
 	json extract {
@@ -265,7 +265,7 @@ test extract-21.4 {length modifier, boolean} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 3 ?length
-} -returnCodes error -result {?length modifier is not supported for type boolean}
+} -returnCodes error -result {Cannot descend into atomic type "boolean" with path element 3: "?length"}
 #>>>
 test extract-21.5 {length modifier, null} -body { #<<<
 	json extract {
@@ -274,7 +274,7 @@ test extract-21.5 {length modifier, null} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 5 ?length
-} -returnCodes error -result {?length modifier is not supported for type null}
+} -returnCodes error -result {Cannot descend into atomic type "null" with path element 3: "?length"}
 #>>>
 test extract-21.6 {length modifier, object} -body { #<<<
 	json extract {
@@ -283,7 +283,7 @@ test extract-21.6 {length modifier, object} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 6 ?length
-} -returnCodes error -result {?length modifier is not supported for type object}
+} -returnCodes error -result {Path element 4: "?length" not found}
 #>>>
 test extract-21.7 {length modifier, template subst: string} -body { #<<<
 	json extract {
@@ -293,7 +293,7 @@ test extract-21.7 {length modifier, template subst: string} -body { #<<<
 			"something": "~S:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.8 {length modifier, template subst: number} -body { #<<<
 	json extract {
@@ -303,7 +303,7 @@ test extract-21.8 {length modifier, template subst: number} -body { #<<<
 			"something": "~N:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.9 {length modifier, template subst: number} -body { #<<<
 	json extract {
@@ -313,7 +313,7 @@ test extract-21.9 {length modifier, template subst: number} -body { #<<<
 			"something": "~B:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.10 {length modifier, template subst: literal} -body { #<<<
 	json extract {
@@ -323,7 +323,7 @@ test extract-21.10 {length modifier, template subst: literal} -body { #<<<
 			"something": "~L:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.11 {length modifier, template subst: json doc} -body { #<<<
 	json extract {
@@ -333,7 +333,7 @@ test extract-21.11 {length modifier, template subst: json doc} -body { #<<<
 			"something": "~J:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.12 {length modifier, template subst: json template} -body { #<<<
 	json extract {
@@ -343,7 +343,7 @@ test extract-21.12 {length modifier, template subst: json template} -body { #<<<
 			"something": "~T:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 test extract-21.13 {length modifier, template subst: invalid} -body { #<<<
 	json extract {
@@ -353,7 +353,7 @@ test extract-21.13 {length modifier, template subst: invalid} -body { #<<<
 			"something": "~X:dynamic"
 		}
 	} something ?length
-} -result 10
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?length"}
 #>>>
 
 # Modifiers - ?size
@@ -364,7 +364,7 @@ test extract-22.1 {size modifier, string} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} foo ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.2 {size modifier, array} -body { #<<<
 	json extract {
@@ -373,7 +373,7 @@ test extract-22.2 {size modifier, array} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz ?size
-} -returnCodes error -result {?size modifier is not supported for type array}
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got ?size}
 #>>>
 test extract-22.3 {size modifier, number} -body { #<<<
 	json extract {
@@ -382,7 +382,7 @@ test extract-22.3 {size modifier, number} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 1 ?size
-} -returnCodes error -result {?size modifier is not supported for type number}
+} -returnCodes error -result {Cannot descend into atomic type "number" with path element 3: "?size"}
 #>>>
 test extract-22.4 {size modifier, boolean} -body { #<<<
 	json extract {
@@ -391,7 +391,7 @@ test extract-22.4 {size modifier, boolean} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 3 ?size
-} -returnCodes error -result {?size modifier is not supported for type boolean}
+} -returnCodes error -result {Cannot descend into atomic type "boolean" with path element 3: "?size"}
 #>>>
 test extract-22.5 {size modifier, null} -body { #<<<
 	json extract {
@@ -400,7 +400,7 @@ test extract-22.5 {size modifier, null} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 5 ?size
-} -returnCodes error -result {?size modifier is not supported for type null}
+} -returnCodes error -result {Cannot descend into atomic type "null" with path element 3: "?size"}
 #>>>
 test extract-22.6 {size modifier, object} -body { #<<<
 	json extract {
@@ -409,7 +409,7 @@ test extract-22.6 {size modifier, object} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj", "x": "y", "z": null}]
 		}
 	} baz 6 ?size
-} -result 3
+} -returnCodes error -result {Path element 4: "?size" not found}
 #>>>
 test extract-22.7 {size modifier, template subst: string} -body { #<<<
 	json extract {
@@ -419,7 +419,7 @@ test extract-22.7 {size modifier, template subst: string} -body { #<<<
 			"something": "~S:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.8 {size modifier, template subst: number} -body { #<<<
 	json extract {
@@ -429,7 +429,7 @@ test extract-22.8 {size modifier, template subst: number} -body { #<<<
 			"something": "~N:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.9 {size modifier, template subst: number} -body { #<<<
 	json extract {
@@ -439,7 +439,7 @@ test extract-22.9 {size modifier, template subst: number} -body { #<<<
 			"something": "~B:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.10 {size modifier, template subst: literal} -body { #<<<
 	json extract {
@@ -449,7 +449,7 @@ test extract-22.10 {size modifier, template subst: literal} -body { #<<<
 			"something": "~L:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.11 {size modifier, template subst: json doc} -body { #<<<
 	json extract {
@@ -459,7 +459,7 @@ test extract-22.11 {size modifier, template subst: json doc} -body { #<<<
 			"something": "~J:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.12 {size modifier, template subst: json template} -body { #<<<
 	json extract {
@@ -469,7 +469,7 @@ test extract-22.12 {size modifier, template subst: json template} -body { #<<<
 			"something": "~T:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 test extract-22.13 {size modifier, template subst: invalid} -body { #<<<
 	json extract {
@@ -479,7 +479,7 @@ test extract-22.13 {size modifier, template subst: invalid} -body { #<<<
 			"something": "~X:dynamic"
 		}
 	} something ?size
-} -returnCodes error -result {?size modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?size"}
 #>>>
 
 # Modifiers - ?keys
@@ -490,7 +490,7 @@ test extract-23.1 {keys modifier, string} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} foo ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.2 {keys modifier, array} -body { #<<<
 	json extract {
@@ -499,7 +499,7 @@ test extract-23.2 {keys modifier, array} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz ?keys
-} -returnCodes error -result {?keys modifier is not supported for type array}
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got ?keys}
 #>>>
 test extract-23.3 {keys modifier, number} -body { #<<<
 	json extract {
@@ -508,7 +508,7 @@ test extract-23.3 {keys modifier, number} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 1 ?keys
-} -returnCodes error -result {?keys modifier is not supported for type number}
+} -returnCodes error -result {Cannot descend into atomic type "number" with path element 3: "?keys"}
 #>>>
 test extract-23.4 {keys modifier, boolean} -body { #<<<
 	json extract {
@@ -517,7 +517,7 @@ test extract-23.4 {keys modifier, boolean} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 3 ?keys
-} -returnCodes error -result {?keys modifier is not supported for type boolean}
+} -returnCodes error -result {Cannot descend into atomic type "boolean" with path element 3: "?keys"}
 #>>>
 test extract-23.5 {keys modifier, null} -body { #<<<
 	json extract {
@@ -526,7 +526,7 @@ test extract-23.5 {keys modifier, null} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz 5 ?keys
-} -returnCodes error -result {?keys modifier is not supported for type null}
+} -returnCodes error -result {Cannot descend into atomic type "null" with path element 3: "?keys"}
 #>>>
 test extract-23.6 {keys modifier, object} -body { #<<<
 	json extract {
@@ -535,7 +535,7 @@ test extract-23.6 {keys modifier, object} -body { #<<<
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj", "x": "y", "z": null}]
 		}
 	} baz 6 ?keys
-} -result {inner x z}
+} -returnCodes error -result {Path element 4: "?keys" not found}
 #>>>
 test extract-23.7 {keys modifier, template subst: string} -body { #<<<
 	json extract {
@@ -545,7 +545,7 @@ test extract-23.7 {keys modifier, template subst: string} -body { #<<<
 			"something": "~S:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.8 {keys modifier, template subst: number} -body { #<<<
 	json extract {
@@ -555,7 +555,7 @@ test extract-23.8 {keys modifier, template subst: number} -body { #<<<
 			"something": "~N:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.9 {keys modifier, template subst: number} -body { #<<<
 	json extract {
@@ -565,7 +565,7 @@ test extract-23.9 {keys modifier, template subst: number} -body { #<<<
 			"something": "~B:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.10 {keys modifier, template subst: literal} -body { #<<<
 	json extract {
@@ -575,7 +575,7 @@ test extract-23.10 {keys modifier, template subst: literal} -body { #<<<
 			"something": "~L:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.11 {keys modifier, template subst: json doc} -body { #<<<
 	json extract {
@@ -585,7 +585,7 @@ test extract-23.11 {keys modifier, template subst: json doc} -body { #<<<
 			"something": "~J:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.12 {keys modifier, template subst: json template} -body { #<<<
 	json extract {
@@ -595,7 +595,7 @@ test extract-23.12 {keys modifier, template subst: json template} -body { #<<<
 			"something": "~T:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 test extract-23.13 {keys modifier, template subst: invalid} -body { #<<<
 	json extract {
@@ -605,7 +605,7 @@ test extract-23.13 {keys modifier, template subst: invalid} -body { #<<<
 			"something": "~X:dynamic"
 		}
 	} something ?keys
-} -returnCodes error -result {?keys modifier is not supported for type string}
+} -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "?keys"}
 #>>>
 
 test extract-50.1 {escaping a modifier} -body { #<<<
@@ -618,7 +618,7 @@ test extract-50.1 {escaping a modifier} -body { #<<<
 			}
 		}
 	} something ??type
-} -result {"fromdoc"}
+} -returnCodes error -result {Path element 3: "??type" not found}
 #>>>
 
 # Invalid paths
@@ -885,6 +885,19 @@ test extract-60.22 {invalid path: subscribed atomic: template invalid} -body { #
 		}
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
+#>>>
+
+test extract-70.1 {Path tail element isn't interpreted as a modifier - no need to escape} -body { #<<<
+	json extract {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} something ?type
+} -result {"fromdoc"}
 #>>>
 
 ::tcltest::cleanupTests
