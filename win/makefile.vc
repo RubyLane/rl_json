@@ -2,9 +2,8 @@
 #
 # Makefile for building rl_json
 #
-# Basic build, test and install
+# Basic build and install
 #   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl
-#   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl test
 #   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl install
 #
 # For other build options (debug, static etc.)
@@ -19,8 +18,11 @@ PROJECT = rl_json
 !include "rules-ext.vc"
 
 PRJ_OBJS = \
-	$(TMP_DIR)\main.obj \
+	$(TMP_DIR)\rl_json.obj \
+	$(TMP_DIR)\rl_jsonStubInit.obj \
 	$(TMP_DIR)\parser.obj
+
+PRJ_STUBOBJS = $(TMP_DIR)\rl_jsonStubLib.obj
 
 PRJ_DEFINES = -D_CRT_SECURE_NO_WARNINGS
 

@@ -15,6 +15,13 @@
 #include <stdint.h>
 #include "parser.h"
 
+#ifdef _MSC_VER
+# ifdef BUILD_rl_json
+#  undef TCL_STORAGE_CLASS
+#  define TCL_STORAGE_CLASS DLLEXPORT
+# endif
+#endif
+
 #define STRING_DEDUP_MAX	16
 
 #ifdef __builtin_expect
