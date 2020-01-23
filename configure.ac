@@ -20,7 +20,7 @@ dnl	to configure the system for the local environment.
 #-----------------------------------------------------------------------
 
 AC_PREREQ(2.61)
-AC_INIT([rl_json], [0.9.13])
+AC_INIT([rl_json], [0.9.14])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.

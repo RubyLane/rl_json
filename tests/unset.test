@@ -85,10 +85,10 @@ test unset-3.1 {Throw error for missing objects in path} -setup { #<<<
 		}
 	}
 } -body {
-	list [catch {json unset json bar Bar} r o] [dict get $o -errorcode]
+	list [catch {json unset json bar Bar} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain json r o
-} -result {1 {RL JSON BAD_PATH bar}}
+} -result {1 {Path element "bar" doesn't exist} {RL JSON BAD_PATH bar}}
 #>>>
 test unset-3.1 {Throw error for dereferencing atomic objects in path} -setup { #<<<
 	set json {

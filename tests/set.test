@@ -382,6 +382,33 @@ test set-6.4 {Append an element in an array, end-relative, 2 beyond end} -setup 
 } -result {{"foo":["a","b","c",null,null,"updated"]}}
 #>>>
 
+test set-7.1 {Be lenient about the value - if it can't be interpreted as a JSON native type, convert to a JSON string} -body { #<<<
+	set j	{{}}
+	foreach {k v} {
+		num		42
+		bool	true
+		null	null
+		string	string
+		arr		{ [1,2,3]}
+		notarr	{ [1,2,3}
+	} {
+		json set j $k $v
+	}
+	set j
+} -cleanup {
+	unset -nocomplain j k v
+} -result [json normalize {
+	{
+		"num":		42,
+		"bool":		true,
+		"null":		null,
+		"string":	"string",
+		"arr":		[1,2,3],
+		"notarr":	" [1,2,3"
+	}
+}]
+#>>>
+
 ::tcltest::cleanupTests
 return
 

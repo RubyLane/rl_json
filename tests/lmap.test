@@ -7,7 +7,7 @@ package require rl_json
 namespace path {::rl_json}
 
 test lmap-1.0 {Single iterator, no vars, over array} -body { #<<<
-	json foreach {} {["a", "b", "other var", null, true, false, {"x": 42}]} {}
+	json lmap {} {["a", "b", "other var", null, true, false, {"x": 42}]} {}
 } -returnCodes error -result "foreach varlist is empty"
 #>>>
 test lmap-1.1 {Single iterator, single var, over array} -setup { #<<<
@@ -117,7 +117,7 @@ test lmap-5.1 {Single iterator, single var, over array, continue} -setup { #<<<
 	"6({\"x\":42})(x 42)" \
 ]
 #>>>
-test lmap-5.1 {Single iterator, single var, over array, continue on final iteration} -setup { #<<<
+test lmap-5.1.1 {Single iterator, single var, over array, continue on final iteration} -setup { #<<<
 	set i	0
 } -body {
 	json lmap elem {["a", "b", "other var", null]} {

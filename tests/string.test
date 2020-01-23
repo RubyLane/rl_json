@@ -1,0 +1,59 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+test string-1.1 {Create a json string} -body { #<<<
+	json string foo
+} -result {"foo"}
+#>>>
+test string-1.2 {Create a json string, template string} -body { #<<<
+	json string ~S:foo
+} -result {"~S:foo"}
+#>>>
+test string-1.3 {Create a json string, template number} -body { #<<<
+	json string "~N:foo"
+} -result {"~N:foo"}
+#>>>
+test string-1.4 {Create a json string, template boolean} -body { #<<<
+	json string "~B:foo"
+} -result {"~B:foo"}
+#>>>
+test string-1.5 {Create a json string, template json value} -body { #<<<
+	json string "~J:foo"
+} -result {"~J:foo"}
+#>>>
+test string-1.6 {Create a json string, nested template value} -body { #<<<
+	json string "~T:foo"
+} -result {"~T:foo"}
+#>>>
+test string-1.7 {Create a json string, template literal} -body { #<<<
+	json string "~L:~S:foo"
+} -result {"~L:~S:foo"}
+#>>>
+test string-2.1 {Too few args} -body { #<<<
+	set code [catch {
+		json string
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Wrong # of arguments.  Must be "string val"} NONE}
+#>>>
+test string-2.2 {Too many args} -body { #<<<
+	set code [catch {
+		json string foo bar
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Wrong # of arguments.  Must be "string val"} NONE}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+

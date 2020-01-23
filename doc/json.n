@@ -4,7 +4,7 @@
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.9.13 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.9.14 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
@@ -12,7 +12,7 @@
 json \- Parse and manipulate JSON documents 
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.9.13\fR? 
+\fBpackage require rl_json\fR ?\fB0.9.14\fR? 
 
 \fBjson exists \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
 \fBjson extract \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
@@ -20,14 +20,21 @@ json \- Parse and manipulate JSON documents
 \fBjson get \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
 \fBjson get_typed \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
 \fBjson lmap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson amap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson omap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
 \fBjson new \fItype value\fR
+\fBjson string \fIvalue\fR
+\fBjson number \fIvalue\fR
+\fBjson bool \fIvalue\fR
 \fBjson normalize \fIjsonValue\fR
 \fBjson pretty \fIjsonValue\fR
 \fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
 \fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
 \fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
-\fBjson isnull \fIjsonValue\fR \fIkey ...\fR?
-\fBjson type \fIjsonValue\fR \fIkey ...\fR?
+\fBjson isnull \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson type \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson length \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson keys \fIjsonValue\fR ?\fIkey ...\fR?
 .fi
 .BE
 .SH DESCRIPTION
@@ -95,6 +102,19 @@ supplied, in the manner described in the section \fBTEMPLATES\fR.
 .
 Return a JSON fragment of type \fItype\fR and value \fIvalue\fR.
 .TP
+\fBjson string \fIvalue\fR
+.
+Return a JSON string with the value \fIvalue\fR.
+.TP
+\fBjson number \fIvalue\fR
+.
+Return a JSON number with the value \fIvalue\fR.
+.TP
+\fBjson boolean \fIvalue\fR
+.
+Return a JSON boolean with the value \fIvalue\fR.  Any of the forms accepted by
+Tcl_GetBooleanFromObj are accepted and normalized.
+.TP
 \fBjson foreach \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
 .
 Evaluate \fIscript\fR in a loop in a similar way to the \fBforeach\fR command.
@@ -107,9 +127,6 @@ the JSON array case, the rules are the same as the \fBforeach\fR command.
 .TP
 \fBjson lmap \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
 .
-Updates the JSON value stored in the variable \fIjsonVariableName\fR,
-replacing the value referenced by \fIkey ...\fR (a path as described in
-\fBPATHS\fR below) with the JSON value \fIvalue\fR.
 As for \fBjson foreach\fR, except that it is collecting; the result from each
 evaluation of \fIscript\fR is added to a Tcl list and returned as the result
 of the \fBjson lmap\fR command.  If the \fIscript\fR results in a TCL_CONTINUE
@@ -118,17 +135,45 @@ element is added to the result list.  If it results in TCL_BREAK (e.g., the
 script does \fBbreak\fR) the iterations are stopped and the results
 accumulated so far are returned.
 .TP
+\fBjson amap \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
+.
+As for \fBjson lmap\fR, but the result is a JSON array rather than a list.  If
+the result of each iteration is a JSON value it is added to the array as-is,
+otherwise it is converted to a JSON string.
+.TP
+\fBjson omap \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
+.
+As for \fBjson lmap\fR, but the result is a JSON object rather than a list.
+The result of each iteration must be a dictionary (or a list of 2n elements,
+including n = 0).  Tcl_ObjType snooping is done to ensure that the iteration
+over the result is efficient for both dict and list cases.
+Each entry in the dictionary will be added to the result object.  If the value
+for each key in the iteration result is a JSON value it is added to the array
+as-is, otherwise it is converted to a JSON string.
+.TP
 \fBjson isnull \fIjsonVariableName\fR ?\fIkey ...\fR?
 .
 Return a boolean indicating whether the named JSON value is null.
 .TP
 \fBjson type \fIjsonVariableName\fR ?\fIkey ...\fR?
 .
-Return the type of the named JSON value, one of "object", "array", "string", "number", "boolean" or "null".
+Return the type of the named JSON value, one of "object", "array", "string",
+"number", "boolean" or "null".
+.TP
+\fBjson length \fIjsonVariableName\fR ?\fIkey ...\fR?
+.
+Return the length of the of the named JSON array, number of entries in the
+named JSON object, or number of characters in the named JSON string.  Other
+value types aren't supported.
+.TP
+\fBjson keys \fIjsonVariableName\fR ?\fIkey ...\fR?
+.
+Return the keys in the of the named JSON object, found by following the path of \fIkey\fRs.
 .TP
 \fBjson pretty \fIjsonValue\fR
 .
-Returns a pretty-printed string representation of \fIjsonValue\fR.  Useful for debugging or inspecting the structure of JSON data.
+Returns a pretty-printed string representation of \fIjsonValue\fR.  Useful for
+debugging or inspecting the structure of JSON data.
 .SH PATHS
 .PP
 Several of the commands (e.g., \fBjson get\fR, \fBjson exists\fR, \fBjson

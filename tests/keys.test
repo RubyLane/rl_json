@@ -6,126 +6,170 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
-test type-1.1 {type: object, no path} -body { #<<<
-	json type {
+test keys-0.1 {too few args} -body { #<<<
+	set code [catch {
+		json keys
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result {1 {Wrong # of arguments.  Must be "keys json_val ?path ...?"} NONE}
+#>>>
+test keys-1.1 {type: object, no path} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	}
-} -result object
+} -result {foo baz}
 #>>>
-test type-1.2 {type: array, no path} -body { #<<<
-	json type {
+test keys-1.2 {type: array, no path} -body { #<<<
+	json keys {
 		[1,2,3]
 	}
-} -result array
+} -returnCodes error -result {Named JSON value type isn't supported: array}
 #>>>
-test type-1.3 {type: string, no path} -body { #<<<
-	json type {
+test keys-1.3 {type: string, no path} -body { #<<<
+	json keys {
 		"foo"
 	}
-} -result string
+} -returnCodes error -result {Named JSON value type isn't supported: string}
 #>>>
-test type-1.4 {type: number, no path} -body { #<<<
-	json type {
-		1234
-	}
-} -result number
+test keys-1.4 {type: number, no path} -body { #<<<
+	set code [catch {
+		json keys {
+			1234
+		}
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result {1 {Named JSON value type isn't supported: number} NONE}
 #>>>
-test type-1.5 {type: boolean true, no path} -body { #<<<
-	json type {
-		true
-	}
-} -result boolean
+test keys-1.5 {type: boolean true, no path} -body { #<<<
+	set code [catch {
+		json keys {
+			true
+		}
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result {1 {Named JSON value type isn't supported: boolean} NONE}
 #>>>
-test type-1.6 {type: boolean false, no path} -body { #<<<
-	json type {
-		false
-	}
-} -result boolean
+test keys-1.6 {type: boolean false, no path} -body { #<<<
+	set code [catch {
+		json keys {
+			false
+		}
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result {1 {Named JSON value type isn't supported: boolean} NONE}
 #>>>
-test type-1.7 {type: null, no path} -body { #<<<
-	json type {
-		null
-	}
-} -result null
+test keys-1.7 {type: null, no path} -body { #<<<
+	set code [catch {
+		json keys {
+			null
+		}
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result {1 {Named JSON value type isn't supported: null} NONE}
 #>>>
-test type-2.1 {type: object, path} -body { #<<<
-	json type {
+test keys-2.1 {type: object, path} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
-			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj", "key2": "foo"}]
 		}
 	} baz end
-} -result object
+} -result {inner key2}
 #>>>
-test type-2.2 {type: array, path} -body { #<<<
-	json type {
+test keys-2.2 {type: array, path} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} baz
-} -result array
+} -returnCodes error -result {Named JSON value type isn't supported: array}
 #>>>
-test type-2.3 {type: string, path} -body { #<<<
-	json type {
+test keys-2.3 {type: string, path} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 		}
 	} foo
-} -result string
+} -returnCodes error -result {Named JSON value type isn't supported: string}
 #>>>
-test type-2.4 {type: number, path} -body { #<<<
-	json type {
-		{
-			"foo": "bar",
-			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
-		}
-	} baz 2
-} -result number
-#>>>
-test type-2.5 {type: boolean true, path} -body { #<<<
-	json type {
-		{
-			"foo": "bar",
-			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
-		}
-	} baz 3
-} -result boolean
-#>>>
-test type-2.6 {type: boolean false, path} -body { #<<<
-	json type {
-		{
-			"foo": "bar",
-			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
-		}
-	} baz 4
-} -result boolean
-#>>>
-test type-2.7 {type: null, path} -body { #<<<
-	json type {
-		{
-			"foo": "bar",
-			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
-		}
-	} baz 5
-} -result null
-#>>>
-test type-3.1 {type: invalid path: out of array bounds} -body { #<<<
-	json type {
-		{
-			"foo": "bar",
-			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
-		}
-	} baz 7
-} -result null
-#>>>
-test type-3.2 {type: invalid path: invalid key} -body { #<<<
+test keys-2.4 {type: number, path} -body { #<<<
 	set code [catch {
-		json type {
+		json keys {
+			{
+				"foo": "bar",
+				"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			}
+		} baz 2
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Named JSON value type isn't supported: number} NONE}
+#>>>
+test keys-2.5 {type: boolean true, path} -body { #<<<
+	set code [catch {
+		json keys {
+			{
+				"foo": "bar",
+				"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			}
+		} baz 3
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Named JSON value type isn't supported: boolean} NONE}
+#>>>
+test keys-2.6 {type: boolean false, path} -body { #<<<
+	set code [catch {
+		json keys {
+			{
+				"foo": "bar",
+				"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			}
+		} baz 4
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Named JSON value type isn't supported: boolean} NONE}
+#>>>
+test keys-2.7 {type: null, path} -body { #<<<
+	set code [catch {
+		json keys {
+			{
+				"foo": "bar",
+				"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			}
+		} baz 5
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Named JSON value type isn't supported: null} NONE}
+#>>>
+test keys-3.1 {type: invalid path} -body { #<<<
+	set code [catch {
+		json keys {
+			{
+				"foo": "bar",
+				"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			}
+		} baz 7
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Named JSON value type isn't supported: null} NONE}
+#>>>
+test keys-3.2 {type: invalid path: invalid key} -body { #<<<
+	set code [catch {
+		json keys {
 			{
 				"foo": "bar",
 				"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
@@ -137,8 +181,8 @@ test type-3.2 {type: invalid path: invalid key} -body { #<<<
 #>>>
 
 # Invalid paths
-test type-60.1 {invalid path: missing key} -body { #<<<
-	json type {
+test keys-60.1 {invalid path: missing key} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -149,8 +193,8 @@ test type-60.1 {invalid path: missing key} -body { #<<<
 	} blah
 } -returnCodes error -result {Path element 2: "blah" not found}
 #>>>
-test type-60.2 {invalid path: subscribed atomic: string} -body { #<<<
-	json type {
+test keys-60.2 {invalid path: subscribed atomic: string} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -161,8 +205,8 @@ test type-60.2 {invalid path: subscribed atomic: string} -body { #<<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.3 {invalid path: subscribed atomic: number} -body { #<<<
-	json type {
+test keys-60.3 {invalid path: subscribed atomic: number} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -173,8 +217,8 @@ test type-60.3 {invalid path: subscribed atomic: number} -body { #<<<
 	} baz 1 blah
 } -returnCodes error -result {Cannot descend into atomic type "number" with path element 3: "blah"}
 #>>>
-test type-60.4 {invalid path: subscribed atomic: boolean} -body { #<<<
-	json type {
+test keys-60.4 {invalid path: subscribed atomic: boolean} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -185,8 +229,8 @@ test type-60.4 {invalid path: subscribed atomic: boolean} -body { #<<<
 	} baz 3 blah
 } -returnCodes error -result {Cannot descend into atomic type "boolean" with path element 3: "blah"}
 #>>>
-test type-60.5 {invalid path: subscribed atomic: null} -body { #<<<
-	json type {
+test keys-60.5 {invalid path: subscribed atomic: null} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -197,8 +241,8 @@ test type-60.5 {invalid path: subscribed atomic: null} -body { #<<<
 	} baz 5 blah
 } -returnCodes error -result {Cannot descend into atomic type "null" with path element 3: "blah"}
 #>>>
-test type-60.6 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.6 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -209,8 +253,8 @@ test type-60.6 {invalid path: invalid array index} -body { #<<<
 	} baz blah
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got blah}
 #>>>
-test type-60.7 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.7 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -219,10 +263,10 @@ test type-60.7 {invalid path: invalid array index} -body { #<<<
 			}
 		}
 	} baz end-12
-} -result null
+} -returnCodes error -result {Named JSON value type isn't supported: null}
 #>>>
-test type-60.8 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.8 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -231,10 +275,10 @@ test type-60.8 {invalid path: invalid array index} -body { #<<<
 			}
 		}
 	} baz 100
-} -result null
+} -returnCodes error -result {Named JSON value type isn't supported: null}
 #>>>
-test type-60.9 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.9 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -243,10 +287,10 @@ test type-60.9 {invalid path: invalid array index} -body { #<<<
 			}
 		}
 	} baz -2
-} -result null
+} -returnCodes error -result {Named JSON value type isn't supported: null}
 #>>>
-test type-60.10 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.10 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -257,8 +301,8 @@ test type-60.10 {invalid path: invalid array index} -body { #<<<
 	} baz end-2foo
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got end-2foo}
 #>>>
-test type-60.11 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.11 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -269,8 +313,8 @@ test type-60.11 {invalid path: invalid array index} -body { #<<<
 	} baz end-foo
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got end-foo}
 #>>>
-test type-60.12 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.12 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -281,8 +325,8 @@ test type-60.12 {invalid path: invalid array index} -body { #<<<
 	} baz end2
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got end2}
 #>>>
-test type-60.13 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.13 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -293,8 +337,8 @@ test type-60.13 {invalid path: invalid array index} -body { #<<<
 	} baz end+2
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got end+2}
 #>>>
-test type-60.14 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.14 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -305,8 +349,8 @@ test type-60.14 {invalid path: invalid array index} -body { #<<<
 	} baz "end- 2"
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got end- 2}
 #>>>
-test type-60.15 {invalid path: invalid array index} -body { #<<<
-	json type {
+test keys-60.15 {invalid path: invalid array index} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -317,8 +361,8 @@ test type-60.15 {invalid path: invalid array index} -body { #<<<
 	} baz end-
 } -returnCodes error -result {Expected an integer index or end(-integer)?, got end-}
 #>>>
-test type-60.16 {invalid path: subscribed atomic: template string} -body { #<<<
-	json type {
+test keys-60.16 {invalid path: subscribed atomic: template string} -body { #<<<
+	json keys {
 		{
 			"foo": "~S:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -329,8 +373,8 @@ test type-60.16 {invalid path: subscribed atomic: template string} -body { #<<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.17 {invalid path: subscribed atomic: template number} -body { #<<<
-	json type {
+test keys-60.17 {invalid path: subscribed atomic: template number} -body { #<<<
+	json keys {
 		{
 			"foo": "~N:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -341,8 +385,8 @@ test type-60.17 {invalid path: subscribed atomic: template number} -body { #<<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.18 {invalid path: subscribed atomic: template boolean} -body { #<<<
-	json type {
+test keys-60.18 {invalid path: subscribed atomic: template boolean} -body { #<<<
+	json keys {
 		{
 			"foo": "~B:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -353,8 +397,8 @@ test type-60.18 {invalid path: subscribed atomic: template boolean} -body { #<<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.19 {invalid path: subscribed atomic: template json doc} -body { #<<<
-	json type {
+test keys-60.19 {invalid path: subscribed atomic: template json doc} -body { #<<<
+	json keys {
 		{
 			"foo": "~J:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -365,8 +409,8 @@ test type-60.19 {invalid path: subscribed atomic: template json doc} -body { #<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.20 {invalid path: subscribed atomic: template json template} -body { #<<<
-	json type {
+test keys-60.20 {invalid path: subscribed atomic: template json template} -body { #<<<
+	json keys {
 		{
 			"foo": "~T:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -377,8 +421,8 @@ test type-60.20 {invalid path: subscribed atomic: template json template} -body 
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.21 {invalid path: subscribed atomic: template literal} -body { #<<<
-	json type {
+test keys-60.21 {invalid path: subscribed atomic: template literal} -body { #<<<
+	json keys {
 		{
 			"foo": "~L:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -389,8 +433,8 @@ test type-60.21 {invalid path: subscribed atomic: template literal} -body { #<<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
-test type-60.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
-	json type {
+test keys-60.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json keys {
 		{
 			"foo": "~X:bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
@@ -402,20 +446,22 @@ test type-60.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
 
-test type-70.1 {Path tail element isn't interpreted as a modifier - no need to escape} -body { #<<<
-	json type {
+test keys-70.1 {Path tail element isn't interpreted as a modifier - no need to escape} -body { #<<<
+	json keys {
 		{
 			"foo": "bar",
 			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
 			"something": {
-				"?type": "fromdoc"
+				"?type": {"fromdoc": "yes", "also this": "too", "another": null}
 			}
 		}
 	} something ?type
-} -result string
+} -result {fromdoc {also this} another}
 #>>>
 
 ::tcltest::cleanupTests
 return
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+
+

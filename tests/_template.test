@@ -6,7 +6,7 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
-test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
+test _template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
 	set bar	"Bar"
 	unset -nocomplain a
 	array set a {
@@ -19,7 +19,7 @@ test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup 
 		subdoc3	null
 	}
 } -body {
-	json template {
+	json _template {
 		{
 			"foo": "~S:bar",
 			"baz":  [
@@ -40,8 +40,8 @@ test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup 
 	unset -nocomplain bar a
 } -result {{"foo":"Bar","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:bar"},{"inner2":"Bar"},null]}}
 #>>>
-test template-1.2 {Produce a JSON doc with interpolated values, using dict} -body { #<<<
-	json template {
+test _template-1.2 {Produce a JSON doc with interpolated values, using dict} -body { #<<<
+	json _template {
 		{
 			"foo": "~S:bar",
 			"baz":  [
@@ -72,8 +72,8 @@ test template-1.2 {Produce a JSON doc with interpolated values, using dict} -bod
 	}
 } -result {{"foo":"Ba\"r","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:foo"},{"inner2":"Foo"},null,"Baz"]}}
 #>>>
-test template-1.3 {Produce a JSON doc with interpolated values, subst object keys, using dict} -body { #<<<
-	json template {
+test _template-1.3 {Produce a JSON doc with interpolated values, subst object keys, using dict} -body { #<<<
+	json _template {
 		{
 			"~S:foo": "~S:bar",
 			"baz":  [
@@ -102,10 +102,10 @@ test template-1.3 {Produce a JSON doc with interpolated values, subst object key
 		subdoc2	{{"inner2" : "~S:foo"}}
 		subdoc3	null
 	}
-} -result {{"Foo":"Ba\"r","baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:foo"},{"inner2":"Foo"},null,"Baz"]}}
+} -result {{"baz":["str",123,123.4,true,false,null,"~S:not a subst",{"inner":"~S:foo"},{"inner2":"Foo"},null,"Baz"],"Foo":"Ba\"r"}}
 #>>>
-test template-1.4 {Invalid interpolated type key fallthrough} -body { #<<<
-	json template {
+test _template-1.4 {Invalid interpolated type key fallthrough} -body { #<<<
+	json _template {
 		{
 			"foo": "~S:foo",
 			"bar": "~A:bar"
@@ -114,8 +114,8 @@ test template-1.4 {Invalid interpolated type key fallthrough} -body { #<<<
 	}
 } -result {{"foo":null,"bar":"~A:bar"}}
 #>>>
-test template-2.1 {Test interpolated numeric validation} -body { #<<<
-	json template {
+test _template-2.1 {Test interpolated numeric validation} -body { #<<<
+	json _template {
 		{
 			"Foo": "~N:num",
 			"Bar": "baz"
@@ -125,40 +125,40 @@ test template-2.1 {Test interpolated numeric validation} -body { #<<<
 	}
 } -returnCodes error -result {Error substituting value from "num" into template, not a number: ""}
 #>>>
-test template-3.1 {Non-string key subst: number} -body { #<<<
+test _template-3.1 {Non-string key subst: number} -body { #<<<
 	list [catch {
-		json template { {"~N:v":"bar"} } {v 1}
+		json _template { {"~N:v":"bar"} } {v 1}
 } r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 NONE {Only strings allowed as object keys}]
 #>>>
-test template-3.2 {Non-string key subst: true} -body { #<<<
+test _template-3.2 {Non-string key subst: true} -body { #<<<
 	list [catch {
-		json template { {"~B:v":"bar"} } {v 1}
+		json _template { {"~B:v":"bar"} } {v 1}
 } r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 NONE {Only strings allowed as object keys}]
 #>>>
-test template-3.3 {Non-string key subst: false} -body { #<<<
+test _template-3.3 {Non-string key subst: false} -body { #<<<
 	list [catch {
-		json template { {"~B:v":"bar"} } {v 0}
+		json _template { {"~B:v":"bar"} } {v 0}
 } r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 NONE {Only strings allowed as object keys}]
 #>>>
-test template-3.4 {Non-string key subst: null} -body { #<<<
+test _template-3.4 {Non-string key subst: null} -body { #<<<
 	list [catch {
-		json template { {"~S:v":"bar"} } {}
-} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+		json _template { {"~S:v":"bar"} } {}
+	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
 } -result [list 1 NONE {Only strings allowed as object keys}]
 #>>>
-test template-3.5 {Non-string key subst: literal} -body { #<<<
-	json template { {"~L:~N:v":"bar"} } {}
+test _template-3.5 {Non-string key subst: literal} -body { #<<<
+	json _template { {"~L:~N:v":"bar"} } {}
 } -result {{"~N:v":"bar"}}
 #>>>
 
@@ -186,34 +186,34 @@ try { # Check string quoting
 		} else {
 			set expect	[format {\u%04X} $c]
 		}
-		test template-4.$c.1 "String quoting: $c -> $expect, no leading, no trailing" -setup { #<<<
+		test _template-4.$c.1 "String quoting: $c -> $expect, no leading, no trailing" -setup { #<<<
 			set str	$char
 		} -body {
-			json template {"~S:str"}
+			json _template {"~S:str"}
 		} -cleanup {
 			unset -nocomplain str
 		} -result "\"$expect\""
 		#>>>
-		test template-4.$c.2 "String quoting: $c -> $expect, leading, no trailing" -setup { #<<<
+		test _template-4.$c.2 "String quoting: $c -> $expect, leading, no trailing" -setup { #<<<
 			set str	"$leading$char"
 		} -body {
-			json template {"~S:str"}
+			json _template {"~S:str"}
 		} -cleanup {
 			unset -nocomplain str
 		} -result "\"$leading$expect\""
 		#>>>
-		test template-4.$c.3 "String quoting: $c -> $expect, no leading, trailing" -setup { #<<<
+		test _template-4.$c.3 "String quoting: $c -> $expect, no leading, trailing" -setup { #<<<
 			set str	"$char$trailing"
 		} -body {
-			json template {"~S:str"}
+			json _template {"~S:str"}
 		} -cleanup {
 			unset -nocomplain str
 		} -result "\"$expect$trailing\""
 		#>>>
-		test template-4.$c.4 "String quoting: $c -> $expect, leading, trailing" -setup { #<<<
+		test _template-4.$c.4 "String quoting: $c -> $expect, leading, trailing" -setup { #<<<
 			set str	"$leading$char$trailing"
 		} -body {
-			json template {"~S:str"}
+			json _template {"~S:str"}
 		} -cleanup {
 			unset -nocomplain str
 		} -result "\"$leading$expect$trailing\""

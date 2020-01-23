@@ -4,7 +4,7 @@ if {"bench" ni [info commands bench]} {
 }
 
 package require rl_json
-package require yajltcl
+#package require yajltcl
 
 namespace import rl_json::json
 

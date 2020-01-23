@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "parser.h"
+#include <tclTomMath.h>
 
 #define STRING_DEDUP_MAX	16
 
@@ -25,6 +26,13 @@
 
 extern Tcl_ObjType json_type;
 extern const char* type_names_dbg[];
+
+enum collecting_mode {
+	COLLECT_NONE,
+	COLLECT_LIST,
+	COLLECT_ARRAY,
+	COLLECT_OBJECT
+};
 
 struct parse_context {
 	struct parse_context*	last;		// Only valid for the first entry
@@ -60,6 +68,7 @@ struct foreach_state {
 	struct foreach_iterator*	it;
 	Tcl_Obj*					script;
 	Tcl_Obj*					res;
+	int							collecting;
 };
 
 void append_to_cx(struct parse_context *cx, Tcl_Obj *val);

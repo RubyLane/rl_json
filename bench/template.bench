@@ -44,6 +44,30 @@ bench template-1.1 {Basic templated document creation} -setup { #<<<
 	variables {
 		json template $tmpl
 	}
+
+	dict_direct {
+		json _template $tmpl {
+			foo		Foo
+			a(bar)	Bar
+		}
+	}
+
+	dict_lit_direct {
+		json _template {
+			{
+				"foo": "~S:foo",
+				"bar": "~S:a(bar)",
+				"baz": "~N:baz"
+			}
+		} {
+			foo		Foo
+			a(bar)	Bar
+		}
+	}
+
+	variables_direct {
+		json _template $tmpl
+	}
 } -cleanup {
 	unset -nocomplain tmpl a foo
 } -result [json normalize {
@@ -51,6 +75,173 @@ bench template-1.1 {Basic templated document creation} -setup { #<<<
 		"foo": "Foo",
 		"bar": "Bar",
 		"baz": null
+	}
+}]
+#>>>
+bench template-2.1 {Test templated doc creation, including numbers} -setup { #<<<
+	set foo		1
+	set bar		42.5
+	set baz		1e6
+	set quux	0x42
+	set octal	077
+	set space	" 42"
+
+	set d {
+		foo		1
+		bar		42.5
+		baz		1e6
+		quux	0x42
+		octal	077
+		space	" 42"
+	}
+} -compare {
+	template {
+		json template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		}
+	}
+
+	template_dict {
+		json template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		} $d
+	}
+
+	_template {
+		json _template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		}
+	}
+
+	_template_dict {
+		json _template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		} $d
+	}
+} -cleanup {
+	unset -nocomplain foo bar baz d
+} -result [json normalize {
+	{
+		"foo":		1,
+		"bar":		42.5,
+		//"baz":		1e6,
+		"quux":		66,
+		"octal":	63,
+		"space":	42
+	}
+}]
+#>>>
+bench template-3.1 {Test templated doc creation, including numbers, json set on result} -setup { #<<<
+	set foo		1
+	set bar		42.5
+	set baz		1e6
+	set quux	0x42
+	set octal	077
+	set space	" 42"
+
+	set d {
+		foo		1
+		bar		42.5
+		baz		1e6
+		quux	0x42
+		octal	077
+		space	" 42"
+	}
+} -compare {
+	template {
+		set j	[json template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		}]
+		json set j new null
+	}
+
+	template_dict {
+		set j	[json template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		} $d]
+		json set j new null
+	}
+
+	_template {
+		set j [json _template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		}]
+		json set j new null
+	}
+
+	_template_dict {
+		set j [json _template {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		} $d]
+		json set j new null
+	}
+} -cleanup {
+	unset -nocomplain foo bar baz d
+} -result [json normalize {
+	{
+		"foo":		1,
+		"bar":		42.5,
+		//"baz":		1e6,
+		"quux":		66,
+		"octal":	63,
+		"space":	42,
+		"new":		null
 	}
 }]
 #>>>

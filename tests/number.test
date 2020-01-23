@@ -1,0 +1,83 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+test number-1.1 {Create a json number: 1} -body { #<<<
+	json number 1
+} -result 1
+#>>>
+test number-1.2 {Create a json number: 0} -body { #<<<
+	json number 0
+} -result 0
+#>>>
+test number-1.3 {Create a json number: real} -body { #<<<
+	json number 42.1
+} -result 42.1
+#>>>
+test number-1.4 {Create a json number: scientific notation} -body { #<<<
+	json number 1e6
+} -result 1000000.0
+#>>>
+test number-1.5 {Create a max 32 bit signed int} -body { #<<<
+	json number [expr {2**31-1}]
+} -result 2147483647
+#>>>
+test number-1.6 {Create a min 32 bit signed int} -body { #<<<
+	json number [expr {-1*(2**31)}]
+} -result -2147483648
+#>>>
+test number-1.7 {Create a max 32 bit unsigned int} -body { #<<<
+	json number [expr {2**32-1}]
+} -result 4294967295
+#>>>
+test number-1.8 {Create a max 64 bit signed int} -body { #<<<
+	json number [expr {2**63-1}]
+} -result 9223372036854775807
+#>>>
+test number-1.9 {Create a min 64 bit signed int} -body { #<<<
+	json number [expr {-1*(2**63)}]
+} -result -9223372036854775808
+#>>>
+test number-1.10 {Create a max 64 bit unsigned int} -body { #<<<
+	json number [expr {2**64-1}]
+} -result 18446744073709551615
+#>>>
+test number-1.11 {Create an positive bignum} -body { #<<<
+	json number [expr {2**1000-1}]
+} -result 10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069375
+#>>>
+test number-1.12 {Create an negative bignum} -body { #<<<
+	json number [expr {-1*(2**1000-1)}]
+} -result -10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069375
+#>>>
+test number-1.13 {string} -body { #<<<
+	json number [string cat 4 2]
+} -result 42
+#>>>
+test number-2.1 {Too few args} -body { #<<<
+	set code [catch {
+		json number
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Wrong # of arguments.  Must be "number val"} NONE}
+#>>>
+test number-2.2 {Too many args} -body { #<<<
+	set code [catch {
+		json number foo bar
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -result {1 {Wrong # of arguments.  Must be "number val"} NONE}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+

@@ -37,14 +37,21 @@ Quick Reference
 * [json exists *json_val* ?*key* ... ?*modifier*??]  - Tests whether the supplied key path and modifier resolve to something that exists in *json_val*
 * [json set *json_variable_name* ?*key* ...? *value*]  - Updates the JSON value stored in the variable *json_variable_name*, replacing the value referenced by *key* ... with the JSON value *value*.
 * [json unset *json_variable_name* ?*key* ...?]  - Updates the JSON value stored in the variable *json_variable_name*, removing the value referenced by *key* ...
-* [json isnull *json_val* ?*key* ...?]  - Return a boolean indicating whether the named JSON value is null.
-* [json type *json_val* ?*key* ...?]  - Return the type of the named JSON value, one of "object", "array", "string", "number", "boolean" or "null".
 * [json normalize *json_val*]  - Return a "normalized" version of the input *json_val* - all optional whitespace trimmed.
 * [json template *json_val* ?*dictionary*?]  - Return a JSON value by interpolating the values from *dictionary* into the template, or from variables in the current scope if *dictionary* is not supplied, in the manner described above.
 * [json new *type* *value*]  - Return a JSON fragment of type *type* and value *value*.
 * [json fmt *type* *value*]  - A deprecated synonym for [json new *type* *value*].
+* [json string *value*]  - Return a JSON string with the value *value*.
+* [json number *value*]  - Return a JSON number with the value *value*.
+* [json boolean *value*]  - Return a JSON boolean with the value *value*.  Any of the forms accepted by Tcl_GetBooleanFromObj are accepted and normalized.
 * [json foreach *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - Evaluate *script* in a loop in a similar way to the [foreach] command.  In each iteration, the values stored in the iterator variables in *varlist* are the JSON fragments from *json_val*.  Supports iterating over JSON arrays and JSON objects.  In the JSON object case, *varlist* must be a two element list, with the first specifiying the variable to hold the key and the second the value.  In the JSON array case, the rules are the same as the [foreach] command.
 * [json lmap *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - As for [json foreach], except that it is collecting - the result from each evaluation of *script* is added to a list and returned as the result of the [json lmap] command.  If the *script* results in a TCL_CONTINUE code, that iteration is skipped and no element is added to the result list.  If it results in TCL_BREAK the iterations are stopped and the results accumulated so far are returned.
+* [json amap *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - As for [json lmap], but the result is a JSON array rather than a list.  If the result of each iteration is a JSON value it is added to the array as-is, otherwise it is converted to a JSON string.
+* [json omap *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - As for [json lmap], but the result is a JSON object rather than a list.  The result of each iteration must be a dictionary (or a list of 2n elements, including n = 0).  Tcl_ObjType snooping is done to ensure that the iteration over the result is efficient for both dict and list cases.  Each entry in the dictionary will be added to the result object.  If the value for each key in the iteration result is a JSON value it is  added to the array as-is, otherwise it is converted to a JSON string.
+* [json isnull *json_val* ?*key* ...?]  - Return a boolean indicating whether the named JSON value is null.
+* [json type *json_val* ?*key* ...?]  - Return the type of the named JSON value, one of "object", "array", "string", "number", "boolean" or "null".
+* [json length *json_val* ?*key* ...?]  - Return the length of the of the named JSON array, number of entries in the named JSON object, or number of characters in the named JSON string.  Other JSON value types are not supported.
+* [json keys *json_val* ?*key* ...?]  - Return the keys in the of the named JSON object, found by following the path of *key*s.
 * [json pretty *json_val*]  - Returns a pretty-printed string representation of *json_val*.  Useful for debugging or inspecting the structure of JSON data.
 
 Paths

@@ -1,0 +1,476 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+test amap-1.0 {Single iterator, no vars, over array} -body { #<<<
+	json amap {} {["a", "b", "other var", null, true, false, {"x": 42}]} {}
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test amap-1.1 {Single iterator, single var, over array} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {["1(\"a\")(a)","2(\"b\")(b)","3(\"other var\")(other var)","4(null)()","5(true)(1)","6(false)(0)","7({\"x\":42})(x 42)"]}
+#>>>
+test amap-2.1 {Single iterator, multi vars, over array} -setup { #<<<
+	set i	0
+} -body {
+	json amap {x y} {["a", "b", "other var", null, true, false, {"x": 42}, 42.1, "last"]} {
+		string cat [incr i] \
+			($x)([json get $x]) \
+			($y)([json get $y])
+	}
+} -cleanup {
+	unset -nocomplain i x y
+} -result {["1(\"a\")(a)(\"b\")(b)","2(\"other var\")(other var)(null)()","3(true)(1)(false)(0)","4({\"x\":42})(x 42)(42.1)(42.1)","5(\"last\")(last)(null)()"]}
+#>>>
+test amap-3.0 {Multiple iterators, no vars, over array} -body { #<<<
+	json amap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		{}    {["A", "B", "OTHER VAR", null, true, {"X": 42}]} \
+	{}
+} -cleanup {
+	unset -nocomplain elem
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test amap-3.1 {Multiple iterators, single var, over array} -setup { #<<<
+	set i	0
+} -body {
+	json amap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {["A", "B", "OTHER VAR", null, true, {"X": 42}]} \
+	{
+		string cat [incr i]($elem)([json get $elem])/($elem2)([json get $elem2])
+	}
+} -cleanup {
+	unset -nocomplain i elem elem2
+} -result {["1(\"a\")(a)/(\"A\")(A)","2(\"b\")(b)/(\"B\")(B)","3(\"other var\")(other var)/(\"OTHER VAR\")(OTHER VAR)","4(null)()/(null)()","5(true)(1)/(true)(1)","6(false)(0)/({\"X\":42})(X 42)","7({\"x\":42})(x 42)/(null)()"]}
+#>>>
+test amap-4.1 {Multiple iterators, multi vars, over array} -setup { #<<<
+	set i	0
+} -body {
+	json amap \
+		{x y} {["a", "b", "other var", null, true, false, {"x": 42}, 42.1]} \
+		{a b} {["A", "B", "OTHER VAR", null, true, {"X": 42}, 42.1]} \
+	{
+		string cat [incr i] \
+			($x)([json get $x]) \
+			($y)([json get $y]) \
+			/ \
+			($a)([json get $a]) \
+			($b)([json get $b])
+	}
+} -cleanup {
+	unset -nocomplain i x y a b
+} -result {["1(\"a\")(a)(\"b\")(b)/(\"A\")(A)(\"B\")(B)","2(\"other var\")(other var)(null)()/(\"OTHER VAR\")(OTHER VAR)(null)()","3(true)(1)(false)(0)/(true)(1)({\"X\":42})(X 42)","4({\"x\":42})(x 42)(42.1)(42.1)/(42.1)(42.1)(null)()"]}
+#>>>
+test amap-5.1 {Single iterator, single var, over array, continue} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} continue
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {["1(\"a\")(a)","2(\"b\")(b)","3(\"other var\")(other var)","4(true)(1)","5(false)(0)","6({\"x\":42})(x 42)"]}
+#>>>
+test amap-5.1.1 {Single iterator, single var, over array, continue on final iteration} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem {["a", "b", "other var", null]} {
+		if {[json get $elem] eq ""} continue
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {["1(\"a\")(a)","2(\"b\")(b)","3(\"other var\")(other var)"]}
+#>>>
+test amap-6.1 {Single iterator, single var, over array, break} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} break
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {["1(\"a\")(a)","2(\"b\")(b)","3(\"other var\")(other var)"]}
+#>>>
+test amap-6.2 {Single iterator, single var, over array, return} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} {return returned}
+		string cat [incr i]($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result returned
+#>>>
+
+test amap-7.1 {Single iterator, single var, over null} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem null { incr i }
+} -cleanup {
+	unset -nocomplain i elem
+} -result {[]}
+#>>>
+test amap-7.2 {Single iterator, single var, over empty array} -setup { #<<<
+	set i	0
+} -body {
+	json amap elem {[]} { incr i }
+} -cleanup {
+	unset -nocomplain i elem
+} -result {[]}
+#>>>
+test amap-7.3 {Single iterator, multi vars, over null} -setup { #<<<
+	set i	0
+} -body {
+	json amap {x y} null { incr i }
+} -cleanup {
+	unset -nocomplain i x y
+} -result {[]}
+#>>>
+test amap-8.1 {Multiple iterators, single var, over null} -setup { #<<<
+	set i	0
+} -body {
+	json amap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {null} \
+	{
+		string cat [incr i]($elem)([json get $elem])/($elem2)([json get $elem2])
+	}
+} -cleanup {
+	unset -nocomplain i elem elem2
+} -result {["1(\"a\")(a)/(null)()","2(\"b\")(b)/(null)()","3(\"other var\")(other var)/(null)()","4(null)()/(null)()","5(true)(1)/(null)()","6(false)(0)/(null)()","7({\"x\":42})(x 42)/(null)()"]}
+#>>>
+test amap-8.2 {Multiple iterators, single var, over empty array} -setup { #<<<
+	set i	0
+	set res	{}
+} -body {
+	json amap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {[]} \
+	{
+		string cat [incr i]($elem)([json get $elem])/($elem2)([json get $elem2])
+	}
+} -cleanup {
+	unset -nocomplain i elem elem2
+} -result {["1(\"a\")(a)/(null)()","2(\"b\")(b)/(null)()","3(\"other var\")(other var)/(null)()","4(null)()/(null)()","5(true)(1)/(null)()","6(false)(0)/(null)()","7({\"x\":42})(x 42)/(null)()"]}
+#>>>
+
+test amap-9.1.0 {Single iterator, no vars, over object} -body { #<<<
+	json amap {} {
+		{
+			"a": "b",
+			"other var": null
+		}
+	} {}
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test amap-9.1.1 {Single iterator, single var, over object} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k v} {{"a": "b", "other var": null}} {
+		string cat [incr i]:$k/$v
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {["1:a/\"b\"","2:other var/null"]}
+#>>>
+test amap-9.3.0 {Multiple iterators, no vars, over object} -body { #<<<
+	json amap \
+		{k v}  {{"a": "b", "other var": null}} \
+		{}     {{"A": "B", "OTHER VAR": null}} \
+	{}
+} -cleanup {
+	unset -nocomplain k v
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test amap-9.3.1 {Multiple iterators, single var, over object} -setup { #<<<
+	set i	0
+} -body {
+	json amap \
+		{k v}   {{"a": "b", "other var": null}} \
+		{k2 v2} {{"A": "B", "OTHER VAR": null}} \
+	{
+		string cat [incr i]($k/$v)($k/[json get $v])/($k2/$v2)($k2/[json get $v2])
+	}
+} -cleanup {
+	unset -nocomplain i k1 k2 v1 v2
+} -result {["1(a/\"b\")(a/b)/(A/\"B\")(A/B)","2(other var/null)(other var/)/(OTHER VAR/null)(OTHER VAR/)"]}
+#>>>
+test amap-9.5.1 {Single iterator, single var, over object, continue} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k v} {{"a": "b", "other var": null,"x": "y"}} {
+		if {[json get $v] eq ""} continue
+		string cat [incr i]($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {["1(a/\"b\")(b)","2(x/\"y\")(y)"]}
+#>>>
+test amap-9.5.1.1 {Single iterator, single var, over object, continue on final iteration} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k v} {{"a": "b", "X": "Y", "other var": null}} {
+		if {[json get $v] eq ""} continue
+		string cat [incr i]($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {["1(a/\"b\")(b)","2(X/\"Y\")(Y)"]}
+#>>>
+test amap-9.6.1 {Single iterator, single var, over object, break} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k v} {{"a": "b", "other var": null, "x": "y"}} {
+		if {[json get $v] eq ""} break
+		string cat [incr i]($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {["1(a/\"b\")(b)"]}
+#>>>
+test amap-9.6.2 {Single iterator, single var, over object, return} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k v} {{"a": "b", "other var": null, "x": "y"}} {
+		if {[json get $v] eq ""} {return returned}
+		string cat [incr i]($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result returned
+#>>>
+
+test amap-10.1.1 {iteration over array result is a (native) JSON value: string} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		json string ([json get $e])
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {["(a)","(bb)","(ccc)"]}
+#>>>
+test amap-10.1.2 {iteration over array result is a (pure string) JSON value: string} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		string trim " \"([json get $e])\""
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {["(a)","(bb)","(ccc)"]}
+#>>>
+test amap-10.2.1 {iteration over array result is a (native) JSON value: number} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		json number [string length [json get $e]]
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {[1,2,3]}
+#>>>
+test amap-10.2.2 {iteration over array result is a (pure string) JSON value: number} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		string trim " [string length [json get $e]]"
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {[1,2,3]}
+#>>>
+test amap-10.3.1 {iteration over array result is a (native) JSON value: bool} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		json boolean [expr {[string length [json get $e]] % 2 == 0}]
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {[false,true,false]}
+#>>>
+test amap-10.3.2 {iteration over array result is a (pure string) JSON value: bool} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		string trim " [expr {[string length [json get $e]] % 2 == 0 ? "true":"false"}]"
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {[false,true,false]}
+#>>>
+test amap-10.4.1 {iteration over array result is a (native) JSON value: null} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		json extract {[null]} 0
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {[null,null,null]}
+#>>>
+test amap-10.4.2 {iteration over array result is a (pure string) JSON value: null} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		string trim " null"
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {[null,null,null]}
+#>>>
+test amap-10.5.1 {iteration over array result is a (native) JSON value: array} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		set r {[]}
+		json set r end+1 $e
+		json set r end+1 [json number [string length [json get $e]]]
+	}
+} -cleanup {
+	unset -nocomplain e r
+} -result {[["a",1],["bb",2],["ccc",3]]}
+#>>>
+test amap-10.5.2 {iteration over array result is a (pure string) JSON value: array} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		set r {[]}
+		json set r end+1 $e
+		json set r end+1 [json number [string length [json get $e]]]
+		string trim " $r"
+	}
+} -cleanup {
+	unset -nocomplain e r
+} -result {[["a",1],["bb",2],["ccc",3]]}
+#>>>
+test amap-10.6.1 {iteration over array result is a (native) JSON value: object} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		set r {{}}
+		json set r k $e
+		json set r l [json number [string length [json get $e]]]
+	}
+} -cleanup {
+	unset -nocomplain e r
+} -result {[{"k":"a","l":1},{"k":"bb","l":2},{"k":"ccc","l":3}]}
+#>>>
+test amap-10.6.2 {iteration over array result is a (pure string) JSON value: object} -body { #<<<
+	json amap e {["a","bb","ccc"]} {
+		set r {{}}
+		json set r k $e
+		json set r l [json number [string length [json get $e]]]
+		string trim " $r"
+	}
+} -cleanup {
+	unset -nocomplain e r
+} -result {[{"k":"a","l":1},{"k":"bb","l":2},{"k":"ccc","l":3}]}
+#>>>
+
+test amap-11.1.1 {iteration over object, iteration result a (native) JSON value: string} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		json string ($k/[json get $v])
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {["(x/a)","(y/bb)","(z/ccc)"]}
+#>>>
+test amap-11.1.2 {iteration over object, iteration result a (pure string) JSON value: string} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		string trim " ($k/[json get $v])"
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {["(x/a)","(y/bb)","(z/ccc)"]}
+#>>>
+test amap-11.2.1 {iteration over object, iteration result a (native) JSON value: number} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		json number [string length [json get $v]]
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {[1,2,3]}
+#>>>
+test amap-11.2.2 {iteration over object, iteration result a (pure string) JSON value: number} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		string trim " [string length [json get $v]]"
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {[1,2,3]}
+#>>>
+test amap-11.3.1 {iteration over object, iteration result a (native) JSON value: bool} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		json boolean [expr {[string length [json get $v]] % 2 == 0}]
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {[false,true,false]}
+#>>>
+test amap-11.3.2 {iteration over object, iteration result a (pure string) JSON value: bool} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		string trim " [expr {[string length [json get $v]] % 2 == 0 ? "true":"false"}]"
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {[false,true,false]}
+#>>>
+test amap-11.4.1 {iteration over object, iteration result a (native) JSON value: null} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		json extract {[null]} 0
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {[null,null,null]}
+#>>>
+test amap-11.4.2 {iteration over object, iteration result a (pure string) JSON value: null} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		string trim " null"
+	}
+} -cleanup {
+	unset -nocomplain k v
+} -result {[null,null,null]}
+#>>>
+test amap-11.5.1 {iteration over object, iteration result a (native) JSON value: array} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {[]}
+		json set r end+1 $v
+		json set r end+1 [json number [string length [json get $v]]]
+	}
+} -cleanup {
+	unset -nocomplain k v r
+} -result {[["a",1],["bb",2],["ccc",3]]}
+#>>>
+test amap-11.5.2 {iteration over object, iteration result a (pure string) JSON value: array} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {[]}
+		json set r end+1 $v
+		json set r end+1 [json number [string length [json get $v]]]
+		string trim " $r"
+	}
+} -cleanup {
+	unset -nocomplain k v r
+} -result {[["a",1],["bb",2],["ccc",3]]}
+#>>>
+test amap-11.6.1 {iteration over object, iteration result a (native) JSON value: object} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {{}}
+		json set r k $v
+		json set r l [json number [string length [json get $v]]]
+	}
+} -cleanup {
+	unset -nocomplain k v r
+} -result {[{"k":"a","l":1},{"k":"bb","l":2},{"k":"ccc","l":3}]}
+#>>>
+test amap-11.6.2 {iteration over object, iteration result a (pure string) JSON value: object} -body { #<<<
+	json amap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {{}}
+		json set r k $v
+		json set r l [json number [string length [json get $v]]]
+		string trim " $r"
+	}
+} -cleanup {
+	unset -nocomplain k v r
+} -result {[{"k":"a","l":1},{"k":"bb","l":2},{"k":"ccc","l":3}]}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+

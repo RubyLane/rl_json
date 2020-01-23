@@ -1,0 +1,568 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+test omap-1.0 {Single iterator, no vars, over array} -body { #<<<
+	json omap {} {["a", "b", "other var", null, true, false, {"x": 42}]} {}
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test omap-1.1 {Single iterator, single var, over array} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		list [incr i] ($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {{"1":"(\"a\")(a)","2":"(\"b\")(b)","3":"(\"other var\")(other var)","4":"(null)()","5":"(true)(1)","6":"(false)(0)","7":"({\"x\":42})(x 42)"}}
+#>>>
+test omap-2.1 {Single iterator, multi vars, over array} -setup { #<<<
+	set i	0
+} -body {
+	json omap {x y} {["a", "b", "other var", null, true, false, {"x": 42}, 42.1, "last"]} {
+		list [incr i] "($x)([json get $x])($y)([json get $y])"
+	}
+} -cleanup {
+	unset -nocomplain i x y
+} -result {{"1":"(\"a\")(a)(\"b\")(b)","2":"(\"other var\")(other var)(null)()","3":"(true)(1)(false)(0)","4":"({\"x\":42})(x 42)(42.1)(42.1)","5":"(\"last\")(last)(null)()"}}
+#>>>
+test omap-3.0 {Multiple iterators, no vars, over array} -body { #<<<
+	json omap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		{}    {["A", "B", "OTHER VAR", null, true, {"X": 42}]} \
+	{}
+} -cleanup {
+	unset -nocomplain elem
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test omap-3.1 {Multiple iterators, single var, over array} -setup { #<<<
+	set i	0
+} -body {
+	json omap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {["A", "B", "OTHER VAR", null, true, {"X": 42}]} \
+	{
+		list [incr i] ($elem)([json get $elem])/($elem2)([json get $elem2])
+	}
+} -cleanup {
+	unset -nocomplain i elem elem2
+} -result {{"1":"(\"a\")(a)/(\"A\")(A)","2":"(\"b\")(b)/(\"B\")(B)","3":"(\"other var\")(other var)/(\"OTHER VAR\")(OTHER VAR)","4":"(null)()/(null)()","5":"(true)(1)/(true)(1)","6":"(false)(0)/({\"X\":42})(X 42)","7":"({\"x\":42})(x 42)/(null)()"}}
+#>>>
+test omap-4.1 {Multiple iterators, multi vars, over array} -setup { #<<<
+	set i	0
+} -body {
+	json omap \
+		{x y} {["a", "b", "other var", null, true, false, {"x": 42}, 42.1]} \
+		{a b} {["A", "B", "OTHER VAR", null, true, {"X": 42}, 42.1]} \
+	{
+		list [incr i] "($x)([json get $x])($y)([json get $y])/($a)([json get $a])($b)([json get $b])"
+	}
+} -cleanup {
+	unset -nocomplain i x y a b
+} -result {{"1":"(\"a\")(a)(\"b\")(b)/(\"A\")(A)(\"B\")(B)","2":"(\"other var\")(other var)(null)()/(\"OTHER VAR\")(OTHER VAR)(null)()","3":"(true)(1)(false)(0)/(true)(1)({\"X\":42})(X 42)","4":"({\"x\":42})(x 42)(42.1)(42.1)/(42.1)(42.1)(null)()"}}
+#>>>
+test omap-5.1 {Single iterator, single var, over array, continue} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} continue
+		list [incr i] ($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {{"1":"(\"a\")(a)","2":"(\"b\")(b)","3":"(\"other var\")(other var)","4":"(true)(1)","5":"(false)(0)","6":"({\"x\":42})(x 42)"}}
+#>>>
+test omap-5.1.1 {Single iterator, single var, over array, continue on final iteration} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem {["a", "b", "other var", null]} {
+		if {[json get $elem] eq ""} continue
+		list [incr i] ($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {{"1":"(\"a\")(a)","2":"(\"b\")(b)","3":"(\"other var\")(other var)"}}
+#>>>
+test omap-6.1 {Single iterator, single var, over array, break} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} break
+		list [incr i] ($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result {{"1":"(\"a\")(a)","2":"(\"b\")(b)","3":"(\"other var\")(other var)"}}
+#>>>
+test omap-6.2 {Single iterator, single var, over array, return} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem {["a", "b", "other var", null, true, false, {"x": 42}]} {
+		if {[json get $elem] eq ""} {return returned}
+		list [incr i] ($elem)([json get $elem])
+	}
+} -cleanup {
+	unset -nocomplain i elem
+} -result returned
+#>>>
+
+test omap-7.1 {Single iterator, single var, over null} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem null { incr i }
+} -cleanup {
+	unset -nocomplain i elem
+} -result {{}}
+#>>>
+test omap-7.2 {Single iterator, single var, over empty array} -setup { #<<<
+	set i	0
+} -body {
+	json omap elem {[]} { incr i }
+} -cleanup {
+	unset -nocomplain i elem
+} -result {{}}
+#>>>
+test omap-7.3 {Single iterator, multi vars, over null} -setup { #<<<
+	set i	0
+} -body {
+	json omap {x y} null { incr i }
+} -cleanup {
+	unset -nocomplain i x y
+} -result {{}}
+#>>>
+test omap-8.1 {Multiple iterators, single var, over null} -setup { #<<<
+	set i	0
+} -body {
+	json omap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {null} \
+	{
+		list [incr i] ($elem)([json get $elem])/($elem2)([json get $elem2])
+	}
+} -cleanup {
+	unset -nocomplain i elem elem2
+} -result {{"1":"(\"a\")(a)/(null)()","2":"(\"b\")(b)/(null)()","3":"(\"other var\")(other var)/(null)()","4":"(null)()/(null)()","5":"(true)(1)/(null)()","6":"(false)(0)/(null)()","7":"({\"x\":42})(x 42)/(null)()"}}
+#>>>
+test omap-8.2 {Multiple iterators, single var, over empty array} -setup { #<<<
+	set i	0
+	set res	{}
+} -body {
+	json omap \
+		elem  {["a", "b", "other var", null, true, false, {"x": 42}]} \
+		elem2 {[]} \
+	{
+		list [incr i] ($elem)([json get $elem])/($elem2)([json get $elem2])
+	}
+} -cleanup {
+	unset -nocomplain i elem elem2
+} -result {{"1":"(\"a\")(a)/(null)()","2":"(\"b\")(b)/(null)()","3":"(\"other var\")(other var)/(null)()","4":"(null)()/(null)()","5":"(true)(1)/(null)()","6":"(false)(0)/(null)()","7":"({\"x\":42})(x 42)/(null)()"}}
+#>>>
+
+test omap-9.1.0 {Single iterator, no vars, over object} -body { #<<<
+	json omap {} {
+		{
+			"a": "b",
+			"other var": null
+		}
+	} {}
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test omap-9.1.1 {Single iterator, single var, over object} -setup { #<<<
+	set i	0
+} -body {
+	json omap {k v} {{"a": "b", "other var": null}} {
+		list [incr i] $k/$v
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {{"1":"a/\"b\"","2":"other var/null"}}
+#>>>
+test omap-9.3.0 {Multiple iterators, no vars, over object} -body { #<<<
+	json omap \
+		{k v}  {{"a": "b", "other var": null}} \
+		{}     {{"A": "B", "OTHER VAR": null}} \
+	{}
+} -cleanup {
+	unset -nocomplain k v
+} -returnCodes error -result "foreach varlist is empty"
+#>>>
+test omap-9.3.1 {Multiple iterators, single var, over object} -setup { #<<<
+	set i	0
+} -body {
+	json omap \
+		{k v}   {{"a": "b", "other var": null}} \
+		{k2 v2} {{"A": "B", "OTHER VAR": null}} \
+	{
+		list [incr i] ($k/$v)($k/[json get $v])/($k2/$v2)($k2/[json get $v2])
+	}
+} -cleanup {
+	unset -nocomplain i k1 k2 v1 v2
+} -result {{"1":"(a/\"b\")(a/b)/(A/\"B\")(A/B)","2":"(other var/null)(other var/)/(OTHER VAR/null)(OTHER VAR/)"}}
+#>>>
+test omap-9.5.1 {Single iterator, single var, over object, continue} -setup { #<<<
+	set i	0
+} -body {
+	json omap {k v} {{"a": "b", "other var": null,"x": "y"}} {
+		if {[json get $v] eq ""} continue
+		list [incr i] ($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {{"1":"(a/\"b\")(b)","2":"(x/\"y\")(y)"}}
+#>>>
+test omap-9.5.1.1 {Single iterator, single var, over object, continue on final iteration} -setup { #<<<
+	set i	0
+} -body {
+	json omap {k v} {{"a": "b", "X": "Y", "other var": null}} {
+		if {[json get $v] eq ""} continue
+		list [incr i] ($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {{"1":"(a/\"b\")(b)","2":"(X/\"Y\")(Y)"}}
+#>>>
+test omap-9.6.1 {Single iterator, single var, over object, break} -setup { #<<<
+	set i	0
+} -body {
+	json omap {k v} {{"a": "b", "other var": null, "x": "y"}} {
+		if {[json get $v] eq ""} break
+		list [incr i] ($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result {{"1":"(a/\"b\")(b)"}}
+#>>>
+test omap-9.6.2 {Single iterator, single var, over object, return} -setup { #<<<
+	set i	0
+} -body {
+	json omap {k v} {{"a": "b", "other var": null, "x": "y"}} {
+		if {[json get $v] eq ""} {return returned}
+		list [incr i] ($k/$v)([json get $v])
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -result returned
+#>>>
+
+test omap-10.1.1 {iteration over array result is a (native) JSON value: string} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [json string ([json get $e])]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":"(a)","2":"(bb)","3":"(ccc)"}}
+#>>>
+test omap-10.1.2 {iteration over array result is a (pure string) JSON value: string} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [string trim " \"([json get $e])\""]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":"(a)","2":"(bb)","3":"(ccc)"}}
+#>>>
+test omap-10.2.1 {iteration over array result is a (native) JSON value: number} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [json number [string length [json get $e]]]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":1,"2":2,"3":3}}
+#>>>
+test omap-10.2.2 {iteration over array result is a (pure string) JSON value: number} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [string trim " [string length [json get $e]]"]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":1,"2":2,"3":3}}
+#>>>
+test omap-10.3.1 {iteration over array result is a (native) JSON value: bool} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [json boolean [expr {[string length [json get $e]] % 2 == 0}]]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":false,"2":true,"3":false}}
+#>>>
+test omap-10.3.2 {iteration over array result is a (pure string) JSON value: bool} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [string trim " [expr {[string length [json get $e]] % 2 == 0 ? "true":"false"}]"]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":false,"2":true,"3":false}}
+#>>>
+test omap-10.4.1 {iteration over array result is a (native) JSON value: null} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [json extract {[null]} 0]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":null,"2":null,"3":null}}
+#>>>
+test omap-10.4.2 {iteration over array result is a (pure string) JSON value: null} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		list [incr i] [string trim " null"]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":null,"2":null,"3":null}}
+#>>>
+test omap-10.5.1 {iteration over array result is a (native) JSON value: array} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		set r {[]}
+		json set r end+1 $e
+		json set r end+1 [json number [string length [json get $e]]]
+		list [incr i] $r
+	}
+} -cleanup {
+	unset -nocomplain e r i
+} -result {{"1":["a",1],"2":["bb",2],"3":["ccc",3]}}
+#>>>
+test omap-10.5.2 {iteration over array result is a (pure string) JSON value: array} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		set r {[]}
+		json set r end+1 $e
+		json set r end+1 [json number [string length [json get $e]]]
+		list [incr i] [string trim " $r"]
+	}
+} -cleanup {
+	unset -nocomplain e r i
+} -result {{"1":["a",1],"2":["bb",2],"3":["ccc",3]}}
+#>>>
+test omap-10.6.1 {iteration over array result is a (native) JSON value: object} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		set r {{}}
+		json set r k $e
+		json set r l [json number [string length [json get $e]]]
+		list [incr i] $r
+	}
+} -cleanup {
+	unset -nocomplain e r i
+} -result {{"1":{"k":"a","l":1},"2":{"k":"bb","l":2},"3":{"k":"ccc","l":3}}}
+#>>>
+test omap-10.6.2 {iteration over array result is a (pure string) JSON value: object} -body { #<<<
+	set i 0
+	json omap e {["a","bb","ccc"]} {
+		set r {{}}
+		json set r k $e
+		json set r l [json number [string length [json get $e]]]
+		list [incr i] [string trim " $r"]
+	}
+} -cleanup {
+	unset -nocomplain e r i
+} -result {{"1":{"k":"a","l":1},"2":{"k":"bb","l":2},"3":{"k":"ccc","l":3}}}
+#>>>
+
+test omap-11.1.1 {iteration over object, iteration result a (native) JSON value: string} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [json string ($k/[json get $v])]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":"(x/a)","2":"(y/bb)","3":"(z/ccc)"}}
+#>>>
+test omap-11.1.2 {iteration over object, iteration result a (pure string) JSON value: string} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [string trim " ($k/[json get $v])"]
+	}
+} -cleanup {
+	unset -nocomplain e i
+} -result {{"1":"(x/a)","2":"(y/bb)","3":"(z/ccc)"}}
+#>>>
+test omap-11.2.1 {iteration over object, iteration result a (native) JSON value: number} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [json number [string length [json get $v]]]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":1,"2":2,"3":3}}
+#>>>
+test omap-11.2.2 {iteration over object, iteration result a (pure string) JSON value: number} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [string trim " [string length [json get $v]]"]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":1,"2":2,"3":3}}
+#>>>
+test omap-11.3.1 {iteration over object, iteration result a (native) JSON value: bool} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [json boolean [expr {[string length [json get $v]] % 2 == 0}]]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":false,"2":true,"3":false}}
+#>>>
+test omap-11.3.2 {iteration over object, iteration result a (pure string) JSON value: bool} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [string trim " [expr {[string length [json get $v]] % 2 == 0 ? "true":"false"}]"]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":false,"2":true,"3":false}}
+#>>>
+test omap-11.4.1 {iteration over object, iteration result a (native) JSON value: null} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [json extract {[null]} 0]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":null,"2":null,"3":null}}
+#>>>
+test omap-11.4.2 {iteration over object, iteration result a (pure string) JSON value: null} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		list [incr i] [string trim " null"]
+	}
+} -cleanup {
+	unset -nocomplain k v i
+} -result {{"1":null,"2":null,"3":null}}
+#>>>
+test omap-11.5.1 {iteration over object, iteration result a (native) JSON value: array} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {[]}
+		json set r end+1 $v
+		json set r end+1 [json number [string length [json get $v]]]
+		list [incr i] $r
+	}
+} -cleanup {
+	unset -nocomplain k v r i
+} -result {{"1":["a",1],"2":["bb",2],"3":["ccc",3]}}
+#>>>
+test omap-11.5.2 {iteration over object, iteration result a (pure string) JSON value: array} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {[]}
+		json set r end+1 $v
+		json set r end+1 [json number [string length [json get $v]]]
+		list [incr i] [string trim " $r"]
+	}
+} -cleanup {
+	unset -nocomplain k v r i
+} -result {{"1":["a",1],"2":["bb",2],"3":["ccc",3]}}
+#>>>
+test omap-11.6.1 {iteration over object, iteration result a (native) JSON value: object} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {{}}
+		json set r k $v
+		json set r l [json number [string length [json get $v]]]
+		list [incr i] $r
+	}
+} -cleanup {
+	unset -nocomplain k v r i
+} -result {{"1":{"k":"a","l":1},"2":{"k":"bb","l":2},"3":{"k":"ccc","l":3}}}
+#>>>
+test omap-11.6.2 {iteration over object, iteration result a (pure string) JSON value: object} -body { #<<<
+	set i 0
+	json omap {k v} {{"x":"a","y":"bb","z":"ccc"}} {
+		set r {{}}
+		json set r k $v
+		json set r l [json number [string length [json get $v]]]
+		list [incr i] [string trim " $r"]
+	}
+} -cleanup {
+	unset -nocomplain k v r i
+} -result {{"1":{"k":"a","l":1},"2":{"k":"bb","l":2},"3":{"k":"ccc","l":3}}}
+#>>>
+
+test omap-12.1 {iteration result is a list, 0 elements} -body { #<<<
+	json omap e {["a","bb","ccc"]} {
+		list
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {{}}
+#>>>
+test omap-12.2 {iteration result is a list, 2 elements} -body { #<<<
+	json omap e {["a","bb","ccc"]} {
+		list [json get $e] [string length [json get $e]]
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {{"a":1,"bb":2,"ccc":3}}
+#>>>
+test omap-12.3 {iteration result is a list, 4 elements} -body { #<<<
+	json omap e {["a","bb","ccc"]} {
+		list \
+			[json get $e]   [string length [json get $e]] \
+			[json get $e]2  [expr {[string length [json get $e]]+10}]
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {{"a":1,"a2":11,"bb":2,"bb2":12,"ccc":3,"ccc2":13}}
+#>>>
+test omap-12.4 {iteration result is a list, 3 elements} -body { #<<<
+	set code	[catch {
+		json omap e {["a","bb","ccc"]} {
+			list \
+				[json get $e]   [string length [json get $e]] \
+				[json get $e]2
+		}
+	} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain e code r o
+} -result {1 {Iteration result must be a list with an even number of elements} NONE}
+#>>>
+
+test omap-13.1 {iteration result is a dict, 0 entry} -body { #<<<
+	json omap e {["a","bb","ccc"]} {
+		dict create
+	}
+} -cleanup {
+	unset -nocomplain e
+} -result {{}}
+#>>>
+test omap-13.2 {iteration result is a dict, 1 entry} -body { #<<<
+	json omap e {["a","bb","ccc"]} {
+		set d {}
+		dict set d [json get $e] [string length [json get $e]]
+		set d
+	}
+} -cleanup {
+	unset -nocomplain e d
+} -result {{"a":1,"bb":2,"ccc":3}}
+#>>>
+test omap-13.3 {iteration result is a dict, 2 entry} -body { #<<<
+	json omap e {["a","bb","ccc"]} {
+		set d {}
+		dict set d [json get $e]   [string length [json get $e]]
+		dict set d [json get $e]2  [expr {[string length [json get $e]]+10}]
+		set d
+	}
+} -cleanup {
+	unset -nocomplain e d
+} -result {{"a":1,"a2":11,"bb":2,"bb2":12,"ccc":3,"ccc2":13}}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+
+

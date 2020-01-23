@@ -80,6 +80,25 @@ bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 		}
 	}
 
+	template_direct {
+		json _template {
+			{
+				"foo": "~S:bar",
+				"baz": [
+					"~S:a(x)",
+					"~N:a(y)",
+					123.4,
+					"~B:a(on)",
+					"~B:a(off)",
+					"~S:a(not_defined)",
+					"~L:~S:not a subst",
+					"~T:a(subdoc)",
+					"~T:a(subdoc2)"
+				]
+			}
+		}
+	}
+
 	yajl {
 		yajl create y
 		try {
