@@ -969,6 +969,11 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
 		if (p >= e) break;
 
+		if (unlikely(cx[0].last->closed)) {
+			_parse_error(interp, "Trailing garbage after value", doc, (p-doc) - char_adj);
+			goto err;
+		}
+
 		switch (cx[0].last->container) { // Handle eof and end-of-context or comma for array and object {{{
 			case JSON_OBJECT:
 				if (*p == '}') {
