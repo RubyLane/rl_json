@@ -20,3 +20,4 @@ perf.data.old
 .cproject
 .project
 .settings
+tests/JSONTestSuite/test_parsing
