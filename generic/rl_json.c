@@ -877,6 +877,34 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 	p = doc = (const unsigned char*)Tcl_GetStringFromObj(obj, &len);
 	e = p + len;
 
+	// Skip BOM
+	if (
+		len >= 3 &&
+		p[0] == 0xef &&
+		p[1] == 0xbb &&
+		p[2] == 0xbf
+	) {
+		p += 3;
+	} /*else if (
+		len >= 2 &&
+		p[0] == 0xff &&
+		p[1] == 0xfe
+	) {
+		fprintf(stderr, "UTF-16LE in UTF-8 detected\n");
+		p += 2;
+		// Somehow this got to us as a UTF-16LE, inside UTF-8
+	} else if (
+		len >= 2 &&
+		p[0] == 0xfe &&
+		p[1] == 0xff
+	) {
+		fprintf(stderr, "UTF-16BE in UTF-8 detected\n");
+		p += 2;
+		// Somehow this got to us as a UTF-16BE, inside UTF-8
+	}
+	*/
+	
+
 	// Skip leading whitespace and comments
 	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0) goto whitespace_err;
 
