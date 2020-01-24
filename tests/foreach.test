@@ -248,6 +248,55 @@ test foreach-8.2 {Multiple iterators, single var, over empty array} -setup { #<<
 ]
 #>>>
 
+test foreach-20.1 {over string} -body { # TODO: perhaps allow this, and iterate over characters? <<<
+	json foreach x {"foo"} {
+		lappend res	$x
+	}
+	set res
+} -cleanup {
+	unset -nocomplain x res
+} -returnCodes error -result {Cannot iterate over JSON type string}
+#>>>
+test foreach-20.2 {over number} -body { #<<<
+	json foreach x {123} {
+		lappend res	$x
+	}
+	set res
+} -cleanup {
+	unset -nocomplain x res
+} -returnCodes error -result {Cannot iterate over JSON type number}
+#>>>
+test foreach-20.3 {over true} -body { #<<<
+	json foreach x {true} {
+		lappend res	$x
+	}
+	set res
+} -cleanup {
+	unset -nocomplain x res
+} -returnCodes error -result {Cannot iterate over JSON type boolean}
+#>>>
+test foreach-20.4 {over false} -body { #<<<
+	json foreach x {false} {
+		lappend res	$x
+	}
+	set res
+} -cleanup {
+	unset -nocomplain x res
+} -returnCodes error -result {Cannot iterate over JSON type boolean}
+#>>>
+test foreach-20.5 {too few args} -body { #<<<
+	json foreach x {false} 
+} -cleanup {
+	unset -nocomplain x
+} -returnCodes error -result {Wrong # of arguments.  Must be "foreach varlist datalist ?varlist datalist ...? script"}
+#>>>
+test foreach-20.6 {too many args} -constraints knownBug -body { #<<<
+	json foreach x {[]} y {}
+} -cleanup {
+	unset -nocomplain x
+} -returnCodes error -result {Wrong # of arguments.  Must be "foreach varlist datalist ?varlist datalist ...? script"}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

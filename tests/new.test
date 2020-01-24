@@ -180,6 +180,90 @@ test new-4.7 {json boolean, scientific notation} -body { #<<<
 	json boolean 1e6
 } -result true
 #>>>
+test new-5.1.1 {Create an object - args} -body { #<<<
+	json new object a {number 1} c {num 2} e {num 3} g {num 4}
+} -result {{"a":1,"c":2,"e":3,"g":4}}
+#>>>
+test new-5.1.2 {Create an object - single arg} -body { #<<<
+	json new object {a {number 1} c {num 2} e {num 3} g {num 4}}
+} -result {{"a":1,"c":2,"e":3,"g":4}}
+#>>>
+test new-6.1 {Create a string} -body { #<<<
+	json new string "hello, world"
+} -result {"hello, world"}
+#>>>
+test new-6.2 {Create a template: string} -body { #<<<
+	json new string "~S:foo"
+} -result {"~S:foo"}
+#>>>
+test new-6.3 {Create a template: number} -body { #<<<
+	json new string "~N:foo"
+} -result {"~N:foo"}
+#>>>
+test new-6.4 {Create a template: boolean} -body { #<<<
+	json new string "~B:foo"
+} -result {"~B:foo"}
+#>>>
+test new-6.5 {Create a template: json} -body { #<<<
+	json new string "~J:foo"
+} -result {"~J:foo"}
+#>>>
+test new-6.6 {Create a template: template} -body { #<<<
+	json new string "~T:foo"
+} -result {"~T:foo"}
+#>>>
+test new-6.7 {Create a template: literal} -body { #<<<
+	json new string "~L:~S:foo"
+} -result {"~L:~S:foo"}
+#>>>
+test new-6.7 {Create a template: undef} -body { #<<<
+	json new string "~X:foo"
+} -result {"~X:foo"}
+#>>>
+test new-6.8 {Create new bool: true} -body { #<<<
+	json new true
+} -result true
+#>>>
+test new-6.9 {Create new bool: false} -body { #<<<
+	json new false
+} -result false
+#>>>
+test new-6.10.1 {Create new bool: value} -body { #<<<
+	json new bool
+} -returnCodes error -result {Wrong # of arguments.  Must be "boolean val"}
+#>>>
+test new-6.10.2 {Create new bool: value} -body { #<<<
+	json new bool true false
+} -returnCodes error -result {Wrong # of arguments.  Must be "boolean val"}
+#>>>
+test new-6.10.3 {Create new bool: value} -body { #<<<
+	json new bool true
+} -result true
+#>>>
+test new-6.10.4 {Create new bool: value} -body { #<<<
+	json new bool tr
+} -result true
+#>>>
+test new-6.10.5 {Create new bool: value} -body { #<<<
+	json new bool false
+} -result false
+#>>>
+test new-6.10.6 {Create new bool: value} -body { #<<<
+	json new bool no
+} -result false
+#>>>
+test new-6.10.7 {Create new bool: value} -body { #<<<
+	json new bool 0
+} -result false
+#>>>
+test new-6.10.8 {Create new bool: value} -body { #<<<
+	json new bool -42
+} -result true
+#>>>
+test new-6.11 {Create new null} -body { #<<<
+	json new null
+} -result null
+#>>>
 
 
 ::tcltest::cleanupTests

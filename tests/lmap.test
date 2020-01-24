@@ -227,6 +227,13 @@ test lmap-8.2 {Multiple iterators, single var, over empty array} -setup { #<<<
 ]
 #>>>
 
+test lmap-20.5 {too few args} -body { #<<<
+	json lmap x {false} 
+} -cleanup {
+	unset -nocomplain x
+} -returnCodes error -result {Wrong # of arguments.  Must be "lmap varlist datalist ?varlist datalist ...? script"}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

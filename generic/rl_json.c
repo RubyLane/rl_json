@@ -1551,7 +1551,6 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 			Tcl_ResetResult(interp);
 			// [dict exists] considers any test to be false when applied to an invalid value, so we do the same
 			EXISTS(0);
-			return TCL_OK;
 		}
 		return TCL_ERROR;
 	}
@@ -3845,28 +3844,28 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			break;
 			//}}}
 		case M_FOREACH: //{{{
-			if (objc < 5 || (objc-3) % 2 != 0)
+			if (objc < 5 || (objc-5) % 2 != 0)
 				CHECK_ARGS(5, "foreach varlist datalist ?varlist datalist ...? script");
 
 			retcode = foreach(interp, objc-2, objv+2, COLLECT_NONE);
 			break;
 			//}}}
 		case M_LMAP: //{{{
-			if (objc < 5 || (objc-3) % 2 != 0)
+			if (objc < 5 || (objc-5) % 2 != 0)
 				CHECK_ARGS(5, "lmap varlist datalist ?varlist datalist ...? script");
 
 			retcode = foreach(interp, objc-2, objv+2, COLLECT_LIST);
 			break;
 			//}}}
 		case M_AMAP: //{{{
-			if (objc < 5 || (objc-3) % 2 != 0)
+			if (objc < 5 || (objc-5) % 2 != 0)
 				CHECK_ARGS(5, "amap varlist datalist ?varlist datalist ...? script");
 
 			retcode = foreach(interp, objc-2, objv+2, COLLECT_ARRAY);
 			break;
 			//}}}
 		case M_OMAP: //{{{
-			if (objc < 5 || (objc-3) % 2 != 0)
+			if (objc < 5 || (objc-5) % 2 != 0)
 				CHECK_ARGS(5, "omap varlist datalist ?varlist datalist ...? script");
 
 			retcode = foreach(interp, objc-2, objv+2, COLLECT_OBJECT);

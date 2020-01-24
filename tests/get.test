@@ -880,6 +880,38 @@ test get-60.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
+test get-60.23 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json get {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz en
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got en}
+#>>>
+test get-60.24 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json get {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got foo}
+#>>>
+test get-60.25 {Get a template point} -body { #<<<
+	json get {
+		{
+			"foo": "~S:bar"
+		}
+	} foo
+} -result {~S:bar}
+#>>>
 
 ::tcltest::cleanupTests
 return

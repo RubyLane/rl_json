@@ -188,6 +188,26 @@ test amap-9.1.1 {Single iterator, single var, over object} -setup { #<<<
 	unset -nocomplain i k v
 } -result {["1:a/\"b\"","2:other var/null"]}
 #>>>
+test amap-9.1.2 {Single iterator, single var, over object} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k} {{"a": "b", "other var": null}} {
+		string cat [incr i]:$k/$v
+	}
+} -cleanup {
+	unset -nocomplain i k v
+} -returnCodes error -result {When iterating over a JSON object, varlist must be a pair of varnames (key value)}
+#>>>
+test amap-9.1.3 {Single iterator, single var, over object} -setup { #<<<
+	set i	0
+} -body {
+	json amap {k v x} {{"a": "b", "other var": null}} {
+		string cat [incr i]:$k/$v
+	}
+} -cleanup {
+	unset -nocomplain i k v x
+} -returnCodes error -result {When iterating over a JSON object, varlist must be a pair of varnames (key value)}
+#>>>
 test amap-9.3.0 {Multiple iterators, no vars, over object} -body { #<<<
 	json amap \
 		{k v}  {{"a": "b", "other var": null}} \
@@ -467,6 +487,13 @@ test amap-11.6.2 {iteration over object, iteration result a (pure string) JSON v
 } -cleanup {
 	unset -nocomplain k v r
 } -result {[{"k":"a","l":1},{"k":"bb","l":2},{"k":"ccc","l":3}]}
+#>>>
+
+test amap-20.5 {too few args} -body { #<<<
+	json amap x {false} 
+} -cleanup {
+	unset -nocomplain x
+} -returnCodes error -result {Wrong # of arguments.  Must be "amap varlist datalist ?varlist datalist ...? script"}
 #>>>
 
 ::tcltest::cleanupTests
