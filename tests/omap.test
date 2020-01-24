@@ -560,6 +560,13 @@ test omap-13.3 {iteration result is a dict, 2 entry} -body { #<<<
 } -result {{"a":1,"a2":11,"bb":2,"bb2":12,"ccc":3,"ccc2":13}}
 #>>>
 
+test omap-20.5 {too few args} -body { #<<<
+	json omap x {false} 
+} -cleanup {
+	unset -nocomplain x
+} -returnCodes error -result {Wrong # of arguments.  Must be "omap varlist datalist ?varlist datalist ...? script"}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

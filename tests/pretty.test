@@ -8,9 +8,11 @@ package require parse_args
 namespace path {::rl_json ::parse_args}
 
 test pretty-1.1 {Basic pretty-print} -body { #<<<
-	json pretty {{"foo":null,"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
+	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
 } -result {{
     "foo":          null,
+    "empty":        {},
+    "emptyarr":     [],
     "hello, world": "bar",
     "This is a much longer key": [
         "str",
@@ -24,6 +26,34 @@ test pretty-1.1 {Basic pretty-print} -body { #<<<
         }
     ]
 }}
+#>>>
+test pretty-1.1 {Basic pretty-print, different indent} -body { #<<<
+	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} "  "
+} -result {{
+  "foo":          null,
+  "empty":        {},
+  "emptyarr":     [],
+  "hello, world": "bar",
+  "This is a much longer key": [
+    "str",
+    123,
+    123.4,
+    true,
+    false,
+    null,
+    {
+      "inner": "obj"
+    }
+  ]
+}}
+#>>>
+test pretty-2.1 {too few args} -body { #<<<
+	json pretty
+} -returnCodes error -result {Wrong # of arguments.  Must be "pretty json_val ?indent?"}
+#>>>
+test pretty-2.2 {too many args} -body { #<<<
+	json pretty {"foo"} 8 bar
+} -returnCodes error -result {Wrong # of arguments.  Must be "pretty json_val ?indent?"}
 #>>>
 
 ::tcltest::cleanupTests

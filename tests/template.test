@@ -223,6 +223,24 @@ try { # Check string quoting
 	unset -nocomplain c char expect range i special
 }
 
+test template-5.1 {Not quite a template} -body { #<<<
+	json template {
+		{
+			"foo": "~X:bar",
+			"~s:bar": null
+		}
+	}
+} -result {{"foo":"~X:bar","~s:bar":null}}
+#>>>
+test template-6.1 {too few args} -body { #<<<
+	json template 
+} -returnCodes error -result {Wrong # of arguments.  Must be "template json_template ?source_dict?"}
+#>>>
+test template-6.2 {too many args} -body { #<<<
+	json template {"~S:foo"} bar baz
+} -returnCodes error -result {Wrong # of arguments.  Must be "template json_template ?source_dict?"}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

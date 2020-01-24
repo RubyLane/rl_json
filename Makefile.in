@@ -238,7 +238,7 @@ install-doc: doc
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(mandir)/mann ; \
 	done
 
-test: binaries libraries
+test: binaries libraries tests/JSONTestSuite/test_parsing
 	$(TCLSH) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
@@ -250,6 +250,11 @@ test_valgrind: binaries libraries
 
 test_valgrind_full: binaries libraries
 	$(TCLSH_VALGRIND_FULL) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
+		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
+			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+
+tests/JSONTestSuite/test_parsing: binaries libraries
+	$(TCLSH) `@CYGPATH@ $(srcdir)/fetch_test_cases.tcl` \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 

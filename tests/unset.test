@@ -213,6 +213,136 @@ test unset-6.4 {Unset an element in an array, end-relative, 2 beyond end} -setup
 	unset -nocomplain json
 } -result {{"foo":["a","b","c"]}}
 #>>>
+test unset-7.1 {Unset an element in an array, end-relative} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo end-1 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["a",["1","3"],"c"]}}
+#>>>
+test unset-7.2 {Unset an element in an array, end-relative, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo end/1 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Expected an integer index or end(+/-integer)?, got end/1}
+#>>>
+test unset-7.3 {Unset an element in an array, end-relative, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo en 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Expected an integer index or end(+/-integer)?, got en}
+#>>>
+test unset-7.4 {Unset an element in an array, end-relative, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo end-1x 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Expected an integer index or end(+/-integer)?, got end-1x}
+#>>>
+test unset-7.5 {Unset an element in an array, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo -1 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Path element "foo -1" doesn't exist}
+#>>>
+test unset-7.6 {Unset an element in an array, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo 4 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Path element "foo 4" doesn't exist}
+#>>>
+test unset-7.7 {Unset an element in an array, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo 0 1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Attempt to index into atomic type string at path "foo 0 1"}
+#>>>
+test unset-7.8 {Unset an element in an array, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo 1 end/1
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Expected an integer index or end(+/-integer)?, got end/1}
+#>>>
+test unset-7.9 {Unset an element in an array, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo 1 en
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Expected an integer index or end(+/-integer)?, got en}
+#>>>
+test unset-7.10 {Unset an element in an array, invalid} -setup { #<<<
+	set json {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}
+} -body {
+	json unset json foo 1 end-1x
+	set json
+} -cleanup {
+	unset -nocomplain json
+} -returnCodes error -result {Expected an integer index or end(+/-integer)?, got end-1x}
+#>>>
 
 ::tcltest::cleanupTests
 return

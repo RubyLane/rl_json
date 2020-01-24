@@ -33,6 +33,10 @@ test string-1.7 {Create a json string, template literal} -body { #<<<
 	json string "~L:~S:foo"
 } -result {"~L:~S:foo"}
 #>>>
+test string-1.8 {Create a json string, undef} -body { #<<<
+	json string "~X:foo"
+} -result {"~X:foo"}
+#>>>
 test string-2.1 {Too few args} -body { #<<<
 	set code [catch {
 		json string
