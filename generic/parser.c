@@ -107,7 +107,7 @@ static int is_whitespace(const unsigned char c) //{{{
 }
 
 //}}}
-static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
+static enum char_advance_status char_advance(const unsigned char** p, size_t* char_adj) //{{{
 {
 	// TODO: use Tcl_UtfNext instead?
 	// This relies on some properties from the utf-8 returned by Tcl_GetString:
@@ -120,6 +120,12 @@ static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 	if (unlikely(first >= 0xC0)) {
 		// Advance to next UTF-8 character
 		// TODO: detect invalid sequences?
+		if (first == 0xC0 && **p == 0x80) {
+			(*p)--;
+			// Have to check for this here - other unescaped control chars are handled by the < 0x1F
+			// test, but 0x00 is transformed to 0xC0 0x80 by Tcl (MUTF-8 rather than UTF-8)
+			return CHAR_ADVANCE_UNESCAPED_NULL;
+		}
 		if (first < 0xe0 /* 0b11100000 */) {
 			eat = 1;
 #if TCL_UTF_MAX == 3
@@ -139,14 +145,17 @@ static void char_advance(const unsigned char** p, size_t* char_adj) //{{{
 		*p += eat;
 		*char_adj += eat;
 	}
+
+	return CHAR_ADVANCE_OK;
 }
 
 //}}}
 int skip_whitespace(const unsigned char** s, const unsigned char* e, const char** errmsg, const unsigned char** err_at, size_t* char_adj) //{{{
 {
-	const unsigned char*	p = *s;
-	const unsigned char*	start;
-	size_t					start_char_adj;
+	const unsigned char*		p = *s;
+	const unsigned char*		start;
+	size_t						start_char_adj;
+	enum char_advance_status	status = CHAR_ADVANCE_OK;
 
 consume_space_or_comment:
 	while (is_whitespace(*p)) p++;
@@ -158,14 +167,15 @@ consume_space_or_comment:
 		if (*p == '/') {
 			p++;
 
-			while (likely(p < e && (*p > 0x1f || *p == 0x09)))
-				char_advance(&p, char_adj);
+			while (likely(p < e && (*p > 0x1f || *p == 0x09) && status == CHAR_ADVANCE_OK))
+				status = char_advance(&p, char_adj);
 		} else if (*p == '*') {
 			p++;
 
 			while (likely(p < e-2 && *p != '*')) {
 				if (unlikely(*p <= 0x1f && !is_whitespace(*p))) goto err_illegal_char;
-				char_advance(&p, char_adj);
+				status = char_advance(&p, char_adj);
+				if (unlikely(status != CHAR_ADVANCE_OK)) goto err_illegal_char;
 			}
 
 			if (unlikely(*p++ != '*' || *p++ != '/')) goto err_unterminated;
@@ -207,11 +217,12 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 		case '"':
 			p++;	// Advance past the " to the first byte of the string
 			{
-				Tcl_Obj*				out = NULL;
-				const unsigned char*	chunk;
-				size_t					len;
-				char					mapped;
-				enum json_types			stype = JSON_STRING;
+				Tcl_Obj*					out = NULL;
+				const unsigned char*		chunk;
+				size_t						len;
+				char						mapped;
+				enum json_types				stype = JSON_STRING;
+				enum char_advance_status	status = CHAR_ADVANCE_OK;
 
 				// Peek ahead to detect template subst markers.
 				if (p[0] == '~' && e-p >= 3 && p[2] == ':') {
@@ -231,8 +242,8 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 					chunk = p;
 
 					// These tests are where the majority of the parsing time is spent
-					while (likely(p < e && *p != '"' && *p != '\\' && *p > 0x1f))
-						char_advance(&p, char_adj);
+					while (likely(p < e && *p != '"' && *p != '\\' && *p > 0x1f && status == CHAR_ADVANCE_OK))
+						status = char_advance(&p, char_adj);
 
 					if (unlikely(p >= e)) goto err;
 

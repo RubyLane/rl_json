@@ -49,6 +49,11 @@ enum action_opcode {
 	TEMPLATE_ACTIONS_END
 };
 
+enum char_advance_status {
+	CHAR_ADVANCE_OK,
+	CHAR_ADVANCE_UNESCAPED_NULL
+};
+
 struct interp_cx {
 	Tcl_Interp*		interp;
 	Tcl_Obj*		tcl_true;
