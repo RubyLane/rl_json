@@ -360,12 +360,25 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			break;
 
 		default:
-			// TODO: Reject leading zero?  The RFC doesn't allow leading zeros
 			{
 				const unsigned char*	start = p;
 				const unsigned char*	t;
 
 				if (*p == '-') p++;
+
+				if (unlikely(
+						*p == '0' && (
+							(p[1] >= '0' && p[1] <= '9') ||		// Octal
+							(p[1] == 'x' || p[1] == 'X')		// Hex
+						)
+				)) {
+					// Indexing one beyond p is safe - all the strings we
+					// receive are guaranteed to be null terminated by Tcl, and
+					// *p here is '0'
+					err_at = p;
+					errmsg = "Leading 0 not allowed for numbers";
+					goto err;
+				}
 
 				t = p;
 				while (*p >= '0' && *p <= '9') p++;
