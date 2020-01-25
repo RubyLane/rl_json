@@ -238,7 +238,7 @@ install-doc: doc
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(mandir)/mann ; \
 	done
 
-test: binaries libraries tests/JSONTestSuite/test_parsing
+test: binaries libraries
 	$(TCLSH) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
@@ -264,8 +264,11 @@ benchmark: binaries libraries
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)
 
+vimgdb:
+	$(PKG_ENV) vim
+
 gdb:
-	$(TCLSH_ENV) gdb $(TCLSH_PROG) $(SCRIPT)
+	$(PKG_ENV) gdb $(TCLSH_PROG) $(SCRIPT)
 
 VALGRINDARGS =	--tool=memcheck --num-callers=8 --leak-resolution=high \
 		--leak-check=yes --show-reachable=yes -v

@@ -192,6 +192,23 @@ test memory-2.1 {json foreach} -setup { #<<<
 	unset -nocomplain before
 	rename test_memory-2.1 {}
 } -result 0
+#>>>
+test memory-2.2 {deeply nested array error} -setup { #<<<
+	proc test_memory-2.2 {} {
+		json normalize [string repeat "\[" 10000]
+	}
+
+	# Warm caches, overhead, etc
+	catch {test_memory-2.2}
+	set before	[my_rss]
+} -body {
+	set code [catch {test_memory-2.2} r o]
+	list [expr {[my_rss] - $before}] $code $r
+} -cleanup {
+	unset -nocomplain before code r o
+	rename test_memory-2.2 {}
+} -match glob -result {0 1 {Error parsing JSON value: Unterminated array at offset *}}
+#>>>
 
 ::tcltest::cleanupTests
 return

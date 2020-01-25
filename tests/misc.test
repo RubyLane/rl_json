@@ -1,0 +1,66 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+test misc-1.1 {too few args} -body { #<<<
+	list [catch {json} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {Wrong # of arguments.  Must be "method ?arg ...?"} NONE}
+#>>>
+test misc-1.2 {invalid subcommand} -body { #<<<
+	list [catch {json invalid_subcommand} r o] [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {TCL LOOKUP INDEX method invalid_subcommand}}
+#>>>
+test misc-2.1 {isnull, no path, true} -body { #<<<
+	json isnull null
+} -result 1
+#>>>
+test misc-2.2 {isnull, no path, false} -body { #<<<
+	json isnull 123
+} -result 0
+#>>>
+test misc-2.3 {isnull, path, true} -body { #<<<
+	json isnull {["a",null,"c"]} 1
+} -result 1
+#>>>
+test misc-2.4 {isnull, path, false} -body { #<<<
+	json isnull {["a",null,"c"]} 2
+} -result 0
+#>>>
+test misc-2.5 {isnull, path, out of array bounds} -body { #<<<
+	json isnull {["a",null,"c"]} 3
+} -result 1
+#>>>
+test misc-2.6 {isnull, path, out of array bounds} -body { #<<<
+	json isnull {["a",null,"c"]} -1
+} -result 1
+#>>>
+test misc-3.1 {interp free} -body { #<<<
+	set slave [interp create]
+	$slave eval {load {} Rl_json; rl_json::json get {["hello","slave"]}}
+} -cleanup {
+	interp delete $slave
+	unset -nocomplain slave
+} -result {hello slave}
+#>>>
+test misc-3.2 {interp free, safe intero} -body { #<<<
+	set slave [interp create -safe]
+	$slave invokehidden load {} Rl_json
+	$slave eval {rl_json::json get {["hello","slave"]}}
+} -cleanup {
+	interp delete $slave
+	unset -nocomplain slave
+} -result {hello slave}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

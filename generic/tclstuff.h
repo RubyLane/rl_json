@@ -16,6 +16,12 @@
 		return TCL_ERROR;								\
 	}
 
+#define THROW_PRINTF( fmtstr, ... )											\
+	{																		\
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf((fmtstr), ##__VA_ARGS__));	\
+		return TCL_ERROR;													\
+	}
+
 #define THROW_ERROR_LABEL( label, var, ... )				\
 	{														\
 		Tcl_AppendResult(interp, ##__VA_ARGS__, NULL);		\

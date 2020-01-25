@@ -2,10 +2,12 @@
 
 void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
 {
-	const char*	char_ofs_str = Tcl_GetString(Tcl_NewIntObj(char_ofs));
+	char		char_ofs_buf[20];		// 20 bytes allows for 19 bytes of decimal max 64 bit size_t, plus null terminator
 
-	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %s", errmsg, char_ofs_str));
-	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", errmsg, doc, char_ofs_str, NULL);
+	snprintf(char_ofs_buf, 20, "%ld", char_ofs);
+
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", errmsg, char_ofs));
+	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", errmsg, doc, char_ofs_buf, NULL);
 }
 
 //}}}
@@ -13,7 +15,6 @@ struct parse_context* push_parse_context(struct parse_context* cx, const int con
 {
 	struct parse_context*	last = cx->last;
 	struct parse_context*	new;
-	Tcl_Obj*				ival;
 
 	if (last->container == JSON_UNDEF) {
 		new = last;
@@ -24,11 +25,11 @@ struct parse_context* push_parse_context(struct parse_context* cx, const int con
 		new = (struct parse_context*)malloc(sizeof(*new));
 	}
 
-	ival = JSON_NewJvalObj(container, container == JSON_OBJECT  ?  Tcl_NewDictObj()  :  Tcl_NewListObj(0, NULL));
-	Tcl_IncrRefCount(ival);
 
 	new->prev = last;
-	new->val = ival;
+	Tcl_IncrRefCount(
+		new->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?  Tcl_NewDictObj()  :  Tcl_NewListObj(0, NULL))
+	);
 	new->hold_key = NULL;
 	new->char_ofs = char_ofs;
 	new->container = container;
@@ -85,9 +86,9 @@ void free_cx(struct parse_context* cx) //{{{
 			tail->val = NULL;
 		}
 
-		tail = pop_parse_context(cx);
-
 		if (tail == cx) break;
+
+		tail = pop_parse_context(cx);
 	}
 }
 

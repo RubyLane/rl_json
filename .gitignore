@@ -21,3 +21,4 @@ perf.data.old
 .project
 .settings
 tests/JSONTestSuite/test_parsing
+tclobjs_remaining
