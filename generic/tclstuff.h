@@ -59,9 +59,21 @@
 #define TEST_OK( cmd )		\
 	if (cmd != TCL_OK) return TCL_ERROR;
 #endif
+
 #define TEST_OK_LABEL( label, var, cmd )		\
 	if (cmd != TCL_OK) { \
 		var = TCL_ERROR; \
 		goto label; \
 	}
+
+#define RELEASE( obj )		if (obj) {Tcl_DecrRefCount(obj); obj=NULL;}
+#define REPLACE(target, replacement)	\
+{ \
+	RELEASE(target); \
+	Tcl_IncrRefCount(target = replacement); \
+}
+
+#include <signal.h>
+#define DEBUGGER raise(SIGTRAP)
+
 #endif

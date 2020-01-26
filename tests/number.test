@@ -5,9 +5,20 @@ if {"::tcltest" ni [namespace children]} {
 
 package require rl_json
 
-test number-1.1 {Create a json number: 1} -body { #<<<
-	json number 1
-} -result 1
+test number-1.1.1 {Create a json number: 1 (was native number} -body { #<<<
+	set n	1
+	expr {$n+0}
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 1 1]
+#>>>
+test number-1.1.2 {Create a json number: 123 (was string} -body { #<<<
+	set n	[string trim " 1"]
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 1 1]
 #>>>
 test number-1.2 {Create a json number: 0} -body { #<<<
 	json number 0
@@ -17,9 +28,16 @@ test number-1.3 {Create a json number: real} -body { #<<<
 	json number 42.1
 } -result 42.1
 #>>>
-test number-1.4 {Create a json number: scientific notation} -body { #<<<
-	json number 1e6
-} -result 1000000.0
+test number-1.4.1 {Create a json number: scientific notation, native double} -body { #<<<
+	set n	1e6
+	expr {$n+0}
+	list [json number $n] $n
+} -result {1e6 1e6}
+#>>>
+test number-1.4.2 {Create a json number: scientific notation, string} -body { #<<<
+	set n	[string trim " 1e6"]
+	list [json number $n] $n
+} -result {1000000.0 1e6}
 #>>>
 test number-1.5 {Create a max 32 bit signed int} -body { #<<<
 	json number [expr {2**31-1}]
@@ -57,6 +75,150 @@ test number-1.13 {string} -body { #<<<
 	json number [string cat 4 2]
 } -result 42
 #>>>
+test number-1.14.1 {positive octal} -body { #<<<
+	set n	077
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {63 077}
+#>>>
+test number-1.14.2 {negative octal} -body { #<<<
+	set n	-077
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-63 -077}
+#>>>
+test number-1.15.1 {positive hex} -body { #<<<
+	set n	0xA0
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {160 0xA0}
+#>>>
+test number-1.15.2 {negative hex} -body { #<<<
+	set n	-0xA0
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-160 -0xA0}
+#>>>
+test number-1.16.1 {positive double, valid leading 0} -body { #<<<
+	set n	0.5e3
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {0.5e3 0.5e3}
+#>>>
+test number-1.16.2 {negative double, valid leading 0} -body { #<<<
+	set n	-0.5e3
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-0.5e3 -0.5e3}
+#>>>
+test number-1.17.1 {trailing whitespace: ' '} -body { #<<<
+	set n	{42 }
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 {42 }]
+#>>>
+test number-1.17.2 {trailing whitespace: '\n'} -body { #<<<
+	set n	42\n
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 42\n]
+#>>>
+test number-1.17.3 {trailing whitespace: '\t'} -body { #<<<
+	set n	42\t
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 42\t]
+#>>>
+test number-1.17.4 {trailing whitespace: '\v'} -body { #<<<
+	set n	42\v
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 42\v]
+#>>>
+test number-1.17.5 {trailing whitespace: '\r'} -body { #<<<
+	set n	42\r
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 42\r]
+#>>>
+test number-1.17.6 {trailing whitespace: '\f'} -body { #<<<
+	set n	42\f
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 42\f]
+#>>>
+test number-1.18.1 {leading whitespace: ' '} -body { #<<<
+	set n	{ 42}
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 { 42}]
+#>>>
+test number-1.18.2 {leading whitespace: '\n'} -body { #<<<
+	set n	\n42
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 \n42]
+#>>>
+test number-1.18.3 {leading whitespace: '\t'} -body { #<<<
+	set n	\t42
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 \t42]
+#>>>
+test number-1.18.4 {leading whitespace: '\v'} -body { #<<<
+	set n	\v42
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 \v42]
+#>>>
+test number-1.18.5 {leading whitespace: '\r'} -body { #<<<
+	set n	\r42
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 \r42]
+#>>>
+test number-1.18.6 {leading whitespace: '\f'} -body { #<<<
+	set n	\f42
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result [list 42 \f42]
+#>>>
 test number-2.1 {Too few args} -body { #<<<
 	set code [catch {
 		json number
@@ -70,6 +232,20 @@ test number-2.2 {Too many args} -body { #<<<
 	} r o]
 	list $code $r [dict get $o -errorcode]
 } -result {1 {Wrong # of arguments.  Must be "number val"} NONE}
+#>>>
+test number-2.3 {json number, not a number} -body { #<<<
+	set code [catch {json number foo} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result [list 1 {can't use non-numeric string as operand of "+"} {ARITH DOMAIN {non-numeric string}}]
+#>>>
+test number-2.4 {json number, not a number: empty string} -body { #<<<
+	set code [catch {json number ""} r o]
+	list $code $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain code r o
+} -result [list 1 {can't use empty string as operand of "+"} {ARITH DOMAIN {empty string}}]
 #>>>
 
 ::tcltest::cleanupTests

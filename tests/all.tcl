@@ -69,7 +69,7 @@ puts $chan "\nTests ended at [eval $timeCmd]"
 ::tcltest::cleanupTests 1
 
 if {[llength [info commands memory]] == 1} {
-	rl_json::json free_cache
+	#rl_json::json free_cache
 	unload -nocomplain {} rl_json
 	memory objs tclobjs_remaining
 }

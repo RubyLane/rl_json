@@ -1,0 +1,181 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+# Helpers <<<
+proc readbin fn {
+	set h	[open $fn rb]
+	try {read $h} finally {close $h}
+}
+
+proc unicode_string {} {
+	# hello, は 🙂 world
+	return "hello, \u306f [format %c 0x1F642] world"
+}
+
+if {"utf-16le" in [encoding names]} {
+	proc string_to_utf16le s { encoding convertto utf-16le $s }
+} else {
+	proc string_to_utf16le s {
+		set chars	{}
+		foreach e [split $s {}] {
+			scan $e %c o
+			if {$o >= 0x010000} {
+				set u	[expr {$o - 0x10000}]
+				set w1	[expr {0b1101100000000000 | ($u >> 10)}]
+				set w2	[expr {0b1101110000000000 | ($u & 0b1111111111)}]
+				lappend chars $w1 $w2
+			} else {
+				lappend chars $o
+			}
+		}
+		binary format su* $chars
+	}
+}
+
+if {"utf-16be" in [encoding names]} {
+	proc string_to_utf16be s { encoding convertto utf-16be $s }
+} else {
+	proc string_to_utf16be s {
+		set chars	{}
+		foreach e [split $s {}] {
+			scan $e %c o
+			if {$o >= 0x010000} {
+				set u	[expr {$o - 0x10000}]
+				set w1	[expr {0b1101100000000000 | ($u >> 10)}]
+				set w2	[expr {0b1101110000000000 | ($u & 0b1111111111)}]
+				lappend chars $w1 $w2
+			} else {
+				lappend chars $o
+			}
+		}
+		binary format Su* $chars
+	}
+}
+
+proc string_to_utf32le s {
+	binary format iu* [lmap e [split $s {}] {scan $e %c o; set o}]
+}
+
+proc string_to_utf32be s {
+	binary format Iu* [lmap e [split $s {}] {scan $e %c o; set o}]
+}
+
+#>>>
+
+test decode-0.1 {Too few args} -body { #<<<
+	list [catch {json decode} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {wrong # args: should be "json decode bytes ?encoding?"} {TCL WRONGARGS}}
+#>>>
+test decode-0.2 {Too many args} -body { #<<<
+	list [catch {json decode foo auto bar} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {wrong # args: should be "json decode bytes ?encoding?"} {TCL WRONGARGS}}
+#>>>
+test decode-0.3 {No optional encoding arg} -body { #<<<
+	json decode foo
+} -result foo
+#>>>
+test decode-1.1 {Decode utf-8, no BOM} -body { #<<<
+	json decode [encoding convertto utf-8 [unicode_string]]
+} -result [unicode_string]
+#>>>
+test decode-1.2 {Decode utf-8, BOM} -body { #<<<
+	json decode [binary decode hex {EF BB BF}][encoding convertto utf-8 [unicode_string]]
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-2.1 {Decode utf-16le, no BOM, explicit encoding} -body { #<<<
+	json decode [string_to_utf16le [unicode_string]] utf-16le
+} -result [unicode_string]
+#>>>
+test decode-2.2 {Decode utf-16le, BOM} -body { #<<<
+	json decode [binary decode hex {FF FE}][string_to_utf16le [unicode_string]]
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-3.1 {Decode utf-16be, no BOM, explicit encoding} -body { #<<<
+	json decode [string_to_utf16be [unicode_string]] utf-16be
+} -result [unicode_string]
+#>>>
+test decode-3.2 {Decode utf-16be, BOM} -body { #<<<
+	json decode [binary decode hex {FE FF}][string_to_utf16be [unicode_string]]
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-4.1 {Decode utf-32le, no BOM, explicit encoding} -body { #<<<
+	json decode [string_to_utf32le [unicode_string]] utf-32le
+} -result [unicode_string]
+#>>>
+test decode-4.2 {Decode utf-32le, BOM} -body { #<<<
+	json decode [binary decode hex {FF FE 00 00}][string_to_utf32le [unicode_string]]
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-5.1 {Decode utf-32be, no BOM, explicit encoding} -body { #<<<
+	json decode [string_to_utf32be [unicode_string]] utf-32be
+} -result [unicode_string]
+#>>>
+test decode-5.2 {Decode utf-32be, BOM} -body { #<<<
+	json decode [binary decode hex {00 00 FE FF}][string_to_utf32be [unicode_string]]
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-6.1 {Decode utf-16le, no BOM, explicit encoding, force manual decode} -body { #<<<
+	json decode [string_to_utf16le [unicode_string]] "x utf-16le"
+} -result [unicode_string]
+#>>>
+test decode-6.2 {Decode utf-16le, BOM, force manual decode} -body { #<<<
+	json decode [binary decode hex {FF FE}][string_to_utf16le [unicode_string]] "x utf-16le"
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-7.1 {Decode utf-16be, no BOM, explicit encoding, force manual decode} -body { #<<<
+	json decode [string_to_utf16be [unicode_string]] "x utf-16be"
+} -result [unicode_string]
+#>>>
+test decode-7.2 {Decode utf-16be, BOM, force manual decode} -body { #<<<
+	json decode [binary decode hex {FE FF}][string_to_utf16be [unicode_string]] "x utf-16be"
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-8.1 {Decode utf-32le, no BOM, explicit encoding, force manual decode} -body { #<<<
+	json decode [string_to_utf32le [unicode_string]]  utf-32le
+} -result [unicode_string]
+#>>>
+test decode-8.2 {Decode utf-32le, BOM, force manual decode} -body { #<<<
+	json decode [binary decode hex {FF FE 00 00}][string_to_utf32le [unicode_string]] utf-32le
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-9.1 {Decode utf-32be, no BOM, explicit encoding, force manual decode} -body { #<<<
+	json decode [string_to_utf32be [unicode_string]] utf-32be
+} -result [unicode_string]
+#>>>
+test decode-9.2 {Decode utf-32be, BOM, force manual decode} -body { #<<<
+	json decode [binary decode hex {00 00 FE FF}][string_to_utf32be [unicode_string]] utf-32be
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-10.1 {Decode utf-32le, no BOM, explicit encoding, force manual decode} -body { #<<<
+	json decode [string_to_utf32le [unicode_string]] "x utf-32le"
+} -result [unicode_string]
+#>>>
+test decode-10.2 {Decode utf-32le, BOM, force manual decode} -body { #<<<
+	json decode [binary decode hex {FF FE 00 00}][string_to_utf32le [unicode_string]] "x utf-32le"
+} -result \uFEFF[unicode_string]
+#>>>
+test decode-11.1 {Decode utf-32be, no BOM, explicit encoding, force manual decode} -body { #<<<
+	json decode [string_to_utf32be [unicode_string]] "x utf-32be"
+} -result [unicode_string]
+#>>>
+test decode-11.2 {Decode utf-32be, BOM, force manual decode} -body { #<<<
+	json decode [binary decode hex {00 00 FE FF}][string_to_utf32be [unicode_string]] "x utf-32be"
+} -result \uFEFF[unicode_string]
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+
+
+

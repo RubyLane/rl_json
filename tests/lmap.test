@@ -228,10 +228,16 @@ test lmap-8.2 {Multiple iterators, single var, over empty array} -setup { #<<<
 #>>>
 
 test lmap-20.5 {too few args} -body { #<<<
-	json lmap x {false} 
+	list [catch {json lmap x {[]}} r o] $r [dict get $o -errorcode]
 } -cleanup {
-	unset -nocomplain x
-} -returnCodes error -result {Wrong # of arguments.  Must be "lmap varlist datalist ?varlist datalist ...? script"}
+	unset -nocomplain x y r o
+} -result {1 {wrong # args: should be "json lmap ?varlist datalist ...? script"} {TCL WRONGARGS}}
+#>>>
+test lmap-20.6 {too many args} -body { #<<<
+	list [catch {json lmap x {[]} y {}} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain x y r o
+} -result {1 {wrong # args: should be "json lmap ?varlist datalist ...? script"} {TCL WRONGARGS}}
 #>>>
 
 ::tcltest::cleanupTests

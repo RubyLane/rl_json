@@ -50,7 +50,7 @@ test misc-3.1 {interp free} -body { #<<<
 	unset -nocomplain slave
 } -result {hello slave}
 #>>>
-test misc-3.2 {interp free, safe intero} -body { #<<<
+test misc-3.2 {interp free, safe interp} -body { #<<<
 	set slave [interp create -safe]
 	$slave invokehidden load {} Rl_json
 	$slave eval {rl_json::json get {["hello","slave"]}}

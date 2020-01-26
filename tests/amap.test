@@ -490,10 +490,16 @@ test amap-11.6.2 {iteration over object, iteration result a (pure string) JSON v
 #>>>
 
 test amap-20.5 {too few args} -body { #<<<
-	json amap x {false} 
+	list [catch {json amap x {[]}} r o] $r [dict get $o -errorcode]
 } -cleanup {
-	unset -nocomplain x
-} -returnCodes error -result {Wrong # of arguments.  Must be "amap varlist datalist ?varlist datalist ...? script"}
+	unset -nocomplain x y r o
+} -result {1 {wrong # args: should be "json amap ?varlist datalist ...? script"} {TCL WRONGARGS}}
+#>>>
+test amap-20.6 {too many args} -body { #<<<
+	list [catch {json amap x {[]} y {}} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain x y r o
+} -result {1 {wrong # args: should be "json amap ?varlist datalist ...? script"} {TCL WRONGARGS}}
 #>>>
 
 ::tcltest::cleanupTests

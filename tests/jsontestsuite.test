@@ -6,132 +6,13 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
-proc readutf {fn encoding} { #<<<
-	set read_utf16le {h { #<<<
-		if {"utf-16le" in [encoding names]} {
-			#puts "using encoding utf-16le"
-			encoding convertfrom utf-16le [read $h]
-		} else {
-			# TODO: proper UTF16
-			set res	{}
-			binary scan [read $h] su* chars
-			foreach char $chars {
-				append res [format %c $char]
-			}
-			set res
-		}
-	}}
-	#>>>
-	set read_utf16be {h { #<<<
-		if {"utf-16be" in [encoding names]} {
-			#puts "using encoding utf-16be"
-			encoding convertfrom utf-16be [read $h]
-		} else {
-			# TODO: proper UTF16
-			set res	{}
-			binary scan [read $h] Su* chars
-			foreach char $chars {
-				append res [format %c $char]
-			}
-			set res
-		}
-	}}
-	#>>>
-
+proc readbin fn {
 	set h	[open $fn rb]
-	try {
-		if {$encoding eq "auto"} {
-			set bom	[binary encode hex [read $h 3]]
-			seek $h 0
-			#puts "auto, bom: $bom"
-			switch -glob -- $bom {
-				feff* { set encoding utf-16be }
-				fffe* { set encoding utf-16le }
-
-				efbbbf -
-				default { # No BOM, or UTF-8 BOM
-					set encoding utf-8
-				}
-			}
-		}
-
-		#puts "reading $fn as $encoding"
-		switch -- $encoding {
-			utf-8 {
-				chan configure $h -encoding utf-8
-				read $h
-			}
-
-			utf-16le { apply $read_utf16le $h }
-			utf-16be { apply $read_utf16be $h }
-
-			default {
-				error "Unsupported encoding \"$encoding\""
-			}
-		}
-	} finally {
-		close $h
-	}
+	try {read $h} finally {close $h}
 }
-
-#>>>
-proc readutf_in_utf8 {fn encoding} { #<<<
-	set read_utf16le {h { #<<<
-		if {"utf-16le" in [encoding names]} {
-			encoding convertfrom utf-16le [read $h]
-		} else {
-			set res	{}
-			binary scan [read $h] su* chars
-			foreach char $chars {
-				append res [format %c $char]
-			}
-			set res
-		}
-	}}
-	#>>>
-	set read_utf16be {h { #<<<
-		if {"utf-16be" in [encoding names]} {
-			encoding convertfrom utf-16le [read $h]
-		} else {
-			set res	{}
-			binary scan [read $h] Su* chars
-			foreach char $chars {
-				append res [format %c $char]
-			}
-			set res
-		}
-	}}
-	#>>>
-
-	set h	[open $fn r]
-	try {
-		chan configure $h -encoding utf-8
-		switch -- $encoding {
-			auto {
-				set bom	[read $h 3]
-				seek $h 0
-				switch -glob -- [binary encode hex $bom] {
-					fffe* { apply $read_utf16le $h }
-					feff* { apply $read_utf16be $h }
-
-					efbbbf -
-					default { # No BOM, or UTF-8 BOM
-						read $h
-					}
-				}
-			}
-
-			utf-16le { apply $read_utf16le $h }
-			utf-16be { apply $read_utf16be $h }
-		}
-	} finally {
-		close $h
-	}
-}
-#>>>
 
 foreach file [glob -nocomplain -type f [file join [file dirname [info script]] JSONTestSuite test_parsing *.json]] {
-	if {![regexp {/([yni])_(.*)\.json$} $file - expected name]} {
+	if {![regexp {/([yni])_([^/]+)\.json$} $file - expected name]} {
 		puts stderr "Could not interpret test case filename \"$file\""
 		continue
 	}
@@ -143,29 +24,75 @@ foreach file [glob -nocomplain -type f [file join [file dirname [info script]] J
 		object_trailing_comment_slash_open -
 		structure_object_with_comment -
 		object_trailing_comment {
+			# Comments are explicitly supported
 			set expected y
 		}
 
 		string_utf16BE_no_BOM {
+			# UTF-16 files without a BOM need an out-of-band signal to indicate the encoding
 			set encoding utf-16be
 		}
 
 		string_utf16LE_no_BOM {
+			# UTF-16 files without a BOM need an out-of-band signal to indicate the encoding
 			set encoding utf-16le
 		}
 	}
 
-	switch -- $expected {
-		y {
-			test jsontestsuite-$name $name -body [list json normalize [readutf $file $encoding]] -match glob -result * -returnCodes ok
-		}
-		n {
-			test jsontestsuite-$name $name -body [list json normalize [readutf $file $encoding]] -match glob -result * -returnCodes error
-		}
-		i {
-			test jsontestsuite-$name $name -body [list json normalize [readutf $file $encoding]] -match glob -result * -returnCodes ok
-		}
+	set cmd	[list test jsontestsuite-$name ${expected}_$name -match glob -result * -body]
+	lappend cmd	[string map [list %file% [list $file] %encoding% [list $encoding]] {
+		json normalize [json decode [readbin %file%] %encoding%]
+	}]
+	if {$expected eq "n"} {
+		lappend cmd -returnCodes error
 	}
+
+	{*}$cmd
+}
+
+foreach file [glob -nocomplain -type f [file join [file dirname [info script]] JSONTestSuite test_transform *.json]] {
+	if {![regexp {/([^/]+)\.json$} $file - name]} {
+		puts stderr "Could not interpret test case filename \"$file\""
+		continue
+	}
+
+	set encoding	auto
+
+	set result		[string trim [json decode [readbin $file]]]
+
+	# Overrides for our intended behaviours in various situations
+	switch -- $name {
+		object_same_key_different_values {
+			# Duplicate keys in object - later replaces earlier
+			set result {{"a":2}}
+		}
+		object_same_key_unclear_values {
+			set result {{"a":-0}}
+		}
+		object_same_key_same_value {
+			set result {{"a":1}}
+		}
+
+		string_1_escaped_invalid_codepoint {
+			# Replace each maximal subpart of the ill-formed sequence by a single U+FFFD (option 2 of http://unicode.org/review/pr-121.html)
+			set result "\[\"\uFFFD\"\]"
+		}
+		string_2_escaped_invalid_codepoints {
+			set result "\[\"\uFFFD\uFFFD\"\]"
+		}
+		string_3_escaped_invalid_codepoints {
+			set result "\[\"\uFFFD\uFFFD\uFFFD\"\]"
+		}
+
+		default {}
+	}
+
+	set cmd	[list test jsontestsuite-$name $name -result $result -body]
+	lappend cmd	[string map [list %file% [list $file] %encoding% [list $encoding]] {
+		json normalize [json decode [readbin %file%] %encoding%]
+	}]
+
+	{*}$cmd
 }
 
 ::tcltest::cleanupTests

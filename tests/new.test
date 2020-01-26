@@ -64,41 +64,9 @@ test new-3.1 {json number, int} -body { #<<<
 	json number 1234
 } -result 1234
 #>>>
-test new-3.2 {json number, too few args} -body { #<<<
-	set code [catch {json number} r o]
-	list $code $r [dict get $o -errorcode]
-} -cleanup {
-	unset -nocomplain code r o
-} -result [list 1 {Wrong # of arguments.  Must be "number val"} NONE]
-#>>>
-test new-3.3 {json number, too many args} -body { #<<<
-	set code [catch {json number foo bar} r o]
-	list $code $r [dict get $o -errorcode]
-} -cleanup {
-	unset -nocomplain code r o
-} -result [list 1 {Wrong # of arguments.  Must be "number val"} NONE]
-#>>>
-test new-3.4 {json number, not a number} -body { #<<<
-	set code [catch {json number foo} r o]
-	list $code $r [dict get $o -errorcode]
-} -cleanup {
-	unset -nocomplain code r o
-} -result [list 1 {can't use non-numeric string as operand of "+"} {ARITH DOMAIN {non-numeric string}}]
-#>>>
-test new-3.5 {json number, not a number: empty string} -body { #<<<
-	set code [catch {json number ""} r o]
-	list $code $r [dict get $o -errorcode]
-} -cleanup {
-	unset -nocomplain code r o
-} -result [list 1 {can't use empty string as operand of "+"} {ARITH DOMAIN {empty string}}]
-#>>>
 test new-3.6 {json number, float} -body { #<<<
 	json number 1234.4
 } -result 1234.4
-#>>>
-test new-3.7 {json number, scientific notation} -body { #<<<
-	json number 1e6
-} -result 1000000.0
 #>>>
 test new-4.1.1 {json boolean, truthy int} -body { #<<<
 	json boolean 1234
