@@ -72,7 +72,7 @@ TEA_SETUP_COMPILER
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c rl_jsonStubInit.c])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c rl_jsonStubInit.c])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h])
 TEA_ADD_INCLUDES([])
 TEA_ADD_LIBS([])
