@@ -75,11 +75,10 @@ struct interp_cx {
 	const Tcl_ObjType*	typeDict;		// Evil hack to identify objects of type dict, used to choose whether to iterate over a list of pairs as a dict or a list, for efficiency
 
 	const Tcl_ObjType*	typeInt;		// Evil hack to snoop on the type of a number, so that we don't have to add 0 to a candidate to know if it's a valid number
-	const Tcl_ObjType*	typeLong;
-	const Tcl_ObjType*	typeWideInt;
 	const Tcl_ObjType*	typeDouble;
-	const Tcl_ObjType*	typeBoolean;
 	const Tcl_ObjType*	typeBignum;
+	Tcl_Obj*		apply;
+	Tcl_Obj*		decode_bytes;
 };
 
 #define CX_STACK_SIZE	6

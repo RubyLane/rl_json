@@ -322,6 +322,14 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 									acc += digit;
 								}
 
+								if (
+									(acc >= 0xD800 && acc <= 0xDBFF) ||
+									(acc >= 0xDC00 && acc <= 0xDFFF)
+								) {
+									// Replace invalid codepoints (in the high and low surrogate ranges for UTF-16) with
+									// U+FFFD in accordance with Unicode recommendations
+									acc = 0xFFFD;
+								}
 								Tcl_AppendUnicodeToObj(out, &acc, 1);
 							}
 							break;
@@ -380,8 +388,9 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 				if (unlikely(
 						*p == '0' && (
-							(p[1] >= '0' && p[1] <= '9') ||		// Octal
-							(p[1] == 'x' || p[1] == 'X')		// Hex
+							// Only 3 characters can legally follow a leading '0' according to the spec:
+							// . - fraction, e or E - exponent
+							(p[1] >= '0' && p[1] <= '9')		// Octal, hex, or decimal with leading 0
 						)
 				)) {
 					// Indexing one beyond p is safe - all the strings we

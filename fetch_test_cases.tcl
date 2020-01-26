@@ -1,14 +1,21 @@
 #!/usr/bin/env tclsh
 
+# Doesn't work.  It should, but github is serving the binary .json files as utf-8, which breaks all the carefully
+# crafted encoding tests
+
 # Dependencies:
 #	rl_json:		https://github.com/RubyLane/rl_json
 #	parse_args: 	https://github.com/RubyLane/parse_args
 #	rl_http:		https://github.com/RubyLane/rl_http
 #	urlencode:		copied to support/
+#	uri:			tcllib
+#	Thread:			https://core.tcl-lang.org/thread
+#	tls:			https://core.tcl-lang.org/tcltls/index
 
 set here	[file dirname [file normalize [info script]]]
 
 tcl::tm::path add [file join $here support]
+lappend auto_path $here
 
 package require rl_json		;# yeah...
 package require rl_http
@@ -40,7 +47,10 @@ proc http {method url args} { #<<<
 		}
 
 		switch -glob -- [$h code] {
-			2*               {return [$h body]}
+			2*               {
+			#puts "Headers:\n\t[join [lmap {k v} [$h headers] {format {%s: %s} $k $v}] \n\t]"
+				return [$h body]
+			}
 			304		         {throw [list HTTP CODE [$h code]] "Not modified"}
 			301 - 302 - 307  {set url [lindex [dict get [$h headers] location] 0]}
 			403 {
@@ -121,18 +131,7 @@ proc writebin {fn data} { #<<<
 
 #>>>
 
-parse_args $argv {
-	-pretty		{-boolean}
-}
-
-set dest	[file join $here tests JSONTestSuite test_parsing]
-file mkdir $dest
-
-set listing	[github api GET -owner nst -repo JSONTestSuite test_parsing]
-
-#puts [json pretty $listing]
-
-json foreach file $listing {
+proc fetch_file {dest file} { #<<<
 	set fn	[file join $dest [json get $file name]]
 	if {[file exists $fn]} {
 		set mtime	[file mtime $fn]
@@ -144,7 +143,7 @@ json foreach file $listing {
 			writebin [file join $dest [json get $file name]] $contents
 		} trap {HTTP CODE 304} {} {
 			puts " not modified"
-			continue
+			return
 		} on error {errmsg options} {
 			puts " Error: $errmsg"
 		}
@@ -159,6 +158,26 @@ json foreach file $listing {
 			puts " Error: $errmsg"
 		}
 	}
+}
+
+#>>>
+
+set dest	[file join $here tests JSONTestSuite test_parsing]
+file mkdir $dest
+
+set listing	[github api GET -owner nst -repo JSONTestSuite test_parsing]
+#puts [json pretty $listing]
+json foreach file $listing {
+	fetch_file $dest $file
+}
+
+set dest	[file join $here tests JSONTestSuite test_transform]
+file mkdir $dest
+
+set listing	[github api GET -owner nst -repo JSONTestSuite test_transform]
+#puts [json pretty $listing]
+json foreach file $listing {
+	fetch_file $dest $file
 }
 
 # vim: foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
