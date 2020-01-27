@@ -36,6 +36,7 @@ json \- Parse and manipulate JSON documents
 \fBjson type \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson length \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson keys \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson decode \fIbytes\fR ?\fIencoding\fR?
 .fi
 .BE
 .SH DESCRIPTION
@@ -75,7 +76,7 @@ replacing the value referenced by \fIkey ...\fR (a path as described in
 a valid JSON as given by the JSON grammar, it is added as that JSON type,
 otherwise it is converted to a JSON string.  Thus the following are equivalent
 (modulo efficiency):
-.PP
+
 .CS
  json set doc foo [json string baz]
  json set doc bar [json number 123]
@@ -86,11 +87,11 @@ otherwise it is converted to a JSON string.  Thus the following are equivalent
  json set doc bar 123
  json set doc baz true
 .CE
-.PP
+
 Watch out for unintended behaviour if the value might look like a boolean or
 number but not meet the JSON grammar for those types, in which case the value
 is converted to a JSON string:
-.PP
+
 .CS
  json set doc foo [json boolean yes]
  # Key "foo" contains the JSON boolean value "true"
@@ -98,11 +99,11 @@ is converted to a JSON string:
  json set doc foo yes
  # Key "foo" contains the JSON string value "yes"
 .CE
-.PP
+
 Constructing the values using [\fBjson \fItype\fR] forces the conversion to
 the specified JSON type, or throws an exception if that can't be done.
 Which is more efficent will depend on the situation:
-.PP
+
 .CS
  set doc {[]}
  for {set i 0} {$i < 100} {incr i} {
@@ -128,7 +129,10 @@ Which is more efficent will depend on the situation:
 .
 Updates the JSON value stored in the variable \fIjsonVariableName\fR, removing
 the value referenced by \fIkey ...\fR, a path as described in \fBPATHS\fR
-below.
+below.  If the path names a entry in an object then that key is removed from the
+object.  If the path names an element in an array, that element is removed
+and all later elements are moved up.
+.TP
 \fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
 .
 Return a JSON value by interpolating the values from \fIdictionary\fR into the
@@ -224,11 +228,41 @@ Return a
 version of the input \fIjsonValue\fR, i.e., with all optional whitespace
 trimmed.
 .TP
-.TP
 \fBjson pretty \fIjsonValue\fR
 .
 Returns a pretty-printed string representation of \fIjsonValue\fR.  Useful for
 debugging or inspecting the structure of JSON data.
+.TP
+\fBjson decode \fIbytes\fR ?\fIencoding\fR?
+.
+Rl_json operates on characters, as returned from Tcl's Tcl_GetStringFromObj,
+not raw bytes, so considerations of encoding are strictly outside of its scope
+(other than ignoring a byte order mark if the string starts with one).  The
+JSON RFC lays out some behaviour for conforming implementations regarding
+character encoding, and ensuring that an application using rl_json meets that
+standard would be up to the application.  Some aspects are not straightforward,
+so rl_json provides this utility subcommand that takes binary data in \fIbytes\fR
+and returns a character string according to the RFC specified behaviour.  If
+the optional \fIencoding\fR argument is given, that encoding will be used to
+interpret \fIbytes\fR.  The supported encodings are those specified in the RFC:
+utf-8, utf-16le, utf-16be, utf-32le, utf-32be.  If the string starts with a BOM
+(byte order mark (U+FFFE)), and no encoding is given, it will be determined
+from the encoding of the BOM.  All the encodings listed are supported, even if
+Tcl lacks support for the utf-16 and utf-32 encodings natively.  However,
+without native support the conversion will be slow.
+
+This might look something like this in an application:
+
+.CS
+ proc readjson file {
+ 	set h [open $file rb]	;# Note that the file is opened in binary mode - no encoding
+ 	try {
+ 		json decode [read $h]
+ 	} finally {
+ 		close $h
+ 	}
+ }
+.CE
 .SH PATHS
 .PP
 Several of the commands (e.g., \fBjson get\fR, \fBjson exists\fR, \fBjson

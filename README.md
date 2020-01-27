@@ -52,6 +52,7 @@ Quick Reference
 * [json length *json_val* ?*key* ...?]  - Return the length of the of the named JSON array, number of entries in the named JSON object, or number of characters in the named JSON string.  Other JSON value types are not supported.
 * [json keys *json_val* ?*key* ...?]  - Return the keys in the of the named JSON object, found by following the path of *key*s.
 * [json pretty *json_val*]  - Returns a pretty-printed string representation of *json_val*.  Useful for debugging or inspecting the structure of JSON data.
+* [json decode *bytes* ?*encoding*?]  - Decode the binary *bytes* into a character string according to the JSON standards.  The optional *encoding* arg can be one of *utf-8*, *utf-16le*, *utf-16be*, *utf-32le*, *utf-32be*.  The encoding is guessed from the BOM (byte order mark) if one is present and *encoding* isn't specified.
 
 Paths
 -----
@@ -81,8 +82,37 @@ json get {
 
 Returns "second"
 
+Properly Interpreting JSON from Other Systems
+---------------------------------------------
+
+Rl_json operates on characters, not bytes, and so considerations of encoding
+are strictly out of scope.  However, interoperating with other systems
+properly in a way that conforms to the standards is a bit tricky, and requires
+support for encodings Tcl currently doesn't natively support, like utf-32be.
+To ease this burden and take care of things like replacing broken encoding
+sequences, the [json decode] subcommand is provided.  Using it in an application
+would look something like:
+
+~~~tcl
+proc readjson file {
+	set h [open $file rb]		;# Note that the file is opened in binary mode
+	try {
+		json decode [read $h]
+	} finally {
+		close $h
+	}
+}
+~~~
+
+If the encoding is known via some out-of-band channel (like headers in an
+HTTP response), it can be supplied to override the BOM-based detection.
+The supported encodings are those listed in the JSON standards: utf-8 (the
+default), utf-16le, utf-16be, utf-32le and utf-32be.
+
 Examples
 --------
+
+## Creating a document from a template
 
 Produce a JSON value from a template:
 ~~~tcl
@@ -104,6 +134,91 @@ json template {
 Result:
 ~~~json
 {"thing1":"hello","thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],"subdoc1":{"thing3":"~S:val1"},"subdoc2":{"thing3":"hello"}}
+~~~
+
+## Construct a JSON array from a SQL result set
+
+~~~tcl
+# Given:
+# sqlite> select * from languages;
+# 'Tcl',1,'http://core.tcl-lang.org/'
+# 'Node.js',1,'https://nodejs.org/'
+# 'Python',1,'https://www.python.org/'
+# 'INTERCAL',0,'http://www.catb.org/~esr/intercal/'
+# 'Unlambda',0,NULL
+
+set langs {[]}
+sqlite3 db languages.sqlite3
+db eval {
+    select
+        rowid,
+        name,
+        active,
+        url
+    from
+        languages
+} {
+    if {$url eq ""} {unset url}
+
+    json set langs end+1 [json template {
+        {
+            "id":       "~N:rowid",
+            "name":     "~S:name",
+            "details": {
+                "active":   "~B:active",  // Template values can be nested anywhere
+                "url":      "~S:url"      /* Both types of comments are
+                                             allowed but stripped at parse-time */
+            }
+        }
+    }]
+}
+
+puts [json pretty $langs]
+~~~
+Result:
+~~~json
+[
+    {
+        "id":      1,
+        "name":    "Tcl",
+        "details": {
+            "active": true,
+            "url":    "http://core.tcl-lang.org/"
+        }
+    },
+    {
+        "id":      2,
+        "name":    "Node.js",
+        "details": {
+            "active": true,
+            "url":    "https://nodejs.org/"
+        }
+    },
+    {
+        "id":      3,
+        "name":    "Python",
+        "details": {
+            "active": true,
+            "url":    "https://www.python.org/"
+        }
+    },
+    {
+        "id":      4,
+        "name":    "INTERCAL",
+        "details": {
+            "active": false,
+            "url":    "http://www.catb.org/~esr/intercal/"
+        }
+    },
+    {
+        "id":      5,
+        "name":    "Unlambda",
+        "details": {
+            "active": false,
+            "url":    null
+        }
+    }
+]
 ~~~
 
 ## Performance
