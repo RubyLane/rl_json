@@ -35,10 +35,12 @@ enum modifiers {
 	MODIFIER_KEYS		// for objects: return the keys defined as Tcl_Obj
 };
 
-int JSON_SetIntRep(Tcl_Interp* interp, Tcl_Obj* target, int type, Tcl_Obj* replacement);
-
+void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
 int serialize(Tcl_Interp* interp, struct serialize_context* scx, Tcl_Obj* obj);
-
 int init_types(Tcl_Interp* interp);
+Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, int length);
+
+extern Tcl_ObjType* g_objtype_for_type[];
+extern const char* type_names_int[];
 
 #endif

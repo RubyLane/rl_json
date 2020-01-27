@@ -1,0 +1,48 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+test array-1.1 {Create an array from type-value pairs} -setup { #<<<
+	set typevalues [lmap v {a 1 c 2 e 3 g} {
+		if {[string is digit $v]} {
+			list number $v
+		} else {
+			list string $v
+		}
+	}];
+} -body {
+	json new array {*}$typevalues
+} -cleanup {
+	unset -nocomplain typevalues
+} -result {["a",1,"c",2,"e",3,"g"]}
+#>>>
+test array-1.2 {Create an array from JSON values} -setup { #<<<
+	set values [lmap v {a 1 c 2 e 3 g} {
+		if {[string is digit $v]} {
+			json new number $v
+		} else {
+			json new string $v
+		}
+	}];
+} -body {
+	json new array {*}[lmap v $values {
+		list json $v
+	}];
+} -cleanup {
+	unset -nocomplain values v
+} -result {["a",1,"c",2,"e",3,"g"]}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

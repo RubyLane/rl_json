@@ -37,6 +37,30 @@ test string-1.8 {Create a json string, undef} -body { #<<<
 	json string "~X:foo"
 } -result {"~X:foo"}
 #>>>
+test string-1.9.1 {Create a json string, template string, with unicode} -body { #<<<
+	json string "~S:foo\x00bar"
+} -result {"~S:foo\u0000bar"}
+#>>>
+test string-1.9.2 {Create a json string, template number, with unicode} -body { #<<<
+	json string "~N:foo\x00bar"
+} -result {"~N:foo\u0000bar"}
+#>>>
+test string-1.9.3 {Create a json string, template boolean, with unicode} -body { #<<<
+	json string "~B:foo\x00bar"
+} -result {"~B:foo\u0000bar"}
+#>>>
+test string-1.9.4 {Create a json string, template json, with unicode} -body { #<<<
+	json string "~J:foo\x00bar"
+} -result {"~J:foo\u0000bar"}
+#>>>
+test string-1.9.5 {Create a json string, template template, with unicode} -body { #<<<
+	json string "~T:foo\x00bar"
+} -result {"~T:foo\u0000bar"}
+#>>>
+test string-1.9.6 {Create a json string, template string, with unicode} -body { #<<<
+	json string "~L:~S:foo\x00bar"
+} -result {"~L:~S:foo\u0000bar"}
+#>>>
 test string-2.1 {Too few args} -body { #<<<
 	set code [catch {
 		json string

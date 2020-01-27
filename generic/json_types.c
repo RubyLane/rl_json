@@ -1,44 +1,227 @@
 #include "rl_json.h"
 #include "rl_jsonInt.h"
 
-static void free_internal_rep(Tcl_Obj* obj);
-static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest);
-static void update_string_rep(Tcl_Obj* obj);
-static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj);
+static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype);
+static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype);
+static void update_string_rep(Tcl_Obj* obj, Tcl_ObjType* objtype);
+static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype, enum json_types* type);
 
-Tcl_ObjType json_type = {
-	"JSON",
-	free_internal_rep,
-	dup_internal_rep,
-	update_string_rep,
-	set_from_any
+extern Tcl_ObjType json_object;
+extern Tcl_ObjType json_array;
+extern Tcl_ObjType json_string;
+extern Tcl_ObjType json_number;
+extern Tcl_ObjType json_bool;
+extern Tcl_ObjType json_null;
+extern Tcl_ObjType json_dyn_string;
+extern Tcl_ObjType json_dyn_number;
+extern Tcl_ObjType json_dyn_bool;
+extern Tcl_ObjType json_dyn_json;
+extern Tcl_ObjType json_dyn_template;
+extern Tcl_ObjType json_dyn_literal;
+
+static void free_internal_rep_object(Tcl_Obj* obj)                { free_internal_rep(obj, &json_object);      }
+static void dup_internal_rep_object(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_object); }
+static void update_string_rep_object(Tcl_Obj* obj)                { update_string_rep(obj, &json_object);      }
+
+static void free_internal_rep_array(Tcl_Obj* obj)                { free_internal_rep(obj, &json_array);      }
+static void dup_internal_rep_array(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_array); }
+static void update_string_rep_array(Tcl_Obj* obj)                { update_string_rep(obj, &json_array);      }
+
+static void free_internal_rep_string(Tcl_Obj* obj)                { free_internal_rep(obj, &json_string);      }
+static void dup_internal_rep_string(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_string); }
+static void update_string_rep_string(Tcl_Obj* obj);
+
+static void free_internal_rep_number(Tcl_Obj* obj)                { free_internal_rep(obj, &json_number);      }
+static void dup_internal_rep_number(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_number); }
+static void update_string_rep_number(Tcl_Obj* obj);
+
+static void free_internal_rep_bool(Tcl_Obj* obj)                { free_internal_rep(obj, &json_bool);      }
+static void dup_internal_rep_bool(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_bool); }
+static void update_string_rep_bool(Tcl_Obj* obj);
+
+static void free_internal_rep_null(Tcl_Obj* obj)                { free_internal_rep(obj, &json_null);      }
+static void dup_internal_rep_null(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_null); }
+static void update_string_rep_null(Tcl_Obj* obj);
+
+static void free_internal_rep_dyn_string(Tcl_Obj* obj)                { free_internal_rep(obj, &json_dyn_string);      }
+static void dup_internal_rep_dyn_string(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_dyn_string); }
+static void update_string_rep_dyn_string(Tcl_Obj* obj)                { update_string_rep(obj, &json_dyn_string);      }
+
+static void free_internal_rep_dyn_number(Tcl_Obj* obj)                { free_internal_rep(obj, &json_dyn_number);      }
+static void dup_internal_rep_dyn_number(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_dyn_number); }
+static void update_string_rep_dyn_number(Tcl_Obj* obj)                { update_string_rep(obj, &json_dyn_number);      }
+
+static void free_internal_rep_dyn_bool(Tcl_Obj* obj)                { free_internal_rep(obj, &json_dyn_bool);      }
+static void dup_internal_rep_dyn_bool(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_dyn_bool); }
+static void update_string_rep_dyn_bool(Tcl_Obj* obj)                { update_string_rep(obj, &json_dyn_bool);      }
+
+static void free_internal_rep_dyn_json(Tcl_Obj* obj)                { free_internal_rep(obj, &json_dyn_json);      }
+static void dup_internal_rep_dyn_json(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_dyn_json); }
+static void update_string_rep_dyn_json(Tcl_Obj* obj)                { update_string_rep(obj, &json_dyn_json);      }
+
+static void free_internal_rep_dyn_template(Tcl_Obj* obj)                { free_internal_rep(obj, &json_dyn_template);      }
+static void dup_internal_rep_dyn_template(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_dyn_template); }
+static void update_string_rep_dyn_template(Tcl_Obj* obj)                { update_string_rep(obj, &json_dyn_template);      }
+
+static void free_internal_rep_dyn_literal(Tcl_Obj* obj)                { free_internal_rep(obj, &json_dyn_literal);      }
+static void dup_internal_rep_dyn_literal(Tcl_Obj* src, Tcl_Obj* dest)  { dup_internal_rep(src, dest, &json_dyn_literal); }
+static void update_string_rep_dyn_literal(Tcl_Obj* obj);
+
+Tcl_ObjType json_object = {
+	"JSON_object",
+	free_internal_rep_object,
+	dup_internal_rep_object,
+	update_string_rep_object,
+	NULL
+};
+Tcl_ObjType json_array = {
+	"JSON_array",
+	free_internal_rep_array,
+	dup_internal_rep_array,
+	update_string_rep_array,
+	NULL
+};
+Tcl_ObjType json_string = {
+	"JSON_string",
+	free_internal_rep_string,
+	dup_internal_rep_string,
+	update_string_rep_string,
+	NULL
+};
+Tcl_ObjType json_number = {
+	"JSON_number",
+	free_internal_rep_number,
+	dup_internal_rep_number,
+	update_string_rep_number,
+	NULL
+};
+Tcl_ObjType json_bool = {
+	"JSON_bool",
+	free_internal_rep_bool,
+	dup_internal_rep_bool,
+	update_string_rep_bool,
+	NULL
+};
+Tcl_ObjType json_null = {
+	"JSON_null",
+	free_internal_rep_null,
+	dup_internal_rep_null,
+	update_string_rep_null,
+	NULL
+};
+Tcl_ObjType json_dyn_string = {
+	"JSON_dyn_string",
+	free_internal_rep_dyn_string,
+	dup_internal_rep_dyn_string,
+	update_string_rep_dyn_string,
+	NULL
+};
+Tcl_ObjType json_dyn_number = {
+	"JSON_dyn_number",
+	free_internal_rep_dyn_number,
+	dup_internal_rep_dyn_number,
+	update_string_rep_dyn_number,
+	NULL
+};
+Tcl_ObjType json_dyn_bool = {
+	"JSON_dyn_bool",
+	free_internal_rep_dyn_bool,
+	dup_internal_rep_dyn_bool,
+	update_string_rep_dyn_bool,
+	NULL
+};
+Tcl_ObjType json_dyn_json = {
+	"JSON_dyn_json",
+	free_internal_rep_dyn_json,
+	dup_internal_rep_dyn_json,
+	update_string_rep_dyn_json,
+	NULL
+};
+Tcl_ObjType json_dyn_template = {
+	"JSON_dyn_template",
+	free_internal_rep_dyn_template,
+	dup_internal_rep_dyn_template,
+	update_string_rep_dyn_template,
+	NULL
+};
+Tcl_ObjType json_dyn_literal = {
+	"JSON_dyn_literal",
+	free_internal_rep_dyn_literal,
+	dup_internal_rep_dyn_literal,
+	update_string_rep_dyn_literal,
+	NULL
 };
 
-int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, int* type, Tcl_Obj** val) //{{{
-{
-	if (obj->typePtr != &json_type)
-		TEST_OK(set_from_any(interp, obj));
+Tcl_ObjType* g_objtype_for_type[JSON_TYPE_MAX];
 
-	*type = obj->internalRep.ptrAndLongRep.value;		// TODO: fix intrep access
-	*val = obj->internalRep.ptrAndLongRep.ptr;
+
+int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
+{
+	enum json_types		t;
+	Tcl_ObjIntRep*		_ir = NULL;
+
+	for (t=JSON_OBJECT; t<JSON_TYPE_MAX && _ir==NULL; t++)
+		_ir = Tcl_FetchIntRep(obj, g_objtype_for_type[t]);
+	t--;
+
+	if (_ir == NULL)
+		return 0;
+
+	*ir = _ir;
+	*type = t;
+	return 1;
+}
+
+//}}}
+int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
+{
+	enum json_types		t;
+	Tcl_ObjIntRep*		_ir = NULL;
+	Tcl_ObjType*		objtype = NULL;
+
+	if (!JSON_IsJSON(obj, &t, &_ir)) {
+		TEST_OK(set_from_any(interp, obj, &objtype, &t));
+		_ir = Tcl_FetchIntRep(obj, objtype);
+		if (_ir == NULL) Tcl_Panic("Could not retrieve the intrep we just created");
+	}
+
+	*type = t;
+	*ir = _ir;
 
 	return TCL_OK;
 }
 
 //}}}
-int JSON_SetIntRep(Tcl_Interp* interp, Tcl_Obj* target, int type, Tcl_Obj* replacement) //{{{
+int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_Obj** val) //{{{
 {
+	Tcl_ObjIntRep*		ir = NULL;
+
+	TEST_OK(JSON_GetIntrepFromObj(interp, obj, type, &ir));
+
+	*val = ir->twoPtrValue.ptr1;
+
+	return TCL_OK;
+}
+
+//}}}
+int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) //{{{
+{
+	Tcl_ObjIntRep		intrep;
+	Tcl_ObjType*		objtype = NULL;
+
 	if (Tcl_IsShared(target))
-		THROW_ERROR("Called JSON_SetIntRep on a shared object: ", Tcl_GetString(target));
+		Tcl_Panic("Called JSON_SetIntRep on a shared object");
 
-	target->internalRep.ptrAndLongRep.value = type;		// TODO: fix intrep access
+	objtype = g_objtype_for_type[type];
 
-	if (target->internalRep.ptrAndLongRep.ptr != NULL)
-		Tcl_DecrRefCount((Tcl_Obj*)target->internalRep.ptrAndLongRep.ptr);
+	Tcl_FreeIntRep(target);
 
-	target->internalRep.ptrAndLongRep.ptr = replacement;
-	if (target->internalRep.ptrAndLongRep.ptr != NULL)
-		Tcl_IncrRefCount((Tcl_Obj*)target->internalRep.ptrAndLongRep.ptr);
+	intrep.twoPtrValue.ptr1 = replacement;		// ptr1 is the Tcl_Obj holding the Tcl structure for this value
+	if (replacement) Tcl_IncrRefCount((Tcl_Obj*)intrep.twoPtrValue.ptr1);
+
+	intrep.twoPtrValue.ptr2 = NULL;				// ptr2 holds the template actions, if any have been generated for this value
+
+	Tcl_StoreIntRep(target, objtype, &intrep);
 
 	Tcl_InvalidateStringRep(target);
 
@@ -46,13 +229,11 @@ int JSON_SetIntRep(Tcl_Interp* interp, Tcl_Obj* target, int type, Tcl_Obj* repla
 }
 
 //}}}
-Tcl_Obj* JSON_NewJvalObj(int type, Tcl_Obj* val) //{{{
+Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val) //{{{
 {
 	Tcl_Obj*	res = Tcl_NewObj();
 
-	res->typePtr = &json_type;
-	res->internalRep.ptrAndLongRep.ptr = NULL;			// TODO: fix intrep access
-
+	/*
 	switch (type) {
 		case JSON_OBJECT:
 		case JSON_ARRAY:
@@ -72,8 +253,9 @@ Tcl_Obj* JSON_NewJvalObj(int type, Tcl_Obj* val) //{{{
 		default:
 			Tcl_Panic("JSON_NewJvalObj, unhandled type: %d", type);
 	}
+	*/
 
-	if (JSON_SetIntRep(NULL, res, type, val) != TCL_OK)
+	if (JSON_SetIntRep(res, type, val) != TCL_OK)
 		Tcl_Panic("Couldn't set JSON intrep");
 
 	return res;
@@ -81,46 +263,55 @@ Tcl_Obj* JSON_NewJvalObj(int type, Tcl_Obj* val) //{{{
 
 //}}}
 
-static void free_internal_rep(Tcl_Obj* obj) //{{{
+static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 {
-	Tcl_Obj*	jv = obj->internalRep.ptrAndLongRep.ptr;
+	Tcl_ObjIntRep*		ir = NULL;
 
-	if (jv == NULL) return;
-
-	Tcl_DecrRefCount(jv); jv = NULL;
+	ir = Tcl_FetchIntRep(obj, objtype);
+	if (ir != NULL) {
+		if (ir->twoPtrValue.ptr1) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr1); ir->twoPtrValue.ptr1 = NULL;}
+		if (ir->twoPtrValue.ptr2) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2 = NULL;}
+	}
 }
 
 //}}}
-static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest) //{{{
+static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) //{{{
 {
-	Tcl_Obj* src_intrep_obj = (Tcl_Obj*)src->internalRep.ptrAndLongRep.ptr;
+	Tcl_ObjIntRep*		srcir = NULL;
+	Tcl_ObjIntRep		destir;
 
-	dest->typePtr = src->typePtr;
+	srcir = Tcl_FetchIntRep(src, objtype);
+	if (srcir == NULL)
+		Tcl_Panic("dup_internal_rep asked to duplicate for type, but that type wasn't available on the src object");
 
-	if (src == src_intrep_obj) {
+	if (src == srcir->twoPtrValue.ptr1) {
 		int			len;
-		const char*	str = Tcl_GetStringFromObj(src_intrep_obj, &len);
+		const char*	str = Tcl_GetStringFromObj((Tcl_Obj*)srcir->twoPtrValue.ptr1, &len);
 		// Don't know how this happens yet, but it's bad news - we get into an endless recursion of duplicateobj calls until the stack blows up
 
 		// Panic and go via the string rep
-		Tcl_IncrRefCount((Tcl_Obj*)(dest->internalRep.ptrAndLongRep.ptr = Tcl_NewStringObj(str, len)));
+		destir.twoPtrValue.ptr1 = Tcl_NewStringObj(str, len);
+		Tcl_IncrRefCount((Tcl_Obj*)(destir.twoPtrValue.ptr1 = Tcl_NewStringObj(str, len)));
 	} else {
-		Tcl_IncrRefCount((Tcl_Obj*)(dest->internalRep.ptrAndLongRep.ptr = Tcl_DuplicateObj(src_intrep_obj)));
-		if (src_intrep_obj->typePtr && src_intrep_obj->internalRep.ptrAndLongRep.value == JSON_ARRAY) {
-			// List intreps are themselves shared - this horrible hack is to ensure that the intrep is unshared
-			//fprintf(stderr, "forcing dedup of list intrep\n");
-			Tcl_ListObjReplace(NULL, (Tcl_Obj*)dest->internalRep.ptrAndLongRep.ptr, 0, 0, 0, NULL);
-		}
+		destir.twoPtrValue.ptr1 = srcir->twoPtrValue.ptr1;
 	}
-	dest->internalRep.ptrAndLongRep.value = src->internalRep.ptrAndLongRep.value;
 
+	destir.twoPtrValue.ptr2 = srcir->twoPtrValue.ptr2;
+	if (destir.twoPtrValue.ptr1) Tcl_IncrRefCount((Tcl_Obj*)destir.twoPtrValue.ptr1);
+	if (destir.twoPtrValue.ptr2) Tcl_IncrRefCount((Tcl_Obj*)destir.twoPtrValue.ptr2);
+
+	Tcl_StoreIntRep(dest, objtype, &destir);
 }
 
 //}}}
-static void update_string_rep(Tcl_Obj* obj) //{{{
+static void update_string_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 {
+	Tcl_ObjIntRep*				ir = Tcl_FetchIntRep(obj, objtype);
 	struct serialize_context	scx;
 	Tcl_DString					ds;
+
+	if (ir == NULL)
+		Tcl_Panic("dup_internal_rep asked to duplicate for type, but that type wasn't available on the src object");
 
 	Tcl_DStringInit(&ds);
 
@@ -141,7 +332,92 @@ static void update_string_rep(Tcl_Obj* obj) //{{{
 }
 
 //}}}
-static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
+static void update_string_rep_string(Tcl_Obj* obj) //{{{
+{
+	update_string_rep(obj, &json_string);
+	/*
+	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_string);
+	const char*		str;
+	int				len;
+
+	str = Tcl_GetStringFromObj((Tcl_Obj*)ir->twoPtrValue.ptr1, &len);
+	obj->bytes = ckalloc(len+3);
+	obj->bytes[0] = '"';
+	memcpy(obj->bytes+1, str, len);
+	obj->bytes[len+1] = '"';
+	obj->bytes[len+2] = 0;
+	obj->length = len+2;
+	*/
+}
+
+//}}}
+static void update_string_rep_number(Tcl_Obj* obj) //{{{
+{
+	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_number);
+	const char*		str;
+	int				len;
+
+	if (ir->twoPtrValue.ptr1 == obj)
+		Tcl_Panic("Turtles all the way down!");
+
+	str = Tcl_GetStringFromObj((Tcl_Obj*)ir->twoPtrValue.ptr1, &len);
+	obj->bytes = ckalloc(len+1);
+	memcpy(obj->bytes, str, len+1);
+	obj->length = len;
+}
+
+//}}}
+static void update_string_rep_bool(Tcl_Obj* obj) //{{{
+{
+	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_bool);
+	int				boolval;
+
+	if (Tcl_GetBooleanFromObj(NULL, (Tcl_Obj*)ir->twoPtrValue.ptr1, &boolval) != TCL_OK)
+		Tcl_Panic("json_bool's intrep tclobj is not a boolean");
+
+	if (boolval) {
+		obj->bytes = ckalloc(5);
+		memcpy(obj->bytes, "true", 5);
+		obj->length = 4;
+	} else {
+		obj->bytes = ckalloc(6);
+		memcpy(obj->bytes, "false", 6);
+		obj->length = 5;
+	}
+}
+
+//}}}
+static void update_string_rep_null(Tcl_Obj* obj) //{{{
+{
+	obj->bytes = ckalloc(5);
+	memcpy(obj->bytes, "null", 5);
+	obj->length = 4;
+}
+
+//}}}
+static void update_string_rep_dyn_literal(Tcl_Obj* obj) //{{{
+{
+	update_string_rep(obj, &json_dyn_literal);
+	/*
+	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_dyn_literal);
+	const char*		str;
+	int				len;
+
+	str = Tcl_GetStringFromObj((Tcl_Obj*)ir->twoPtrValue.ptr1, &len);
+	obj->bytes = ckalloc(len+6);
+	obj->bytes[0] = '"';
+	obj->bytes[1] = '~';
+	obj->bytes[2] = 'L';
+	obj->bytes[3] = ':';
+	memcpy(obj->bytes+4, str, len);
+	obj->bytes[len+4] = '"';
+	obj->bytes[len+5] = 0;
+	obj->length = len+5;
+	*/
+}
+
+//}}}
+static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype, enum json_types* out_type) //{{{
 {
 	struct interp_cx*	l;
 	const unsigned char*	err_at = NULL;
@@ -155,8 +431,30 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 	const unsigned char*	val_start;
 	int						len;
 	struct parse_context	cx[CX_STACK_SIZE];
+	Tcl_ObjIntRep			ir;
 
 	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+
+#if 1
+	// Snoop on the intrep for clues on optimized conversions {{{
+	{
+		if (
+			Tcl_FetchIntRep(obj, l->typeInt)    != NULL ||
+			Tcl_FetchIntRep(obj, l->typeDouble) != NULL /*||
+			Tcl_FetchIntRep(obj, l->typeBignum) != NULL  Something weird going on with bignum */
+		) {
+			Tcl_IncrRefCount((Tcl_Obj*)(ir.twoPtrValue.ptr1 = Tcl_DuplicateObj(obj)));	// Must dup because obj will soon be us, creating a circular ref
+			ir.twoPtrValue.ptr2 = NULL;
+
+			*out_type = JSON_NUMBER;
+			*objtype = g_objtype_for_type[JSON_NUMBER];
+
+			Tcl_StoreIntRep(obj, *objtype, &ir);
+			return TCL_OK;
+		}
+	}
+	// Snoop on the intrep for clues on optimized conversions }}}
+#endif
 
 	cx[0].prev = NULL;
 	cx[0].last = cx;
@@ -177,25 +475,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 		p[2] == 0xbf
 	) {
 		p += 3;
-	} /*else if (
-		len >= 2 &&
-		p[0] == 0xff &&
-		p[1] == 0xfe
-	) {
-		fprintf(stderr, "UTF-16LE in UTF-8 detected\n");
-		p += 2;
-		// Somehow this got to us as a UTF-16LE, inside UTF-8
-	} else if (
-		len >= 2 &&
-		p[0] == 0xfe &&
-		p[1] == 0xff
-	) {
-		fprintf(stderr, "UTF-16BE in UTF-8 detected\n");
-		p += 2;
-		// Somehow this got to us as a UTF-16BE, inside UTF-8
-	}
-	*/
-	
+	}	
 
 	// Skip leading whitespace and comments
 	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0) goto whitespace_err;
@@ -278,6 +558,8 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
 			case JSON_NULL:
 			case JSON_NUMBER:
 				append_to_cx(cx->last, JSON_NewJvalObj(type, val));
+				if (unlikely(cx->last->container != JSON_OBJECT && cx->last->container != JSON_ARRAY))
+					cx->last->container = type;	// Record our type (at the document top-level)
 				break;
 
 			default:
@@ -341,6 +623,9 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 			case JSON_ARRAY:
 				_parse_error(interp, "Unterminated array", doc, cx[0].last->char_ofs);
 				goto err;
+
+			default:	// Suppress compiler warning
+				break;
 		}
 	}
 	//}}}
@@ -351,21 +636,25 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		goto whitespace_err;
 	}
 
-	if (obj->typePtr != NULL && obj->typePtr->freeIntRepProc != NULL)
-		obj->typePtr->freeIntRepProc(obj);
+	//Tcl_FreeIntRep(obj);
 
-	obj->typePtr = &json_type;
-	obj->internalRep.ptrAndLongRep.value = cx[0].val->internalRep.ptrAndLongRep.value;
-	obj->internalRep.ptrAndLongRep.ptr   = cx[0].val->internalRep.ptrAndLongRep.ptr;
+	{
+		Tcl_ObjType*	top_objtype = g_objtype_for_type[cx[0].container];
+		Tcl_ObjIntRep*	top_ir = Tcl_FetchIntRep(cx[0].val, top_objtype);
 
-	// We're transferring the ref from cx[0].val to our intrep
-	if (obj->internalRep.ptrAndLongRep.ptr != NULL) {
-		// NULL signals a JSON null type
-		Tcl_IncrRefCount((Tcl_Obj*)obj->internalRep.ptrAndLongRep.ptr);
+		if (unlikely(top_ir == NULL))
+			Tcl_Panic("Can't get intrep for the top container");
+
+		// We're transferring the ref from cx[0].val to our intrep
+		ir.twoPtrValue.ptr1 = top_ir->twoPtrValue.ptr1;
+		ir.twoPtrValue.ptr2 = NULL;
+		if (ir.twoPtrValue.ptr1) Tcl_IncrRefCount((Tcl_Obj*)ir.twoPtrValue.ptr1);
+		RELEASE(cx[0].val);
+
+		Tcl_StoreIntRep(obj, top_objtype, &ir);
+		*objtype = top_objtype;
+		*out_type = cx[0].container;
 	}
-
-	Tcl_DecrRefCount(cx[0].val);
-	cx[0].val = NULL;
 
 	return TCL_OK;
 
@@ -381,7 +670,21 @@ err:
 
 int init_types(Tcl_Interp* interp) //{{{
 {
-	Tcl_RegisterObjType(&json_type);
+	// We don't define set_from_any callbacks for our types, so they must not be Tcl_RegisterObjType'ed
+
+	g_objtype_for_type[JSON_UNDEF]			= NULL;
+	g_objtype_for_type[JSON_OBJECT]			= &json_object;
+	g_objtype_for_type[JSON_ARRAY]			= &json_array;
+	g_objtype_for_type[JSON_STRING]			= &json_string;
+	g_objtype_for_type[JSON_NUMBER]			= &json_number;
+	g_objtype_for_type[JSON_BOOL]			= &json_bool;
+	g_objtype_for_type[JSON_NULL]			= &json_null;
+	g_objtype_for_type[JSON_DYN_STRING]		= &json_dyn_string;
+	g_objtype_for_type[JSON_DYN_NUMBER]		= &json_dyn_number;
+	g_objtype_for_type[JSON_DYN_BOOL]		= &json_dyn_bool;
+	g_objtype_for_type[JSON_DYN_JSON]		= &json_dyn_json;
+	g_objtype_for_type[JSON_DYN_TEMPLATE]	= &json_dyn_template;
+	g_objtype_for_type[JSON_DYN_LITERAL]	= &json_dyn_literal;
 
 	return TCL_OK;
 }

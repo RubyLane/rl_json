@@ -4,7 +4,7 @@
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.9.14 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.10.0 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
@@ -12,25 +12,26 @@
 json \- Parse and manipulate JSON documents 
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.9.14\fR? 
+\fBpackage require rl_json\fR ?\fB0.10.0\fR? 
 
-\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
-\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson get \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
+\fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
 \fBjson foreach \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
-\fBjson get \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
-\fBjson get_typed \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
 \fBjson lmap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
 \fBjson amap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
 \fBjson omap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
-\fBjson new \fItype value\fR
 \fBjson string \fIvalue\fR
 \fBjson number \fIvalue\fR
+\fBjson boolean \fIvalue\fR
+\fBjson object \fI?key value ?key value ...??\fR
+\fBjson array \fIelem ...\fR
 \fBjson bool \fIvalue\fR
 \fBjson normalize \fIjsonValue\fR
 \fBjson pretty \fIjsonValue\fR
-\fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
 \fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
-\fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
 \fBjson isnull \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson type \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson length \fIjsonValue\fR ?\fIkey ...\fR?
@@ -46,19 +47,12 @@ similar way to how the \fBdict\fR command directly manipulates values whose
 string representation is a valid dictionary.  It is similar to \fBdict\fR in
 performance.
 .TP
-\fBjson get \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson get \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Extract the value of a portion of the \fIjsonValue\fR, returns the closest
 native Tcl type (other than JSON) for the extracted portion. The \fIkey ...\fR
 arguments are a path, as described in \fBPATHS\fR below.
 '\" TODO: describe what happens with a null
-.TP
-\fBjson get_typed \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
-.
-Extract the value of a portion of the \fIjsonValue\fR, returning a two element
-list: the first element is the value that would be returned by \fBjson get\fR
-and the second element is the JSON type of the extracted portion.  The
-\fIkey ...\fR arguments are a path, as described in \fBPATHS\fR below.
 .TP
 \fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
 .
@@ -66,41 +60,80 @@ Extract the value of a portion of the \fIjsonValue\fR, returns the JSON
 fragment. The \fIkey ...\fR arguments are a path, as described in \fBPATHS\fR
 below.
 .TP
-\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR ?\fImodifier\fR??
+\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR?
 .
-Tests whether the supplied key path (see \fBPATHS\fR below) and modifier
-resolve to something that exists in \fIjsonValue\fR (i.e., that it can be
-used with \fBjson get\fR without error).  Returns false if the value named
-by the path \fIkey ...\fR is null.
+Tests whether the supplied key path (see \fBPATHS\fR below) resolves to
+something that exists in \fIjsonValue\fR (i.e., that it can be used with
+\fBjson get\fR without error) and is not null.  Returns false if the value
+named by the path \fIkey ...\fR is null.
 .TP
 \fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
 .
 Updates the JSON value stored in the variable \fIjsonVariableName\fR,
 replacing the value referenced by \fIkey ...\fR (a path as described in
-\fBPATHS\fR below) with the JSON value \fIvalue\fR.
+\fBPATHS\fR below) with the JSON value \fIvalue\fR.  If \fIvalue\fR is
+a valid JSON as given by the JSON grammar, it is added as that JSON type,
+otherwise it is converted to a JSON string.  Thus the following are equivalent
+(modulo efficiency):
+.PP
+.CS
+ json set doc foo [json string baz]
+ json set doc bar [json number 123]
+ json set doc baz [json boolean true]
+
+ #------------------------------------------
+ json set doc foo baz
+ json set doc bar 123
+ json set doc baz true
+.CE
+.PP
+Watch out for unintended behaviour if the value might look like a boolean or
+number but not meet the JSON grammar for those types, in which case the value
+is converted to a JSON string:
+.PP
+.CS
+ json set doc foo [json boolean yes]
+ # Key "foo" contains the JSON boolean value "true"
+
+ json set doc foo yes
+ # Key "foo" contains the JSON string value "yes"
+.CE
+.PP
+Constructing the values using [\fBjson \fItype\fR] forces the conversion to
+the specified JSON type, or throws an exception if that can't be done.
+Which is more efficent will depend on the situation:
+.PP
+.CS
+ set doc {[]}
+ for {set i 0} {$i < 100} {incr i} {
+ 	json set doc end+1 [json boolean true]	;# 1
+ 	json set doc end+1 true				;# 2
+ }
+ # 2 will be faster since "true" will be stored as a literal, and converted
+ # to a JSON boolean.  Each loop iteration will just append another reference
+ # to this static value to the array, whereas 1 will call [json boolean] each
+ # iteration.
+ 
+ set doc {[]}
+ for {set i 0} {$i < 100} {incr i} {
+ 	json set doc end+1 [json string false$i]	;# 1
+ 	json set doc end+1 false$i				;# 2
+ }
+ # 1 will be faster since [json string] knows what the type is and directly
+ # creates the new element as that type.  2 Needs to parse the string to
+ # determine the type.
+.CE
 .TP
 \fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
 .
 Updates the JSON value stored in the variable \fIjsonVariableName\fR, removing
 the value referenced by \fIkey ...\fR, a path as described in \fBPATHS\fR
 below.
-.TP
-\fBjson normalize \fIjsonValue\fR
-.
-Return a
-.QW normalized
-version of the input \fIjsonValue\fR, i.e., with all optional whitespace
-trimmed.
-.TP
 \fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
 .
 Return a JSON value by interpolating the values from \fIdictionary\fR into the
 template, or from variables in the current scope if \fIdictionary\fR is not
 supplied, in the manner described in the section \fBTEMPLATES\fR.
-.TP
-\fBjson new \fItype value\fR
-.
-Return a JSON fragment of type \fItype\fR and value \fIvalue\fR.
 .TP
 \fBjson string \fIvalue\fR
 .
@@ -114,6 +147,20 @@ Return a JSON number with the value \fIvalue\fR.
 .
 Return a JSON boolean with the value \fIvalue\fR.  Any of the forms accepted by
 Tcl_GetBooleanFromObj are accepted and normalized.
+.TP
+\fBjson object \fI?key value ?key value ...??\fR -or- \fBjson object \fIpacked_value\fR
+.
+Return a JSON object with the each of the keys and values given.  \fIvalue\fR is a list
+of two elements, the first being the type {string, number, boolean, null, object, array, json},
+and the second being the value.  The alternate syntax \fBjson object \fIpacked_value\fR
+takes the list of keys and values as a single arg instead of a list of args, but is
+otherwise the same.
+.TP
+\fBjson array \fI?elem ...?\fR
+.
+Return a JSON array containing each of the elements given.  \fIelem\fR is a list
+of two elements, the first being the type {string, number, boolean, null, object, array, json},
+and the second being the value.
 .TP
 \fBjson foreach \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
 .
@@ -170,6 +217,14 @@ value types aren't supported.
 .
 Return the keys in the of the named JSON object, found by following the path of \fIkey\fRs.
 .TP
+\fBjson normalize \fIjsonValue\fR
+.
+Return a
+.QW normalized
+version of the input \fIjsonValue\fR, i.e., with all optional whitespace
+trimmed.
+.TP
+.TP
 \fBjson pretty \fIjsonValue\fR
 .
 Returns a pretty-printed string representation of \fIjsonValue\fR.  Useful for
@@ -183,42 +238,6 @@ equivalent concept in the \fBdict\fR command, except that the paths used by
 \fBjson\fR allow indexing into JSON arrays by the integer key (or a string
 matching the regex
 .QW "^end(-[0-9]+)?$" ).
-.PP
-Some of the commands also accept an optional modifier at the end of the path,
-which is defined to be one of the following:
-.TP
-\fB?type\fR
-.
-Returns the type of the named fragment.
-.TP
-\fB?length\fR
-.
-When the path refers to an array, this returns the length of the array.  When
-the path refers to a string, this returns the number of characters in the
-string.  All other types throw an error.
-.TP
-\fB?size\fR
-.
-Valid only for objects, returns the number of keys defined in the object.
-.TP
-\fB?keys\fR
-.
-Valid only for objects, returns a list of the keys in the object.
-.PP
-A literal value that would match one of the above modifiers can be used as the
-last element in the path by doubling the \fB?\fR. For example:
-.PP
-.CS
- \fBjson get\fR {
-     {
-         "foo": {
-             "?size": "quite big"
-         }
-     }
- } foo ??size
-.CE
-.PP
-Returns "quite big"
 .SH TEMPLATES
 .PP
 The command \fBjson template\fR generates JSON documents by interpolating
@@ -308,7 +327,7 @@ Incrementally append an element to an array (similar to \fBdict lappend\fR):
 .CS
  set doc {{"foo":[]}}
  for {set i 0} {$i < 4} {incr i} {
-     json set doc foo end+1 [json new string "elem: $i"]
+     json set doc foo end+1 [json string "elem: $i"]
  }
  # $doc is {"foo":["elem 0","elem 1","elem 2","elem 3"]}
 .CE
@@ -318,7 +337,7 @@ Similar to the above, but prepend the elements instead:
 .CS
  set doc {{"foo":[]}}
  for {set i 0} {$i < 4} {incr i} {
-     json set doc foo -1 [json new string "elem: $i"]
+     json set doc foo -1 [json string "elem: $i"]
  }
  # $doc is {"foo":["elem 3","elem 2","elem 1","elem 0"]}
 .CE

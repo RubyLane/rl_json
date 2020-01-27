@@ -315,6 +315,12 @@ proc run_benchmarks {dir args} { #<<<
 		} [namespace current] \
 	]
 
+	# Automatically save and compare with the previous run
+	set args [list {*}{
+		-relative last last
+		-save last
+	} {*}$args]
+
 	set i	0
 	while {$i < [llength $args]} {
 		lassign [apply $consume_args 1] next
@@ -326,7 +332,9 @@ proc run_benchmarks {dir args} { #<<<
 
 			-relative {
 				lassign [apply $consume_args 2] label rel_fn
-				dict set relative $label [_readfile $rel_fn]
+				if {[file readable $rel_fn]} {
+					dict set relative $label [_readfile $rel_fn]
+				}
 			}
 
 			-save {

@@ -1,4 +1,5 @@
 #include "rl_json.h"
+#include "rl_jsonInt.h"
 
 void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
 {
@@ -11,7 +12,7 @@ void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* d
 }
 
 //}}}
-struct parse_context* push_parse_context(struct parse_context* cx, const int container, const size_t char_ofs) //{{{
+struct parse_context* push_parse_context(struct parse_context* cx, const enum json_types container, const size_t char_ofs) //{{{
 {
 	struct parse_context*	last = cx->last;
 	struct parse_context*	new;
@@ -28,12 +29,15 @@ struct parse_context* push_parse_context(struct parse_context* cx, const int con
 
 	new->prev = last;
 	Tcl_IncrRefCount(
-		new->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?  Tcl_NewDictObj()  :  Tcl_NewListObj(0, NULL))
+		new->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?
+		   	Tcl_NewDictObj()  :
+		   	Tcl_NewListObj(0, NULL))
 	);
 	new->hold_key = NULL;
 	new->char_ofs = char_ofs;
 	new->container = container;
 	new->closed = 0;
+	new->objtype = g_objtype_for_type[container];
 
 	cx->last = new;
 

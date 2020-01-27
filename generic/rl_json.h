@@ -11,7 +11,6 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "parser.h"
 #include <tclTomMath.h>
 
 #define STRING_DEDUP_MAX	16
@@ -24,8 +23,25 @@
 #	define unlikely(exp) (exp)
 #endif
 
-extern Tcl_ObjType json_type;
-extern const char* type_names_dbg[];
+enum json_types {		// Order must be preserved
+	JSON_UNDEF,
+	JSON_OBJECT,
+	JSON_ARRAY,
+	JSON_STRING,
+	JSON_NUMBER,
+	JSON_BOOL,
+	JSON_NULL,
+
+	/* Dynamic types - placeholders for dynamic values in templates */
+	JSON_DYN_STRING,	// ~S:
+	JSON_DYN_NUMBER,	// ~N:
+	JSON_DYN_BOOL,		// ~B:
+	JSON_DYN_JSON,		// ~J:
+	JSON_DYN_TEMPLATE,	// ~T:
+	JSON_DYN_LITERAL,	// ~L:	literal escape - used to quote literal values that start with the above sequences
+
+	JSON_TYPE_MAX		// Not an actual type - records the number of types
+};
 
 enum collecting_mode {
 	COLLECT_NONE,
@@ -38,11 +54,12 @@ struct parse_context {
 	struct parse_context*	last;		// Only valid for the first entry
 	struct parse_context*	prev;
 
-	Tcl_Obj*	val;
-	Tcl_Obj*	hold_key;
-	size_t		char_ofs;
-	int			container;
-	int			closed;
+	Tcl_Obj*		val;
+	Tcl_Obj*		hold_key;
+	size_t			char_ofs;
+	enum json_types	container;
+	int				closed;
+	Tcl_ObjType*	objtype;
 };
 
 struct foreach_iterator {
@@ -71,11 +88,6 @@ struct foreach_state {
 	int							collecting;
 };
 
-void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
-
-Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, int length);
-
-
 // Taken from tclInt.h:
 #if !defined(INT2PTR) && !defined(PTR2INT)
 #   if defined(HAVE_INTPTR_T) || defined(intptr_t)
@@ -97,5 +109,6 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, int length)
 #endif
 
 #include "rl_jsonDecls.h"
+#include "parser.h"
 
 #endif

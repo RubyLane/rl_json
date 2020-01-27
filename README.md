@@ -30,20 +30,19 @@ exist, a JSON null is interpolated in its place.
 
 Quick Reference
 ---------------
-* [json get *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns the closest native Tcl type (other than JSON) for the extracted portion.
-* [json parse *json_val*]  - A deprecated synonym for [json get *json_val*].
-* [json get_typed *json_val* ?*key* ... ?*modifier*??]  - Extract the value of a portion of the *json_val*, returns a two element list: the first being the value that would be returned by [json get] and the second being the JSON type of the extracted portion.
+* [json get *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the closest native Tcl type (other than JSON) for the extracted portion.
 * [json extract *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the JSON fragment.
-* [json exists *json_val* ?*key* ... ?*modifier*??]  - Tests whether the supplied key path and modifier resolve to something that exists in *json_val*
+* [json exists *json_val* ?*key* ...?]  - Tests whether the supplied key path resolve to something that exists in *json_val*
 * [json set *json_variable_name* ?*key* ...? *value*]  - Updates the JSON value stored in the variable *json_variable_name*, replacing the value referenced by *key* ... with the JSON value *value*.
 * [json unset *json_variable_name* ?*key* ...?]  - Updates the JSON value stored in the variable *json_variable_name*, removing the value referenced by *key* ...
 * [json normalize *json_val*]  - Return a "normalized" version of the input *json_val* - all optional whitespace trimmed.
 * [json template *json_val* ?*dictionary*?]  - Return a JSON value by interpolating the values from *dictionary* into the template, or from variables in the current scope if *dictionary* is not supplied, in the manner described above.
-* [json new *type* *value*]  - Return a JSON fragment of type *type* and value *value*.
-* [json fmt *type* *value*]  - A deprecated synonym for [json new *type* *value*].
 * [json string *value*]  - Return a JSON string with the value *value*.
 * [json number *value*]  - Return a JSON number with the value *value*.
 * [json boolean *value*]  - Return a JSON boolean with the value *value*.  Any of the forms accepted by Tcl_GetBooleanFromObj are accepted and normalized.
+* [json object ?*key* *value* ?*key* *value* ...??]  - Return a JSON object with the keys and values specified.  *value* is a list of two elements, the first being the type {string, number, boolean, null, object, array, json}, and the second being the value.
+* [json object *packed_value*]  - An alternate syntax that takes the list of keys and values as a single arg instead of a list of args, but is otherwise the same.
+* [json array ?*elem* ...?]  - Return a JSON array containing each of the elements given.  *elem* is a list of two elements, the first being the type {string, number, boolean, null, object, array, json}, and the second being the value.
 * [json foreach *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - Evaluate *script* in a loop in a similar way to the [foreach] command.  In each iteration, the values stored in the iterator variables in *varlist* are the JSON fragments from *json_val*.  Supports iterating over JSON arrays and JSON objects.  In the JSON object case, *varlist* must be a two element list, with the first specifiying the variable to hold the key and the second the value.  In the JSON array case, the rules are the same as the [foreach] command.
 * [json lmap *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - As for [json foreach], except that it is collecting - the result from each evaluation of *script* is added to a list and returned as the result of the [json lmap] command.  If the *script* results in a TCL_CONTINUE code, that iteration is skipped and no element is added to the result list.  If it results in TCL_BREAK the iterations are stopped and the results accumulated so far are returned.
 * [json amap *varlist1* *json_val1* ?*varlist2* *json_val2* ...? *script*]  - As for [json lmap], but the result is a JSON array rather than a list.  If the result of each iteration is a JSON value it is added to the array as-is, otherwise it is converted to a JSON string.
@@ -57,30 +56,30 @@ Quick Reference
 Paths
 -----
 
-The commands [json get], [json get_typed], [json extract] and [json exists]
+The commands [json get], [json extract], [json set], [json unset] and [json exists]
 accept a path specification that names some subset of the supplied *json_val*.
 The rules are similar to the equivalent concept in the [dict] command, except
 that the paths used by [json] allow indexing into JSON arrays by the integer
-key (or a string matching the regex "^end(-[0-9]+)?$"), and that the last
-element can be a modifier:
-* **?type** - Returns the type of the named fragment.
-* **?length** - When the path refers to an array, this returns the length of the array.  When the path refers to a string, this returns the number of characters in the string.  All other types throw an error.
-* **?size** - Valid only for objects, returns the number of keys defined in the object.
-* **?keys** - Valid only for objects, returns a list of the keys in the object.
-
-A literal value that would match one of the above modifiers can be used as the last element in the path by doubling the ?:
+key (or a string matching the regex "^end(-[0-9]+)?$").  If a path to [json set]
+includes a key within an object that doesn't exist, it and all later elements of
+the path are created as nested keys into (new) objects.  If a path element into
+an array is outside the current bounds of the array, it resolves to a JSON null
+(for [json get], [json extract], [json exists]), or appends or prepends null
+elements to resolve the path (for [json set], or does nothing ([json unset]).
 
 ~~~tcl
 json get {
     {
-        "foo": {
-            "?size": "quite big"
+        "foo": [
+			{ "name": "first" },
+			{ "name": "second" },
+			{ "name": "third" }
         }
     }
-} foo ??size
+} foo end-1 name
 ~~~
 
-Returns "quite big"
+Returns "second"
 
 Examples
 --------
@@ -212,6 +211,31 @@ bench/new.bench for the details.
    template_dict |    2.500
     yajltcl_dict |    7.530
 ```
+
+Deprecations
+------------
+
+Version 0.10.0 deprecates various subcommands and features, which will be removed in a near future version:
+
+* [json get_type *json_val* ?*key* ...?]  - Removed
+    * lassign [json get_type *json_val* ?*key* ...?] val type  ->  set val [json get *json_val* ?*key* ...?]; set type [json type *json_val* ?*key* ...?]
+* [json parse *json_val*]  - A deprecated synonym for [json get *json_val*].
+* [json fmt *type* *value*]  - A deprecated synonym for [json new *type* *value*], which is itself deprecated, see below.
+* [json new *type* *value*]  - Use direct subcommands of [json]:
+    * [json new string *value*] -> [json string *value*]
+    * [json new number *value*] -> [json number *value*]
+    * [json new boolean *value*] -> [json boolean *value*]
+    * [json new true] -> true
+    * [json new false] -> false
+    * [json new null] -> null
+    * [json new json *value*] -> *value*
+    * [json new object ...] -> [json object ...]   (but consider [json template])
+    * [json new array ...] -> [json array ...]   (but consider [json template])
+* modifiers at the end of a path  - Modifiers like [json get *json_val* foo ?type] are deprecated.  Replacements are:
+    * ?type  - use [json type *json_val* ?*key* ...?]
+    * ?length - use [json length *json_val* ?*key* ...?]
+    * ?size - use [json length *json_val* ?*key* ...?]
+    * ?keys - use [json keys *json_val* ?*key* ...?]
 
 Under the Hood
 --------------

@@ -56,6 +56,27 @@ test pretty-2.2 {too many args} -body { #<<<
 } -returnCodes error -result {Wrong # of arguments.  Must be "pretty json_val ?indent?"}
 #>>>
 
+test debug-1.1 {Basic debug pretty-print} -body { #<<<
+	json debug {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
+} -match regexp -result {^\(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\){
+    "foo":          \(0x[0-9a-fA-F]+\[[0-9]\]+/NULL\)null,
+    "empty":        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\){},
+    "emptyarr":     \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)\[\],
+    "hello, world": \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)"bar",
+    "This is a much longer key": \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)\[
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)"str",
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)123,
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)123.4,
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)true,
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)false,
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/NULL\)null,
+        \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\){
+            "inner": \(0x[0-9a-fA-F]+\[[0-9]\]+/0x[0-9a-fA-F]+\[[0-9]\]+ [a-z ]+\)"obj"
+        }
+    \]
+}$}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

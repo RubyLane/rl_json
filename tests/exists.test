@@ -112,6 +112,26 @@ test exists-7.7 {exists for invalid value - truncated null} -body { #<<<
 	json exists {nul} foo
 } -result 0
 #>>>
+test exists-8.1 {exists on an atomic value - string} -body { #<<<
+	json exists {"foo"}
+} -result 1
+#>>>
+test exists-8.2 {exists on an atomic value - number} -body { #<<<
+	json exists 123
+} -result 1
+#>>>
+test exists-8.3 {exists on an atomic value - bool: true} -body { #<<<
+	json exists true
+} -result 1
+#>>>
+test exists-8.4 {exists on an atomic value - bool: false} -body { #<<<
+	json exists false
+} -result 1
+#>>>
+test exists-8.5 {exists on an atomic value - null} -body { #<<<
+	json exists null
+} -result 0
+#>>>
 
 # Modifiers - ?type
 test exists-20.1 {type modifier, string} -body { #<<<

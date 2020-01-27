@@ -1,0 +1,27 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+test object-1.1 {Create an object - args} -body { #<<<
+	json object a {number 1} c {num 2} e {num 3} g {num 4}
+} -result {{"a":1,"c":2,"e":3,"g":4}}
+#>>>
+test object-1.2 {Create an object - single arg} -body { #<<<
+	json object {a {number 1} c {num 2} e {num 3} g {num 4}}
+} -result {{"a":1,"c":2,"e":3,"g":4}}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
+

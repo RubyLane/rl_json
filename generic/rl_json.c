@@ -61,8 +61,7 @@ static const char* type_names[] = {
 	"string",		// JSON_DYN_TEMPLATE
 	"string"		// JSON_DYN_LITERAL
 };
-// These are just for debugging
-const char* type_names_dbg[] = {
+const char* type_names_int[] = {
 	"JSON_UNDEF",
 	"JSON_OBJECT",
 	"JSON_ARRAY",
@@ -273,14 +272,13 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 
 static Tcl_Obj* as_json(Tcl_Interp* interp, Tcl_Obj* from) //{{{
 {
-	int			type;
-	Tcl_Obj*	val = NULL;
+	Tcl_ObjIntRep*	ir = NULL;
+	enum json_types	type;
 
-	if (JSON_GetJvalFromObj(interp, from, &type, &val) == TCL_OK) {
+	if (JSON_GetIntrepFromObj(interp, from, &type, &ir) == TCL_OK) {
 		// Already a JSON value, use it directly
 		return from;
 	} else {
-		Tcl_ResetResult(interp);
 		// Anything else, use it as a JSON string
 		return JSON_NewJvalObj(JSON_STRING, from);		// EIAS, so we can use whatever $from is as the intrep for a JSON_STRING value
 	}
@@ -303,8 +301,8 @@ display *obj
 		if (
 			obj->typePtr && (
 				Tcl_FetchIntRep(obj, l->typeInt) != NULL ||
-				Tcl_FetchIntRep(obj, l->typeDouble) != NULL ||
-				Tcl_FetchIntRep(obj, l->typeBignum) != NULL
+				Tcl_FetchIntRep(obj, l->typeDouble) != NULL /*||
+				Tcl_FetchIntRep(obj, l->typeBignum) != NULL  Something weird going on with bignum */
 		   )
 		) {
 			// It's a known number type, we can safely use it directly
@@ -454,7 +452,7 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 				Tcl_DictSearch	search;
 				Tcl_Obj*		k;
 				Tcl_Obj*		v;
-				int				v_type = 0;
+				enum json_types	v_type = JSON_UNDEF;
 				Tcl_Obj*		iv = NULL;
 
 				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
@@ -529,10 +527,10 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 			//}}}
 		case JSON_ARRAY: //{{{
 			{
-				int			i, oc, first=1;
-				Tcl_Obj**	ov;
-				Tcl_Obj*	iv = NULL;
-				int			v_type = 0;
+				int				i, oc, first=1;
+				Tcl_Obj**		ov;
+				Tcl_Obj*		iv = NULL;
+				enum json_types	v_type = JSON_UNDEF;
 
 				TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
 
@@ -592,9 +590,9 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 				append_json_string(scx, tmp);
 				Tcl_DecrRefCount(tmp);
 			} else {
-				Tcl_Obj*	subst_val = NULL;
-				int			subst_type;
-				int			reset_mode = 0;
+				Tcl_Obj*		subst_val = NULL;
+				enum json_types	subst_type;
+				int				reset_mode = 0;
 
 				if (type == JSON_DYN_LITERAL) {
 					append_json_string(scx, val);
@@ -665,6 +663,8 @@ done:
 
 void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 {
+	Tcl_ObjIntRep*	ir = NULL;
+
 	/*
 	fprintf(stderr, "append_to_cx, storing %s: \"%s\"\n",
 			type_names[val->internalRep.ptrAndLongRep.value],
@@ -674,15 +674,21 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 	switch (cx->container) {
 		case JSON_OBJECT:
 			//fprintf(stderr, "append_to_cx, cx->hold_key->refCount: %d (%s)\n", cx->hold_key->refCount, Tcl_GetString(cx->hold_key));
-			Tcl_DictObjPut(NULL, cx->val->internalRep.ptrAndLongRep.ptr, cx->hold_key, val);		// TODO: fix intrep access
+			ir = Tcl_FetchIntRep(cx->val, cx->objtype);
+			if (ir == NULL) Tcl_Panic("Can't get intrep for container");
+			Tcl_DictObjPut(NULL, ir->twoPtrValue.ptr1, cx->hold_key, val);
+			if (ir->twoPtrValue.ptr2) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2=NULL;}
 			Tcl_InvalidateStringRep(cx->val);
 			Tcl_DecrRefCount(cx->hold_key);
 			cx->hold_key = NULL;
 			break;
 
 		case JSON_ARRAY:
+			ir = Tcl_FetchIntRep(cx->val, cx->objtype);
+			if (ir == NULL) Tcl_Panic("Can't get intrep for container");
 			//fprintf(stderr, "append_to_cx, appending to list: (%s)\n", Tcl_GetString(val));
-			Tcl_ListObjAppendElement(NULL, cx->val->internalRep.ptrAndLongRep.ptr, val);		// TODO: fix intrep access
+			Tcl_ListObjAppendElement(NULL, ir->twoPtrValue.ptr1, val);
+			if (ir->twoPtrValue.ptr2) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2=NULL;}
 			Tcl_InvalidateStringRep(cx->val);
 			break;
 
@@ -696,8 +702,9 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 
 int serialize(Tcl_Interp* interp, struct serialize_context* scx, Tcl_Obj* obj) //{{{
 {
-	int			type = 0, res;
-	Tcl_Obj*	val = NULL;
+	enum json_types	type = JSON_UNDEF;
+	int				res;
+	Tcl_Obj*		val = NULL;
 
 	TEST_OK(JSON_GetJvalFromObj(interp, obj, &type, &val));
 
@@ -730,17 +737,39 @@ static int get_modifier(Tcl_Interp* interp, Tcl_Obj* modobj, enum modifiers* mod
 }
 
 //}}}
+static Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir) //{{{
+{
+	Tcl_Obj*	val = ir->twoPtrValue.ptr1;
+
+	if (val != NULL && Tcl_IsShared(val)) {
+		Tcl_DecrRefCount(val);
+		val = Tcl_DuplicateObj(val);
+		Tcl_IncrRefCount((Tcl_Obj*)(ir->twoPtrValue.ptr1 = val));
+	}
+
+	if (ir->twoPtrValue.ptr2) {
+		// The caller wants val unshared, which implies that they intend to
+		// change it, which would invalidate our cached template actions, so
+		// release those if we have them
+		Tcl_DecrRefCount(ir->twoPtrValue.ptr2);
+		ir->twoPtrValue.ptr2 = NULL;
+	}
+
+	return val;
+}
+
+//}}}
 int JSON_Set(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[], int pathc, Tcl_Obj* replacement) //{{{
 {
-	int				type, i, newtype;
-	Tcl_Obj*		val;
+	int				i;
+	enum json_types	type, newtype;
+	Tcl_ObjIntRep*	ir = NULL;
+	Tcl_Obj*		val = NULL;
 	Tcl_Obj*		step;
 	Tcl_Obj*		src;
 	Tcl_Obj*		target;
 	Tcl_Obj*		newval;
-	Tcl_Obj*		rep = as_json(interp, replacement);
-
-	TEST_OK(JSON_GetJvalFromObj(interp, rep, &newtype, &newval));
+	Tcl_Obj*		rep = NULL;
 
 	src = Tcl_ObjGetVar2(interp, srcvar, NULL, 0);
 	if (src == NULL) {
@@ -759,18 +788,14 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[], int pa
 			*/
 	target = src;
 
-	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-	if (val != NULL && Tcl_IsShared(val)) {
-		Tcl_DecrRefCount(val);
-		val = Tcl_DuplicateObj(val);
-		Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));		// TODO: fix intrep access
-	}
+	TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+	val = get_unshared_val(ir);
 
 	// Walk the path as far as it exists in src
 	//fprintf(stderr, "set, initial type %s\n", type_names[type]);
 	for (i=0; i<pathc; i++) {
 		step = pathv[i];
-		//fprintf(stderr, "looking at step %s, cx type: %s\n", Tcl_GetString(step), type_names_dbg[type]);
+		//fprintf(stderr, "looking at step %s, cx type: %s\n", Tcl_GetString(step), type_names_int[type]);
 
 		switch (type) {
 			case JSON_UNDEF: //{{{
@@ -883,26 +908,15 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[], int pa
 				THROW_ERROR("Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
 		}
 
-		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-		//fprintf(stderr, "Followed path element %d: \"%s\", type %s\n", i, Tcl_GetString(step), type_names_dbg[type]);
-		if (val != NULL && Tcl_IsShared(val)) {
-			Tcl_DecrRefCount(val);
-			val = Tcl_DuplicateObj(val);
-			Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));		// TODO: fix intrep access
-		}
-		//fprintf(stderr, "Walked on to new type %s\n", type_names[type]);
+		TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+		val = get_unshared_val(ir);
 	}
 
 	goto set_val;
 
 followed_path:
-	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-	//fprintf(stderr, "Followed path element %d: \"%s\", type %s\n", i, Tcl_GetString(step), type_names_dbg[type]);
-	if (val != NULL && Tcl_IsShared(val)) {
-		Tcl_DecrRefCount(val);
-		val = Tcl_DuplicateObj(val);
-		Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));		// TODO: fix intrep access
-	}
+	TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+	val = get_unshared_val(ir);
 
 	// target points at the (first) object to replace.  It and its internalRep
 	// are unshared
@@ -911,27 +925,30 @@ followed_path:
 	// keys
 	//fprintf(stderr, "After walking path, %d elements remain to be created\n", pathc-i);
 	for (; i<pathc; i++) {
-		//fprintf(stderr, "create walk %d: %s, cx type: %s\n", i, Tcl_GetString(pathv[i]), type_names_dbg[type]);
+		//fprintf(stderr, "create walk %d: %s, cx type: %s\n", i, Tcl_GetString(pathv[i]), type_names_int[type]);
 		if (type != JSON_OBJECT) {
-			//fprintf(stderr, "Type isn't JSON_OBJECT: %s, replacing with a JSON_OBJECT\n", type_names_dbg[type]);
+			//fprintf(stderr, "Type isn't JSON_OBJECT: %s, replacing with a JSON_OBJECT\n", type_names_int[type]);
 			if (val != NULL)
 				Tcl_DecrRefCount(val);
 			val = Tcl_NewDictObj();
-			TEST_OK(JSON_SetIntRep(interp, target, JSON_OBJECT, val));
+			TEST_OK(JSON_SetIntRep(target, JSON_OBJECT, val));
 		}
 
 		target = JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj());
 		//fprintf(stderr, "Adding key \"%s\"\n", Tcl_GetString(pathv[i]));
 		TEST_OK(Tcl_DictObjPut(interp, val, pathv[i], target));
 		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-		//fprintf(stderr, "Newly added key \"%s\" is of type %s\n", Tcl_GetString(pathv[i]), type_names_dbg[type]);
+		//fprintf(stderr, "Newly added key \"%s\" is of type %s\n", Tcl_GetString(pathv[i]), type_names_int[type]);
 		// This was just created - it can't be shared
 	}
 
 set_val:
 	//fprintf(stderr, "Reached end of path, calling JSON_SetIntRep for replacement value %s (%s), target is %s\n",
-	//		type_names_dbg[newtype], Tcl_GetString(replacement), type_names_dbg[type]);
-	TEST_OK(JSON_SetIntRep(interp, target, newtype, newval));
+	//		type_names_int[newtype], Tcl_GetString(replacement), type_names_int[type]);
+	rep = as_json(interp, replacement);
+
+	TEST_OK(JSON_GetJvalFromObj(interp, rep, &newtype, &newval));
+	TEST_OK(JSON_SetIntRep(target, newtype, newval));
 
 	Tcl_InvalidateStringRep(src);
 
@@ -942,9 +959,10 @@ set_val:
 }
 
 //}}}
-static int unset_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[], int pathc) //{{{
+int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[], int pathc) //{{{
 {
-	int				type, i;
+	enum json_types	type;
+	int				i;
 	Tcl_Obj*		val;
 	Tcl_Obj*		step;
 	Tcl_Obj*		src;
@@ -971,18 +989,17 @@ static int unset_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[
 			*/
 	target = src;
 
-	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-	if (val != NULL && Tcl_IsShared(val)) {
-		Tcl_DecrRefCount(val);
-		val = Tcl_DuplicateObj(val);
-		Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));		// TODO: fix intrep access
+	{
+		Tcl_ObjIntRep*	ir = NULL;
+		TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+		val = get_unshared_val(ir);
 	}
 
 	// Walk the path as far as it exists in src
 	//fprintf(stderr, "set, initial type %s\n", type_names[type]);
 	for (i=0; i<pathc-1; i++) {
 		step = pathv[i];
-		//fprintf(stderr, "looking at step %s, cx type: %s\n", Tcl_GetString(step), type_names_dbg[type]);
+		//fprintf(stderr, "looking at step %s, cx type: %s\n", Tcl_GetString(step), type_names_int[type]);
 
 		switch (type) {
 			case JSON_UNDEF: //{{{
@@ -1076,18 +1093,16 @@ static int unset_path(Tcl_Interp* interp, Tcl_Obj* srcvar, Tcl_Obj *const pathv[
 				THROW_ERROR("Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
 		}
 
-		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-		//fprintf(stderr, "Followed path element %d: \"%s\", type %s\n", i, Tcl_GetString(step), type_names_dbg[type]);
-		if (val != NULL && Tcl_IsShared(val)) {
-			Tcl_DecrRefCount(val);
-			val = Tcl_DuplicateObj(val);
-			Tcl_IncrRefCount((Tcl_Obj*)(target->internalRep.ptrAndLongRep.ptr = val));		// TODO: fix intrep access
+		{
+			Tcl_ObjIntRep*	ir = NULL;
+			TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+			val = get_unshared_val(ir);
 		}
 		//fprintf(stderr, "Walked on to new type %s\n", type_names[type]);
 	}
 
 	//fprintf(stderr, "Reached end of path, calling JSON_SetIntRep for replacement value %s (%s), target is %s\n",
-	//		type_names_dbg[newtype], Tcl_GetString(replacement), type_names_dbg[type]);
+	//		type_names_int[newtype], Tcl_GetString(replacement), type_names_int[type]);
 
 	step = pathv[i];	// This names the key / element to unset
 	//fprintf(stderr, "To replace: path step %d: \"%s\"\n", i, Tcl_GetString(step));
@@ -1197,7 +1212,8 @@ bad_path:
 //}}}
 static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers) //{{{
 {
-	int					type, i, modstrlen;
+	int					i, modstrlen;
+	enum json_types		type;
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 	const char*			modstr;
 	enum modifiers		modifier;
@@ -1282,7 +1298,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 							//}}}
 						case MODIFIER_TYPE: //{{{
 							EXISTS(1);
-							*target = Tcl_NewStringObj(type_names[type], -1);
+							*target = l->type[type];
 							break;
 							//}}}
 						case MODIFIER_KEYS: //{{{
@@ -1431,8 +1447,9 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 //}}}
 static int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out) //{{{
 {
-	int			type, res = TCL_OK;
-	Tcl_Obj*	val = NULL;
+	enum json_types	type;
+	int				res = TCL_OK;
+	Tcl_Obj*		val = NULL;
 
 	TEST_OK(JSON_GetJvalFromObj(interp, obj, &type, &val));
 	/*
@@ -1515,7 +1532,7 @@ static int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out) //{{{
 //}}}
 static int _new_object(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res) //{{{
 {
-	int			i, ac;
+	int			i, ac, retval = TCL_OK;
 	Tcl_Obj**	av;
 	Tcl_Obj*	k;
 	Tcl_Obj*	v;
@@ -1523,20 +1540,22 @@ static int _new_object(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_
 	Tcl_Obj*	val;
 
 	if (objc % 2 != 0)
-		THROW_ERROR("json fmt object needs an even number of arguments");
+		THROW_ERROR("json new object needs an even number of arguments");
 
-	*res = JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj());
-	val = ((Tcl_Obj*)*res)->internalRep.ptrAndLongRep.ptr;		// TODO: fix intrep access
+	Tcl_IncrRefCount(val = Tcl_NewDictObj());
 
 	for (i=0; i<objc; i+=2) {
 		k = objv[i];
 		v = objv[i+1];
-		TEST_OK(Tcl_ListObjGetElements(interp, v, &ac, &av));
-		TEST_OK(new_json_value_from_list(interp, ac, av, &new_val));
-		TEST_OK(Tcl_DictObjPut(interp, val, k, new_val));
+		TEST_OK_LABEL(end, retval, Tcl_ListObjGetElements(interp, v, &ac, &av));
+		TEST_OK_LABEL(end, retval, new_json_value_from_list(interp, ac, av, &new_val));
+		TEST_OK_LABEL(end, retval, Tcl_DictObjPut(interp, val, k, new_val));
 	}
 
-	return TCL_OK;
+	Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_OBJECT, val));
+end:
+	RELEASE(val);
+	return retval;
 }
 
 //}}}
@@ -1594,11 +1613,11 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 					}
 
 					if (type != JSON_UNDEF) {
-						*res = JSON_NewJvalObj(type, Tcl_NewStringObj((const char*)s+3, l-3));
+						Tcl_IncrRefCount(*res = JSON_NewJvalObj(type, Tcl_NewStringObj((const char*)s+3, l-3)));
 						break;
 					}
 				}
-				*res = JSON_NewJvalObj(JSON_STRING, Tcl_NewStringObj(s, l));
+				Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_STRING, Tcl_NewStringObj(s, l)));
 			}
 			break;
 			//}}}
@@ -1618,18 +1637,25 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 			//}}}
 		case NEW_ARRAY: //{{{
 			{
-				int			i, ac;
+				int			i, ac, retval = TCL_OK;;
 				Tcl_Obj**	av;
-				Tcl_Obj*	elem;
-				Tcl_Obj*	val;
+				Tcl_Obj*	elem = NULL;
+				Tcl_Obj*	val = NULL;
 
-				*res = JSON_NewJvalObj(JSON_ARRAY, Tcl_NewListObj(0, NULL));
-				val = ((Tcl_Obj*)*res)->internalRep.ptrAndLongRep.ptr;			// TODO: fix intrep access
+				Tcl_IncrRefCount(val = Tcl_NewListObj(0, NULL));
+
 				for (i=1; i<objc; i++) {
-					TEST_OK(Tcl_ListObjGetElements(interp, objv[i], &ac, &av));
-					TEST_OK(new_json_value_from_list(interp, ac, av, &elem));
-					TEST_OK(Tcl_ListObjAppendElement(interp, val, elem));
+					TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjGetElements(interp, objv[i], &ac, &av));
+					TEST_OK_LABEL(end_new_array, retval, new_json_value_from_list(interp, ac, av, &elem));
+					TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjAppendElement(interp, val, elem));
+					RELEASE(elem);
 				}
+				Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_ARRAY, val));
+end_new_array:
+				RELEASE(elem);
+				RELEASE(val);
+				if (retval != TCL_OK)
+					return retval;
 			}
 			break;
 			//}}}
@@ -1641,7 +1667,7 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 
 				CHECK_ARGS(1, "number val");
 				if (likely((retval = force_json_number(interp, l, objv[1], &forced)) == TCL_OK)) {
-					*res = JSON_NewJvalObj(JSON_NUMBER, forced);
+					Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_NUMBER, forced));
 				}
 				RELEASE(forced);
 				if (retval != TCL_OK) return retval;
@@ -1651,20 +1677,20 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 		case NEW_TRUE: //{{{
 			{
 				CHECK_ARGS(0, "true");
-				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(1));
+				Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(1)));
 			}
 			break;
 			//}}}
 		case NEW_FALSE: //{{{
 			{
 				CHECK_ARGS(0, "false");
-				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(0));
+				Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(0)));
 			}
 			break;
 			//}}}
 		case NEW_NULL: //{{{
 			CHECK_ARGS(0, "null");
-			*res = JSON_NewJvalObj(JSON_NULL, NULL);
+			Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_NULL, NULL));
 			break;
 			//}}}
 		case NEW_BOOL: //{{{
@@ -1673,18 +1699,18 @@ static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const
 
 				CHECK_ARGS(1, "boolean val");
 				TEST_OK(Tcl_GetBooleanFromObj(interp, objv[1], &b));
-				*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(b));
+				Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(b)));
 			}
 			break;
 			//}}}
 		case NEW_JSON: //{{{
 			{
-				int _type;
-				Tcl_Obj *_val;
+				enum json_types	type;
+				Tcl_Obj*		val = NULL;
 
 				CHECK_ARGS(1, "json val");
-				TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &_type, &_val));
-				*res = objv[1];
+				TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &type, &val));
+				Tcl_IncrRefCount(*res = objv[1]);
 			}
 			break;
 			//}}}
@@ -1794,8 +1820,8 @@ static int NRforeach_next_loop_bottom(ClientData cdata[], Tcl_Interp* interp, in
 				case COLLECT_ARRAY:
 				case COLLECT_OBJECT:
 					{
-						int			type;
-						Tcl_Obj*	val = NULL;		// Intrep of state->res
+						enum json_types	type;
+						Tcl_Obj*		val = NULL;		// Intrep of state->res
 
 						if (Tcl_IsShared(state->res)) {
 							Tcl_Obj*	new = NULL;
@@ -1936,9 +1962,10 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], enum col
 	}
 
 	for (i=0; i<state->iterators; i++) {
-		int			loops, type, j;
-		Tcl_Obj*	val;
-		Tcl_Obj*	varlist = objv[i*2];
+		int				loops, j;
+		enum json_types	type;
+		Tcl_Obj*		val;
+		Tcl_Obj*		varlist = objv[i*2];
 
 		if (Tcl_IsShared(varlist))
 			varlist = Tcl_DuplicateObj(varlist);
@@ -2005,7 +2032,8 @@ done:
 //}}}
 static int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
 {
-	int							type, indent_len, pad_len, next_pad_len, count;
+	int							indent_len, pad_len, next_pad_len, count;
+	enum json_types				type;
 	const char*					pad_str;
 	const char*					next_pad_str;
 	Tcl_Obj*					next_pad;
@@ -2129,7 +2157,8 @@ static int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_O
 //}}}
 static int json_pretty_dbg(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
 {
-	int							type, indent_len, pad_len, next_pad_len, count;
+	int							indent_len, pad_len, next_pad_len, count;
+	enum json_types				type;
 	const char*					pad_str;
 	const char*					next_pad_str;
 	Tcl_Obj*					next_pad;
@@ -2409,7 +2438,7 @@ static int get_subst_slot(struct template_cx* cx, Tcl_Obj* elem, Tcl_Obj* type, 
 	// Find the allocated slot for this type for this key
 	TEST_OK(Tcl_DictObjGet(cx->interp, keydict, type, slot));
 	if (*slot == NULL) {
-		*slot = Tcl_NewIntObj(cx->slots_used++);
+		Tcl_IncrRefCount(*slot = Tcl_NewIntObj(cx->slots_used++));
 		TEST_OK(Tcl_DictObjPut(cx->interp, keydict, type, *slot));
 		/*
 		fprintf(stderr, "Allocated new slot for %s %s: %s\n", Tcl_GetString(elem), Tcl_GetString(type), Tcl_GetString(*slot));
@@ -2484,10 +2513,10 @@ static int record_subst_location(Tcl_Interp* interp, Tcl_Obj* parent, Tcl_Obj* e
 */
 static int template_actions(struct template_cx* cx, Tcl_Obj* template, Tcl_Obj* path, Tcl_Obj* parent, Tcl_Obj* elem) //{{{
 {
-	int			type;
-	Tcl_Obj*	val = NULL;
-	Tcl_Interp*	interp = cx->interp;
-	int			retval = TCL_OK;
+	enum json_types	type;
+	Tcl_Obj*		val = NULL;
+	Tcl_Interp*		interp = cx->interp;
+	int				retval = TCL_OK;
 
 	TEST_OK(JSON_GetJvalFromObj(interp, template, &type, &val));
 
@@ -2542,11 +2571,11 @@ static int template_actions(struct template_cx* cx, Tcl_Obj* template, Tcl_Obj* 
 						if (stype != JSON_UNDEF) {
 							Tcl_Obj*	slot = NULL;
 
-							if (get_subst_slot(cx, new_stringobj_dedup(cx->l, s+3, len-3), cx->l->type[stype], stype, &slot) != TCL_OK) {
+							if (get_subst_slot(cx, new_stringobj_dedup(cx->l, s+3, len-3), cx->l->type_int[stype], stype, &slot) != TCL_OK) {
 								if (slot) { Tcl_DecrRefCount(slot); slot = NULL; }
 								return TCL_ERROR;
 							}
-							//fprintf(stderr, "Found key subst at \"%s\": (%s) %s %s, allocated slot %s\n", Tcl_GetString(path), Tcl_GetString(k), type_names_dbg[stype], s+3, Tcl_GetString(slot));
+							//fprintf(stderr, "Found key subst at \"%s\": (%s) %s %s, allocated slot %s\n", Tcl_GetString(path), Tcl_GetString(k), type_names_int[stype], s+3, Tcl_GetString(slot));
 
 							//TEST_OK(record_subst_location(cx->interp, path, k, cx->keys, slot));
 							if (emit_action(cx, REPLACE_KEY, slot) != TCL_OK) {
@@ -2615,9 +2644,9 @@ release_subpath:
 			{
 				Tcl_Obj*	slot = NULL;
 
-				TEST_OK(get_subst_slot(cx, val, cx->l->type[type], type, &slot));
+				TEST_OK(get_subst_slot(cx, val, cx->l->type_int[type], type, &slot));
 
-				//fprintf(stderr, "Found value subst at \"%s\": (%s) %s: %s, allocated slot %s\n", Tcl_GetString(parent), Tcl_GetString(elem), type_names_dbg[type], Tcl_GetString(val), Tcl_GetString(slot));
+				//fprintf(stderr, "Found value subst at \"%s\": (%s) %s: %s, allocated slot %s\n", Tcl_GetString(parent), Tcl_GetString(elem), type_names_int[type], Tcl_GetString(val), Tcl_GetString(slot));
 
 				//TEST_OK(record_subst_location(cx->interp, parent, elem, cx->values, slot));
 				TEST_OK(emit_action(cx, REPLACE_VAL, slot));
@@ -2735,8 +2764,8 @@ static int lookup_type(Tcl_Interp* interp, Tcl_Obj* typeobj, int* type) //{{{
 */
 static int replace(Tcl_Interp* interp, struct cx_stack* containers, int stacklevel, Tcl_Obj* replacement) //{{{
 {
-	int			containertype;
-	Tcl_Obj*	container;
+	enum json_types	containertype;
+	Tcl_Obj*		container;
 
 	//fprintf(stderr, "Replacing key %s in %s with %s\n", containers[stacklevel].elem ? Tcl_GetString(containers[stacklevel].elem) : "NULL", Tcl_GetString(containers[stacklevel].target), Tcl_GetString(replacement));
 	TEST_OK(JSON_GetJvalFromObj(interp, containers[stacklevel].target, &containertype, &container));
@@ -2899,8 +2928,8 @@ static int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj
 				if (subst_val == NULL) {
 					jval = l->json_null;
 				} else {
-					Tcl_Obj*	dummy;
-					int			subst_type;
+					Tcl_Obj*		dummy;
+					enum json_types	subst_type;
 
 					TEST_OK_LABEL(finally, retcode, JSON_GetJvalFromObj(interp, subst_val, &subst_type, &dummy));
 					jval = subst_val;
@@ -2938,8 +2967,9 @@ evaluate_template_finally:
 				//}}}
 			case CX_OBJ_KEY: //{{{
 				{
-					int			containertype;
-					Tcl_Obj*	container;
+					enum json_types	containertype;
+					Tcl_Obj*		container;
+					Tcl_ObjIntRep*	ir;
 
 					if (Tcl_IsShared(target)) {
 						Tcl_Obj*	newtarget = Tcl_DuplicateObj(target);
@@ -2953,16 +2983,18 @@ evaluate_template_finally:
 					containers[stacklevel].target = target;
 					containers[stacklevel].elem = value;
 
-					TEST_OK_LABEL(finally, retcode, JSON_GetJvalFromObj(interp, target, &containertype, &container));
+					TEST_OK_LABEL(finally, retcode, JSON_GetIntrepFromObj(interp, target, &containertype, &ir));
+					container = get_unshared_val(ir);
 					TEST_OK_LABEL(finally, retcode, Tcl_DictObjGet(interp, container, value, &target));
 				}
 				break;
 				//}}}
 			case CX_ARR_IDX: //{{{
 				{
-					int	idx;
-					int			containertype;
-					Tcl_Obj*	container;
+					int				idx;
+					enum json_types	containertype;
+					Tcl_Obj*		container;
+					Tcl_ObjIntRep*	ir;
 
 					if (Tcl_IsShared(target)) {
 						Tcl_Obj*	newtarget = Tcl_DuplicateObj(target);
@@ -2975,8 +3007,9 @@ evaluate_template_finally:
 					containers[stacklevel].target = target;
 					containers[stacklevel].elem = value;
 
-					TEST_OK_LABEL(finally, retcode, JSON_GetJvalFromObj(interp, target, &containertype, &container));
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, value, &idx));
+					TEST_OK_LABEL(finally, retcode, JSON_GetIntrepFromObj(interp, target, &containertype, &ir));
+					container = get_unshared_val(ir);
 					TEST_OK_LABEL(finally, retcode, Tcl_ListObjIndex(interp, container, idx, &target));
 				}
 				break;
@@ -3006,12 +3039,12 @@ evaluate_template_finally:
 				//}}}
 			case REPLACE_KEY: //{{{
 				{
-					int	slot;
-					Tcl_Obj*	container;
-					Tcl_Obj*	elem = containers[stacklevel].elem;
-					Tcl_Obj*	hold = NULL;
-					Tcl_Obj*	tclval = NULL;
-					int			slottype, containertype;
+					int				slot;
+					Tcl_Obj*		container;
+					Tcl_Obj*		elem = containers[stacklevel].elem;
+					Tcl_Obj*		hold = NULL;
+					Tcl_Obj*		tclval = NULL;
+					enum json_types	containertype, slottype;
 
 					TEST_OK_LABEL(finally, retcode, JSON_GetJvalFromObj(interp, containers[stacklevel].target, &containertype, &container));
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, value, &slot));
@@ -3053,14 +3086,20 @@ finally:
 //}}}
 int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj** res) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	//struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 	Tcl_Obj*			actions = NULL;
 	int					retcode = TCL_OK;
+	Tcl_ObjIntRep*		ir;
+	enum json_types		type;
 
-	TEST_OK(Tcl_DictObjGet(interp, l->templates, template, &actions));
+	TEST_OK(JSON_GetIntrepFromObj(interp, template, &type, &ir));
+
+	//TEST_OK(Tcl_DictObjGet(interp, l->templates, template, &actions));
+	actions = ir->twoPtrValue.ptr2;
 	if (actions == NULL) {
 		TEST_OK_LABEL(release_actions, retcode, build_template_actions(interp, template, &actions));
-		TEST_OK_LABEL(release_actions, retcode, Tcl_DictObjPut(interp, l->templates, template, actions));
+		Tcl_IncrRefCount((Tcl_Obj*)(ir->twoPtrValue.ptr2 = actions));
+		//TEST_OK_LABEL(release_actions, retcode, Tcl_DictObjPut(interp, l->templates, template, actions));
 	} else {
 		Tcl_IncrRefCount(actions);
 	}
@@ -3081,7 +3120,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 {
 	int method, retcode=TCL_OK;
 	static const char *methods[] = {
-		"parse",
+		"parse",		// DEPRECATED
 		"normalize",
 		"extract",
 		"type",
@@ -3089,11 +3128,10 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 		"keys",
 		"exists",
 		"get",
-		"get_typed",
 		"set",
 		"unset",
-		"new",
-		"fmt",
+		"new",			// DEPRECATED
+		"fmt",			// DEPRECATED
 		"isnull",
 		"template",
 		"_template",
@@ -3102,12 +3140,15 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 		"amap",
 		"omap",
 		"pretty",
+		"debug",
 //		"merge",
 
-		// Create json atomic types
+		// Create json types
 		"string",
 		"number",
 		"boolean",
+		"object",
+		"array",
 
 		"decode",
 
@@ -3125,7 +3166,6 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 		M_KEYS,
 		M_EXISTS,
 		M_GET,
-		M_GET_TYPED,
 		M_SET,
 		M_UNSET,
 		M_NEW,
@@ -3138,10 +3178,13 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 		M_AMAP,
 		M_OMAP,
 		M_PRETTY,
+		M_DEBUG,
 //		M_MERGE,
 		M_STRING,
 		M_NUMBER,
 		M_BOOLEAN,
+		M_OBJECT,
+		M_ARRAY,
 		M_DECODE,
 		// Debugging
 		M_FREE_CACHE,
@@ -3167,9 +3210,9 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			//DEBUGGER;
 			CHECK_ARGS(2, "normalize json_val");
 			{
-				int			type;
-				Tcl_Obj*	json = objv[2];
-				Tcl_Obj*	val;
+				enum json_types	type;
+				Tcl_Obj*		json = objv[2];
+				Tcl_Obj*		val;
 
 				if (Tcl_IsShared(json))
 					json = Tcl_DuplicateObj(json);
@@ -3184,40 +3227,35 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			//}}}
 		case M_TYPE: //{{{
 			{
-				int			type;
-				Tcl_Obj*	val;
-				Tcl_Obj*	target = NULL;
+				enum json_types	type;
+				Tcl_Obj*			val;
+				Tcl_Obj*			target = NULL;
+				struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
 				if (objc < 3) CHECK_ARGS(2, "type json_val ?path ...?");
 
 				if (objc >= 4) {
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
 					target = objv[2];
 				}
 
 				TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-				Tcl_SetObjResult(interp, Tcl_NewStringObj(type_names[type], -1));
+				Tcl_SetObjResult(interp, l->type[type]);
 			}
 			break;
 			//}}}
 		case M_LENGTH: //{{{
 			{
-				int			type;
-				Tcl_Obj*	val;
-				Tcl_Obj*	target = NULL;
+				enum json_types	type;
+				Tcl_Obj*		val;
+				Tcl_Obj*		target = NULL;
 
 				if (objc < 3) CHECK_ARGS(2, "length json_val ?path ...?");
 
 				if (objc >= 4) {
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
 					target = objv[2];
 				}
 
@@ -3269,7 +3307,8 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			//}}}
 		case M_KEYS: //{{{
 			{
-				int				type, done;
+				enum json_types	type;
+				int				done;
 				Tcl_Obj*		val;
 				Tcl_Obj*		target = NULL;
 				Tcl_Obj*		res = NULL;
@@ -3282,9 +3321,6 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc >= 4) {
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
 					target = objv[2];
 				}
 
@@ -3317,10 +3353,10 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 1, 1));
 					// resolve_path sets the interp result in exists mode
 				} else {
-					int			type;
-					Tcl_Obj*	val;
+					enum json_types	type;
+					Tcl_Obj*		val;
 					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
-					Tcl_SetObjResult(interp, Tcl_NewBooleanObj(1));
+					Tcl_SetObjResult(interp, Tcl_NewBooleanObj(type != JSON_NULL));
 				}
 			}
 			break;
@@ -3329,61 +3365,36 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			{
 				Tcl_Obj*	target = NULL;
 				Tcl_Obj*	res = NULL;
+				int			convert = 1;
 
 				if (objc < 3) CHECK_ARGS(2, "get json_val ?path ...?");
 
 				if (objc >= 4) {
+					const char*		s = NULL;
+					int				l;
+
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 1));
+					s = Tcl_GetStringFromObj(objv[objc-1], &l);
+					if (s[0] == '?' && s[1] != '?') {
+						// If the last element of the path is an unquoted
+						// modifier, we need to skip the conversion from JSON
+						// (it won't be json, but the modifier result)
+						convert = 0;
+					}
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
+					enum json_types	type;
+					Tcl_ObjIntRep*	ir;
 					target = objv[2];
+					TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));	// Force parsing objv[2] as JSON
 				}
 
-				// Might be the result of a modifier
-				if (target->typePtr == &json_type) {
+				if (convert) {
 					TEST_OK(convert_to_tcl(interp, target, &res));
-					target = res;
-				}
-
-				Tcl_SetObjResult(interp, target);
-			}
-			break;
-			//}}}
-		case M_GET_TYPED: //{{{
-			{
-				Tcl_Obj*		target = NULL;
-				Tcl_Obj*		res[2];
-				int				rescount;
-
-				if (objc < 3) CHECK_ARGS(2, "get_typed json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 1));
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
-					target = objv[2];
+					res = target;
 				}
 
-				// Might be the result of a modifier
-				if (target->typePtr == &json_type) {
-					int				type;
-					Tcl_Obj*		val;
-
-					TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-					TEST_OK(convert_to_tcl(interp, target, &target));
-					res[0] = target;
-					res[1] = Tcl_NewStringObj(type_names[type], -1);
-					rescount = 2;
-				} else {
-					res[0] = target;
-					rescount = 1;
-				}
-
-				Tcl_SetObjResult(interp, Tcl_NewListObj(rescount, res));
+				Tcl_SetObjResult(interp, res);
 			}
 			break;
 			//}}}
@@ -3396,9 +3407,9 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc >= 4) {
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
+					enum json_types	type;
+					Tcl_Obj*		val;
+					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));	// Just a validation, keeps the contract that we return JSON
 					target = objv[2];
 				}
 
@@ -3413,7 +3424,7 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			//}}}
 		case M_UNSET: //{{{
 			if (objc < 3) CHECK_ARGS(4, "unset varname ?path ...?");
-			TEST_OK(unset_path(interp, objv[2], objv+3, objc-3));
+			TEST_OK(JSON_Unset(interp, objv[2], objv+3, objc-3));
 			break;
 			//}}}
 		case M_FMT:
@@ -3424,8 +3435,8 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 				if (objc < 3) CHECK_ARGS(2, "new type ?val?");
 
 				TEST_OK(new_json_value_from_list(interp, objc-2, objv+2, &res));
-
 				Tcl_SetObjResult(interp, res);
+				RELEASE(res);
 			}
 			break;
 			//}}}
@@ -3485,6 +3496,45 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			}
 			break;
 			//}}}
+		case M_OBJECT: //{{{
+			{
+				int			oc;
+				Tcl_Obj**	ov;
+				Tcl_Obj*	res = NULL;
+
+				if (objc == 3) {
+					TEST_OK(Tcl_ListObjGetElements(interp, objv[2], &oc, &ov));
+					TEST_OK(_new_object(interp, oc, ov, &res));
+				} else {
+					TEST_OK(_new_object(interp, objc-2, objv+2, &res));
+				}
+				Tcl_SetObjResult(interp, res);
+				RELEASE(res);
+			}
+			break;
+			//}}}
+		case M_ARRAY: //{{{
+			{
+				int			i, ac, retval = TCL_OK;;
+				Tcl_Obj**	av;
+				Tcl_Obj*	elem;
+				Tcl_Obj*	val = NULL;
+
+				Tcl_IncrRefCount(val = Tcl_NewListObj(0, NULL));
+
+				for (i=2; i<objc; i++) {
+					TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjGetElements(interp, objv[i], &ac, &av));
+					TEST_OK_LABEL(end_new_array, retval, new_json_value_from_list(interp, ac, av, &elem));
+					TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjAppendElement(interp, val, elem));
+				}
+				Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_ARRAY, val));
+end_new_array:
+				RELEASE(val);
+				if (retval != TCL_OK)
+					return retval;
+			}
+			break;
+			//}}}
 		case M_DECODE: //{{{
 			{
 				Tcl_Obj*			ov[4];
@@ -3511,18 +3561,15 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			//}}}
 		case M_ISNULL: //{{{
 			{
-				Tcl_Obj*	target = NULL;
-				Tcl_Obj*	val;
-				int			type;
+				Tcl_Obj*		target = NULL;
+				Tcl_Obj*		val;
+				enum json_types	type;
 
 				if (objc < 3) CHECK_ARGS(2, "isnull json_val ?path ...?");
 
 				if (objc >= 4) {
 					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
 				} else {
-					int			type;
-					Tcl_Obj*	val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
 					target = objv[2];
 				}
 
@@ -3650,6 +3697,34 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 			}
 			break;
 			//}}}
+		case M_DEBUG: //{{{
+			{
+				Tcl_DString	ds;
+				Tcl_Obj*	indent = NULL;
+				Tcl_Obj*	pad = Tcl_NewStringObj("", 0);
+
+				if (objc < 3 || objc > 4)
+					CHECK_ARGS(2, "debug json_val ?indent?");
+
+				if (objc > 3) {
+					indent = objv[3];
+				} else {
+					indent = Tcl_NewStringObj("    ", 4);
+				}
+				Tcl_IncrRefCount(indent);
+
+				Tcl_DStringInit(&ds);
+				if (json_pretty_dbg(interp, objv[2], indent, pad, &ds) != TCL_OK) {
+					Tcl_DecrRefCount(indent); indent=NULL;
+					Tcl_DStringFree(&ds);
+					return TCL_ERROR;
+				}
+				Tcl_DecrRefCount(indent); indent=NULL;
+				Tcl_DStringResult(interp, &ds);
+				Tcl_DStringFree(&ds);
+			}
+			break;
+			//}}}
 			/*
 		case M_MERGE: //{{{
 			THROW_ERROR("merge method is not functional yet, sorry");
@@ -3738,16 +3813,16 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 
 	l->interp = NULL;
 
-	Tcl_DecrRefCount(l->tcl_true);   l->tcl_true = NULL;
-	Tcl_DecrRefCount(l->tcl_false);  l->tcl_false = NULL;
-	Tcl_DecrRefCount(l->tcl_one);    l->tcl_one = NULL;
+	RELEASE(l->tcl_true);
+	RELEASE(l->tcl_false);
+	RELEASE(l->tcl_one);
 
 	Tcl_DecrRefCount(l->tcl_empty);
-	Tcl_DecrRefCount(l->tcl_empty);  l->tcl_empty = NULL;
+	RELEASE(l->tcl_empty);
 
-	Tcl_DecrRefCount(l->json_true);          l->json_true = NULL;
-	Tcl_DecrRefCount(l->json_false);         l->json_false = NULL;
-	Tcl_DecrRefCount(l->json_null);          l->json_null = NULL;
+	RELEASE(l->json_true);
+	RELEASE(l->json_false);
+	RELEASE(l->json_null);
 
 	free_cache(l);
 	/*
@@ -3768,42 +3843,30 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 	l->kc_count = 0;
 	*/
 
-	for (i=0; i<2; i++) {
-		Tcl_DecrRefCount(l->force_num_cmd[i]);	l->force_num_cmd[i] = NULL;
+	for (i=0; i<2; i++)
+		RELEASE(l->force_num_cmd[i]);
+
+	for (i=0; i<JSON_TYPE_MAX; i++) {
+		RELEASE(l->type_int[i]);
+		RELEASE(l->type[i]);
 	}
 
-	Tcl_DecrRefCount(l->type[JSON_UNDEF]);			l->type[JSON_UNDEF] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_OBJECT]);			l->type[JSON_OBJECT] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_ARRAY]);			l->type[JSON_ARRAY] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_STRING]);			l->type[JSON_STRING] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_NUMBER]);			l->type[JSON_NUMBER] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_BOOL]);			l->type[JSON_BOOL] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_NULL]);			l->type[JSON_NULL] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_DYN_STRING]);		l->type[JSON_DYN_STRING] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_DYN_NUMBER]);		l->type[JSON_DYN_NUMBER] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_DYN_BOOL]);		l->type[JSON_DYN_BOOL] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_DYN_JSON]);		l->type[JSON_DYN_JSON] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_DYN_TEMPLATE]);	l->type[JSON_DYN_TEMPLATE] = NULL;
-	Tcl_DecrRefCount(l->type[JSON_DYN_LITERAL]);	l->type[JSON_DYN_LITERAL] = NULL;
+	for (i=0; i<TEMPLATE_ACTIONS_END; i++)
+		RELEASE(l->action[i]);
 
-	for (i=0; i<TEMPLATE_ACTIONS_END; i++) {
-		Tcl_DecrRefCount(l->action[i]); l->action[i] = NULL;
-	}
-
-	Tcl_DecrRefCount(l->templates);		l->templates = NULL;
+	RELEASE(l->templates);
 
 	Tcl_DeleteHashTable(&l->kc);
 
-	Tcl_DecrRefCount(l->apply);			l->apply = NULL;
-	Tcl_DecrRefCount(l->decode_bytes);	l->decode_bytes = NULL;
+	RELEASE(l->apply);
+	RELEASE(l->decode_bytes);
 
 	free(l); l = NULL;
 }
 
 //}}}
 extern Rl_jsonStubs rl_jsonStubs;
-_DLLEXPORT
-int Rl_json_Init(Tcl_Interp* interp) //{{{
+_DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
 	int					i;
 	struct interp_cx*	l = NULL;
@@ -3836,19 +3899,10 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 	l->force_num_cmd[2] = NULL;
 
 	// Const type name objects
-	Tcl_IncrRefCount(l->type[JSON_UNDEF]        = Tcl_NewStringObj("JSON_UNDEF", -1));
-	Tcl_IncrRefCount(l->type[JSON_OBJECT]       = Tcl_NewStringObj("JSON_OBJECT", -1));
-	Tcl_IncrRefCount(l->type[JSON_ARRAY]        = Tcl_NewStringObj("JSON_ARRAY", -1));
-	Tcl_IncrRefCount(l->type[JSON_STRING]       = Tcl_NewStringObj("JSON_STRING", -1));
-	Tcl_IncrRefCount(l->type[JSON_NUMBER]       = Tcl_NewStringObj("JSON_NUMBER", -1));
-	Tcl_IncrRefCount(l->type[JSON_BOOL]         = Tcl_NewStringObj("JSON_BOOL", -1));
-	Tcl_IncrRefCount(l->type[JSON_NULL]         = Tcl_NewStringObj("JSON_NULL", -1));
-	Tcl_IncrRefCount(l->type[JSON_DYN_STRING]   = Tcl_NewStringObj("JSON_DYN_STRING", -1));
-	Tcl_IncrRefCount(l->type[JSON_DYN_NUMBER]   = Tcl_NewStringObj("JSON_DYN_NUMBER", -1));
-	Tcl_IncrRefCount(l->type[JSON_DYN_BOOL]     = Tcl_NewStringObj("JSON_DYN_BOOL", -1));
-	Tcl_IncrRefCount(l->type[JSON_DYN_JSON]     = Tcl_NewStringObj("JSON_DYN_JSON", -1));
-	Tcl_IncrRefCount(l->type[JSON_DYN_TEMPLATE] = Tcl_NewStringObj("JSON_DYN_TEMPLATE", -1));
-	Tcl_IncrRefCount(l->type[JSON_DYN_LITERAL]  = Tcl_NewStringObj("JSON_DYN_LITERAL", -1));
+	for (i=0; i<JSON_TYPE_MAX; i++) {
+		Tcl_IncrRefCount(l->type_int[i] = Tcl_NewStringObj(type_names_int[i], -1));
+		Tcl_IncrRefCount(l->type[i]     = Tcl_NewStringObj(type_names[i], -1));
+	}
 
 	// Const template action objects
 	for (i=0; i<TEMPLATE_ACTIONS_END; i++)
@@ -3967,8 +4021,13 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 
 	Tcl_SetAssocData(interp, "rl_json", free_interp_cx, l);
 
+	{
+		Tcl_Namespace*	ns = NULL;
+
+		ns = Tcl_CreateNamespace(interp, "::rl_json", NULL, NULL);
+		TEST_OK(Tcl_Export(interp, ns, "*", 0));
+	}
 	Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObjCmd, jsonNRObjCmd, NULL, NULL);
-	TEST_OK(Tcl_EvalEx(interp, "namespace eval ::rl_json {namespace export *}", -1, TCL_EVAL_DIRECT | TCL_EVAL_GLOBAL));
 
 	TEST_OK(Tcl_PkgProvideEx(interp, PACKAGE_NAME, PACKAGE_VERSION, &rl_jsonStubs));
 
@@ -3976,29 +4035,35 @@ int Rl_json_Init(Tcl_Interp* interp) //{{{
 }
 
 //}}}
-_DLLEXPORT
-int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
+_DLLEXPORT int Rl_json_SafeInit(Tcl_Interp* interp) //{{{
+{
+	// No unsafe features
+	return Rl_json_Init(interp);
+}
+
+//}}}
+_DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 {
 	Tcl_Namespace*		ns;
 
 	switch (flags) {
 		case TCL_UNLOAD_DETACH_FROM_INTERPRETER:
 			//fprintf(stderr, "rl_json detach from interpreter\n");
+			Tcl_DeleteAssocData(interp, "rl_json");
 			ns = Tcl_FindNamespace(interp, "::rl_json", NULL, TCL_GLOBAL_ONLY);
 			if (ns) {
 				Tcl_DeleteNamespace(ns);
 				ns = NULL;
 			}
-			Tcl_DeleteAssocData(interp, "rl_json");
 			break;
 		case TCL_UNLOAD_DETACH_FROM_PROCESS:
 			//fprintf(stderr, "rl_json detach from process\n");
+			Tcl_DeleteAssocData(interp, "rl_json");
 			ns = Tcl_FindNamespace(interp, "::rl_json", NULL, TCL_GLOBAL_ONLY);
 			if (ns) {
 				Tcl_DeleteNamespace(ns);
 				ns = NULL;
 			}
-			Tcl_DeleteAssocData(interp, "rl_json");
 			break;
 		default:
 			THROW_ERROR("Unhandled flags");
@@ -4008,16 +4073,7 @@ int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 }
 
 //}}}
-_DLLEXPORT
-int Rl_json_SafeInit(Tcl_Interp* interp) //{{{
-{
-	// No unsafe features
-	return Rl_json_Init(interp);
-}
-
-//}}}
-_DLLEXPORT
-int Rl_json_SafeUnload(Tcl_Interp* interp, int flags) //{{{
+_DLLEXPORT int Rl_json_SafeUnload(Tcl_Interp* interp, int flags) //{{{
 {
 	// No unsafe features
 	return Rl_json_Unload(interp, flags);

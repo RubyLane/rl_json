@@ -12,13 +12,13 @@ proc _compare_json {opts j1 j2 {path {}}} { #<<<
 	}
 
 	try {
-		json get $j1 ?type
+		json type $j1
 	} on error errmsg {
 		apply $mismatch "Cannot parse left JSON value:\n$errmsg"
 	} on ok j1_type {}
 
 	try {
-		json get $j2 ?type
+		json type $j2
 	} on error errmsg {
 		apply $mismatch "Cannot parse right JSON value:\n$errmsg"
 	} on ok j2_type {}
