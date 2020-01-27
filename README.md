@@ -72,9 +72,9 @@ elements to resolve the path (for [json set], or does nothing ([json unset]).
 json get {
     {
         "foo": [
-			{ "name": "first" },
-			{ "name": "second" },
-			{ "name": "third" }
+            { "name": "first" },
+            { "name": "second" },
+            { "name": "third" }
         }
     }
 } foo end-1 name
@@ -95,12 +95,12 @@ would look something like:
 
 ~~~tcl
 proc readjson file {
-	set h [open $file rb]		;# Note that the file is opened in binary mode
-	try {
-		json decode [read $h]
-	} finally {
-		close $h
-	}
+    set h [open $file rb]    ;# Note that the file is opened in binary mode
+    try {
+        json decode [read $h]
+    } finally {
+        close $h
+    }
 }
 ~~~
 
