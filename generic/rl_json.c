@@ -3094,12 +3094,10 @@ int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj*
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, template, &type, &ir));
 
-	//TEST_OK(Tcl_DictObjGet(interp, l->templates, template, &actions));
 	actions = ir->twoPtrValue.ptr2;
 	if (actions == NULL) {
 		TEST_OK_LABEL(release_actions, retcode, build_template_actions(interp, template, &actions));
 		Tcl_IncrRefCount((Tcl_Obj*)(ir->twoPtrValue.ptr2 = actions));
-		//TEST_OK_LABEL(release_actions, retcode, Tcl_DictObjPut(interp, l->templates, template, actions));
 	} else {
 		Tcl_IncrRefCount(actions);
 	}
@@ -3660,8 +3658,6 @@ end_new_array:
 
 				free_cache(l);
 
-				Tcl_DecrRefCount(l->templates);
-				Tcl_IncrRefCount(l->templates = Tcl_NewDictObj());
 				return TCL_OK;
 			}
 			break;
@@ -3805,11 +3801,6 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 {
 	struct interp_cx* l = cdata;
 	int					i;
-	/*
-	Tcl_HashEntry*		he;
-	Tcl_HashSearch		search;
-	struct kc_entry*	e;
-	*/
 
 	l->interp = NULL;
 
@@ -3825,23 +3816,6 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 	RELEASE(l->json_null);
 
 	free_cache(l);
-	/*
-	he = Tcl_FirstHashEntry(&l->kc, &search);
-	while (he) {
-		ptrdiff_t	idx = (ptrdiff_t)Tcl_GetHashValue(he);
-
-		e = &l->kc_entries[idx];
-
-		Tcl_DeleteHashEntry(he);
-		Tcl_DecrRefCount(e->val);
-		Tcl_DecrRefCount(e->val);	// Two references - one for the cache table and one on loan to callers' interim processing
-		mark_free(l->freemap, idx);
-		e->val = NULL;
-
-		he = Tcl_NextHashEntry(&search);
-	}
-	l->kc_count = 0;
-	*/
 
 	for (i=0; i<2; i++)
 		RELEASE(l->force_num_cmd[i]);
@@ -3853,8 +3827,6 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 
 	for (i=0; i<TEMPLATE_ACTIONS_END; i++)
 		RELEASE(l->action[i]);
-
-	RELEASE(l->templates);
 
 	Tcl_DeleteHashTable(&l->kc);
 
@@ -3907,8 +3879,6 @@ _DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 	// Const template action objects
 	for (i=0; i<TEMPLATE_ACTIONS_END; i++)
 		Tcl_IncrRefCount(l->action[i] = Tcl_NewStringObj(action_opcode_str[i], -1));
-
-	Tcl_IncrRefCount(l->templates = Tcl_NewDictObj());
 
 	Tcl_InitHashTable(&l->kc, TCL_STRING_KEYS);
 	l->kc_count = 0;

@@ -48,7 +48,6 @@ struct interp_cx {
 	Tcl_Obj*		force_num_cmd[3];
 	Tcl_Obj*		type_int[JSON_TYPE_MAX];	// Tcl_Obj for JSON_STRING, JSON_ARRAY, etc
 	Tcl_Obj*		type[JSON_TYPE_MAX];		// Holds the Tcl_Obj values returned for [json type ...]
-	Tcl_Obj*		templates;
 	Tcl_HashTable	kc;
 	int				kc_count;
 	long long		freemap[(KC_ENTRIES / (8*sizeof(long long)))+1];	// long long for ffsll
