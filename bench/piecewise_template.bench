@@ -7,6 +7,7 @@ package require rl_json
 
 namespace import rl_json::json
 
+proc main {} {
 bench piecewise_template-1.1 {Templated document creation in multiple steps} -setup { #<<<
 	set tmpl {
 		{
@@ -87,7 +88,7 @@ bench piecewise_template-1.2 {Templated document creation in a loop} -setup { #<
 		bar		Bar
 	}
 } -compare {
-	serialiaze {
+	serialize {
 		set res {[]}
 		for {set i 0} {$i < 20} {incr i} {
 			json set res end+1 [json template $tmpl]
@@ -228,6 +229,8 @@ bench piecewise_template-1.2 {Templated document creation in a loop} -setup { #<
 	]
 }]
 #>>>
+}
+main
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
 

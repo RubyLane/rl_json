@@ -20,6 +20,7 @@ proc readfile fn { #<<<
 }
 #>>>
 
+proc main {} {
 bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
 	set json {
 		{
@@ -112,5 +113,7 @@ bench parse-3.1 {Parse a large json doc with deep nesting and many UTF-8 chars} 
 } -result {a key z}
 #>>>
 }
+}
+main
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

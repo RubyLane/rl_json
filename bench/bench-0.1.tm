@@ -70,7 +70,7 @@ proc _writefile {fn dat} { #<<<
 #>>>
 proc _run_if_set script { #<<<
 	if {$script eq ""} return
-	uplevel 2 $script
+	uplevel 2 [list if 1 $script]
 }
 
 #>>>
@@ -165,7 +165,7 @@ proc bench {name desc args} { #<<<
 	set script	[apply $make_script $opts(-batch) list]
 	for {set i 0} {$i < 1000} {incr i} {
 		set start [clock microseconds]
-		uplevel 1 $script
+		uplevel 1 [list if 1 $script]
 		lappend times [- [clock microseconds] $start]
 	}
 	set overhead	[::tcl::mathfunc::min {*}[lmap e $times {expr {$e / double($opts(-batch))}}]]
@@ -183,7 +183,7 @@ proc bench {name desc args} { #<<<
 
 			if {[info exists opts(-result)]} {
 				set start	[clock microseconds]
-				catch {uplevel 1 $script} r o
+				catch {uplevel 1 [list if 1 $script]} r o
 				lappend times	[- [clock microseconds] $start]
 				incr it
 				_verify_res $variant $normalized_codes $opts(-result) $opts(-match) $r $o
@@ -192,7 +192,7 @@ proc bench {name desc args} { #<<<
 			set bscript	[apply $make_script $opts(-batch) $script]
 			while {[llength $times] < 10 || [- [clock microseconds] $begin] < 500000} {
 				set start [clock microseconds]
-				uplevel 1 $bscript
+				uplevel 1 [list if 1 $bscript]
 				lappend times [expr {
 					([clock microseconds] - $start) / double($opts(-batch)) - $overhead
 				}]

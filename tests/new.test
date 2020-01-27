@@ -47,14 +47,14 @@ test new-2.2 {json string, too few args} -body { #<<<
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {Wrong # of arguments.  Must be "string val"} NONE]
+} -result [list 1 {wrong # args: should be "*string value"} {TCL WRONGARGS}] -match glob
 #>>>
 test new-2.3 {json string, too many args} -body { #<<<
 	set code [catch {json string foo bar} r o]
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {Wrong # of arguments.  Must be "string val"} NONE]
+} -result [list 1 {wrong # args: should be "*string value"} {TCL WRONGARGS}] -match glob
 #>>>
 test new-2.4 {json string, template string} -body { #<<<
 	json string ~S:foo
@@ -117,14 +117,14 @@ test new-4.2 {json boolean, too few args} -body { #<<<
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {Wrong # of arguments.  Must be "boolean val"} NONE]
+} -result [list 1 {wrong # args: should be "*boolean value"} {TCL WRONGARGS}] -match glob
 #>>>
 test new-4.3 {json boolean, too many args} -body { #<<<
 	set code [catch {json boolean foo bar} r o]
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {Wrong # of arguments.  Must be "boolean val"} NONE]
+} -result [list 1 {wrong # args: should be "*boolean value"} {TCL WRONGARGS}] -match glob
 #>>>
 test new-4.4 {json boolean, invalid string} -body { #<<<
 	set code [catch {json boolean foo} r o]
@@ -232,7 +232,6 @@ test new-6.11 {Create new null} -body { #<<<
 	json new null
 } -result null
 #>>>
-
 
 ::tcltest::cleanupTests
 return

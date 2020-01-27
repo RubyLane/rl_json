@@ -9,6 +9,7 @@ package require json_old
 
 namespace import rl_json::json
 
+proc main {} {
 bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 	array set a {
 		x		"str\"foo\nbar"
@@ -187,5 +188,7 @@ bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 	unset -nocomplain a d
 } -result {{"foo":"Bar","baz":["str\"foo\nbar",123,123.4,true,false,null,"~S:not a subst",{"inner":"Bar"},{"inner2":"Bar"}]}}
 #>>>
+}
+main
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

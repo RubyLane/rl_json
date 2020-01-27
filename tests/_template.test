@@ -255,11 +255,11 @@ test _template-5.1 {Not quite a template} -body { #<<<
 #>>>
 test _template-6.1 {too few args} -body { #<<<
 	json _template 
-} -returnCodes error -result {Wrong # of arguments.  Must be "template json_template ?source_dict?"}
+} -returnCodes error -result {wrong # args: should be "*_template json_template ?source_dict?"} -match glob
 #>>>
 test _template-6.2 {too many args} -body { #<<<
 	json _template {"~S:foo"} bar baz
-} -returnCodes error -result {Wrong # of arguments.  Must be "template json_template ?source_dict?"}
+} -returnCodes error -result {wrong # args: should be "*_template json_template ?source_dict?"} -match glob
 #>>>
 
 

@@ -1,6 +1,8 @@
 #include "rl_json.h"
 #include "rl_jsonInt.h"
 
+#define ENSEMBLE	0
+
 #if defined(_WIN32)
 #define snprintf _snprintf
 #endif
@@ -3114,10 +3116,732 @@ release_actions:
 }
 
 //}}}
+
+// Ensemble subcommands
+static int jsonParseCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*		res = NULL;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val");
+		return TCL_ERROR;
+	}
+
+	TEST_OK(JSON_ForceJSON(interp, objv[1]));	// Force parsing objv[1] as JSON
+	TEST_OK(convert_to_tcl(interp, objv[1], &res));
+	Tcl_SetObjResult(interp, res);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonNormalizeCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*		json = NULL;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val");
+		return TCL_ERROR;
+	}
+
+	json = objv[1];
+
+	if (Tcl_IsShared(json))
+		json = Tcl_DuplicateObj(json);
+
+	TEST_OK(JSON_ForceJSON(interp, json));
+	Tcl_InvalidateStringRep(json);
+
+	// Defer string rep generation to our caller
+	Tcl_SetObjResult(interp, json);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonTypeCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	enum json_types		type;
+	Tcl_Obj*			val;
+	Tcl_Obj*			target = NULL;
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		return TCL_ERROR;
+	}
+
+	if (objc >= 3) {
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+	} else {
+		target = objv[1];
+	}
+
+	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+	Tcl_SetObjResult(interp, l->type[type]);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonLengthCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	enum json_types	type;
+	Tcl_Obj*		val;
+	Tcl_Obj*		target = NULL;
+
+	if (objc < 2) CHECK_ARGS(2, "length json_val ?path ...?");
+
+	if (objc >= 3) {
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+	} else {
+		target = objv[1];
+	}
+
+	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+	switch (type) {
+		case JSON_ARRAY:
+			{
+				int			oc;
+				Tcl_Obj**	ov = NULL;
+
+				TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
+				Tcl_SetObjResult(interp, Tcl_NewIntObj(oc));
+			}
+			break;
+		case JSON_OBJECT:
+			{
+				int			size;
+				TEST_OK(Tcl_DictObjSize(interp, val, &size));
+				Tcl_SetObjResult(interp, Tcl_NewIntObj(size));
+			}
+			break;
+		case JSON_STRING:
+			{
+				int len;
+
+				Tcl_GetStringFromObj(val, &len);
+				Tcl_SetObjResult(interp, Tcl_NewIntObj(len));
+			}
+			break;
+		case JSON_DYN_STRING:
+		case JSON_DYN_NUMBER:
+		case JSON_DYN_BOOL:
+		case JSON_DYN_JSON:
+		case JSON_DYN_TEMPLATE:
+		case JSON_DYN_LITERAL:
+			{
+				int len;
+
+				Tcl_GetStringFromObj(val, &len);
+				Tcl_SetObjResult(interp, Tcl_NewIntObj(len+3));
+			}
+			break;
+
+		default:
+			THROW_ERROR("Named JSON value type isn't supported: ", type_names[type]);
+	}
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonKeysCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	enum json_types	type;
+	int				done;
+	Tcl_Obj*		val;
+	Tcl_Obj*		target = NULL;
+	Tcl_Obj*		res = NULL;
+	Tcl_Obj*		k = NULL;
+	Tcl_Obj*		v = NULL;
+	Tcl_DictSearch	search;
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		return TCL_ERROR;
+	}
+
+	if (objc >= 3) {
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+	} else {
+		target = objv[1];
+	}
+
+	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+	if (type != JSON_OBJECT)
+		THROW_ERROR("Named JSON value type isn't supported: ", type_names[type]);
+
+	Tcl_IncrRefCount(res = Tcl_NewListObj(0, NULL));
+
+	TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
+	for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+		if (Tcl_ListObjAppendElement(interp, res, k) != TCL_OK) {
+			Tcl_DictObjDone(&search);
+			Tcl_DecrRefCount(res); res = NULL;
+			return TCL_ERROR;
+		}
+	}
+	Tcl_SetObjResult(interp, res);
+	Tcl_DecrRefCount(res); res = NULL;
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonExistsCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*		target = NULL;
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		return TCL_ERROR;
+	}
+
+	if (objc >= 3) {
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 1, 1));
+		// resolve_path sets the interp result in exists mode
+	} else {
+		enum json_types	type;
+		Tcl_Obj*		val;
+		TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &type, &val));
+		Tcl_SetObjResult(interp, Tcl_NewBooleanObj(type != JSON_NULL));
+	}
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonGetCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*	target = NULL;
+	Tcl_Obj*	res = NULL;
+	int			convert = 1;
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		return TCL_ERROR;
+	}
+
+	if (objc >= 3) {
+		const char*		s = NULL;
+		int				l;
+
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 1));
+		s = Tcl_GetStringFromObj(objv[objc-1], &l);
+		if (s[0] == '?' && s[1] != '?') {
+			// If the last element of the path is an unquoted
+			// modifier, we need to skip the conversion from JSON
+			// (it won't be json, but the modifier result)
+			convert = 0;
+		}
+	} else {
+		enum json_types	type;
+		Tcl_ObjIntRep*	ir;
+		target = objv[1];
+		TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));	// Force parsing objv[2] as JSON
+	}
+
+	if (convert) {
+		TEST_OK(convert_to_tcl(interp, target, &res));
+	} else {
+		res = target;
+	}
+
+	Tcl_SetObjResult(interp, res);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonExtractCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*		target = NULL;
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		return TCL_ERROR;
+	}
+
+	if (objc >= 3) {
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+	} else {
+		enum json_types	type;
+		Tcl_Obj*		val;
+		TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &type, &val));	// Just a validation, keeps the contract that we return JSON
+		target = objv[1];
+	}
+
+	Tcl_SetObjResult(interp, target);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonSetCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	if (objc < 3) {
+		Tcl_WrongNumArgs(interp, 1, objv, "varname ?path ...? json_val");
+		return TCL_ERROR;
+	}
+
+	TEST_OK(JSON_Set(interp, objv[1], objv+2, objc-3, objv[objc-1]));
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonUnsetCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "varname ?path ...?");
+		return TCL_ERROR;
+	}
+
+	TEST_OK(JSON_Unset(interp, objv[1], objv+2, objc-2));
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonNewCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "type ?val?");
+		return TCL_ERROR;
+	}
+
+	Tcl_Obj*	res = NULL;
+
+	TEST_OK(new_json_value_from_list(interp, objc-1, objv+1, &res));
+	Tcl_SetObjResult(interp, res);
+	RELEASE(res);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonStringCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int			l, type;
+	const char*	s;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "value");
+		return TCL_ERROR;
+	}
+
+	s = Tcl_GetStringFromObj(objv[1], &l);
+	if (
+		l >= 3 &&
+		s[0] == '~' &&
+		s[2] == ':'
+	) {
+		switch (s[1]) {
+			case 'S': type = JSON_DYN_STRING; break;
+			case 'N': type = JSON_DYN_NUMBER; break;
+			case 'B': type = JSON_DYN_BOOL; break;
+			case 'J': type = JSON_DYN_JSON; break;
+			case 'T': type = JSON_DYN_TEMPLATE; break;
+			case 'L': type = JSON_DYN_LITERAL; break;
+			default:  type = JSON_UNDEF; break;
+		}
+
+		if (type != JSON_UNDEF) {
+			Tcl_SetObjResult(interp, JSON_NewJvalObj(type, Tcl_NewStringObj((const char*)s+3, l-3)));
+			return TCL_OK;
+		}
+	}
+	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_STRING, Tcl_NewStringObj(s, l)));
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonNumberCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*			forced = NULL;
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	int					res = TCL_OK;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "value");
+		return TCL_ERROR;
+	}
+
+	if (likely((res = force_json_number(interp, l, objv[1], &forced)) == TCL_OK)) {
+		Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_NUMBER, forced));
+	}
+	RELEASE(forced);
+
+	return res;
+}
+
+//}}}
+static int jsonBooleanCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int b;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "value");
+		return TCL_ERROR;
+	}
+
+	TEST_OK(Tcl_GetBooleanFromObj(interp, objv[1], &b));
+	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(b)));
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonObjectCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int			oc;
+	Tcl_Obj**	ov;
+	Tcl_Obj*	res = NULL;
+
+	if (objc == 2) {
+		TEST_OK(Tcl_ListObjGetElements(interp, objv[1], &oc, &ov));
+		TEST_OK(_new_object(interp, oc, ov, &res));
+	} else {
+		TEST_OK(_new_object(interp, objc-1, objv+1, &res));
+	}
+	Tcl_SetObjResult(interp, res);
+	RELEASE(res);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonArrayCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int			i, ac, retval = TCL_OK;;
+	Tcl_Obj**	av;
+	Tcl_Obj*	elem;
+	Tcl_Obj*	val = NULL;
+
+	Tcl_IncrRefCount(val = Tcl_NewListObj(0, NULL));
+
+	for (i=1; i<objc; i++) {
+		TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjGetElements(interp, objv[i], &ac, &av));
+		TEST_OK_LABEL(end_new_array, retval, new_json_value_from_list(interp, ac, av, &elem));
+		TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjAppendElement(interp, val, elem));
+	}
+	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_ARRAY, val));
+
+end_new_array:
+	RELEASE(val);
+
+	return retval;
+}
+
+//}}}
+static int jsonDecodeCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	Tcl_Obj*			ov[4];
+	int					i, retval;
+
+	if (objc < 2 || objc > 3) {
+		Tcl_WrongNumArgs(interp, 1, objv, "bytes ?encoding?");
+		return TCL_ERROR;
+	}
+
+	ov[0] = l->apply;
+	ov[1] = l->decode_bytes;
+	ov[2] = objv[1];
+	ov[3] = (objc >= 3) ? objv[2] : NULL;
+
+	for (i=0; i<4 && ov[i]; i++) if (ov[i]) Tcl_IncrRefCount(ov[i]);
+	retval = Tcl_EvalObjv(interp, i, ov, TCL_EVAL_GLOBAL);
+	for (i=0; i<4 && ov[i]; i++) RELEASE(ov[i]);
+
+	return retval;
+}
+
+//}}}
+static int jsonIsNullCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*		target = NULL;
+	Tcl_Obj*		val;
+	enum json_types	type;
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		return TCL_ERROR;
+	}
+
+	if (objc >= 3) {
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+	} else {
+		target = objv[1];
+	}
+
+	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+
+	Tcl_SetObjResult(interp, Tcl_NewBooleanObj(type == JSON_NULL));
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonTemplateCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int							res;
+	struct serialize_context	scx;
+	Tcl_DString					ds;
+
+	if (objc < 2 || objc > 3) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_template ?source_dict?");
+		return TCL_ERROR;
+	}
+
+	Tcl_DStringInit(&ds);
+
+	scx.ds = &ds;
+	scx.serialize_mode = SERIALIZE_TEMPLATE;
+	scx.fromdict = NULL;
+	scx.l = (struct interp_cx*)cdata;
+	scx.allow_null = 1;
+
+	if (objc >= 3)
+		Tcl_IncrRefCount(scx.fromdict = objv[2]);
+
+	res = serialize(interp, &scx, objv[1]);
+
+	RELEASE(scx.fromdict);
+
+	if (res == TCL_OK)
+		Tcl_DStringResult(interp, scx.ds);
+
+	Tcl_DStringFree(scx.ds); scx.ds = NULL;
+
+	return res == TCL_OK ? TCL_OK : TCL_ERROR;
+}
+
+//}}}
+static int jsonTemplateNewCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	Tcl_Obj*	res = NULL;
+
+	if (objc < 2 || objc > 3) {
+		Tcl_WrongNumArgs(interp, 1, objv, "json_template ?source_dict?");
+		return TCL_ERROR;
+	}
+
+	TEST_OK(JSON_Template(interp, objv[1], objc >= 3 ? objv[2] : NULL, &res));
+
+	Tcl_SetObjResult(interp, res);
+	return TCL_OK;
+}
+
+//}}}
+static int _foreach(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], enum collecting_mode mode) //{{{
+{
+	if (objc < 4 || (objc-4) % 2 != 0) {
+		Tcl_WrongNumArgs(interp, 1, objv, "?varlist datalist ...? script");
+		return TCL_ERROR;
+	}
+
+	return foreach(interp, objc-1, objv+1, mode);
+}
+
+//}}}
+static int jsonNRForeachCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return _foreach(cdata, interp, objc, objv, COLLECT_NONE);
+}
+
+//}}}
+static int jsonForeachCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return Tcl_NRCallObjProc(interp, jsonNRForeachCmd, cdata, objc, objv);
+}
+
+//}}}
+static int jsonNRLmapCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return _foreach(cdata, interp, objc, objv, COLLECT_LIST);
+}
+
+//}}}
+static int jsonLmapCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return Tcl_NRCallObjProc(interp, jsonNRLmapCmd, cdata, objc, objv);
+}
+
+//}}}
+static int jsonNRAmapCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return _foreach(cdata, interp, objc, objv, COLLECT_ARRAY);
+}
+
+//}}}
+static int jsonAmapCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return Tcl_NRCallObjProc(interp, jsonNRAmapCmd, cdata, objc, objv);
+}
+
+//}}}
+static int jsonNROmapCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return _foreach(cdata, interp, objc, objv, COLLECT_OBJECT);
+}
+
+//}}}
+static int jsonOmapCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return Tcl_NRCallObjProc(interp, jsonNROmapCmd, cdata, objc, objv);
+}
+
+//}}}
+static int jsonFreeCacheCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+
+	if (objc != 1) {
+		Tcl_WrongNumArgs(interp, 1, objv, "");
+		return TCL_ERROR;
+	}
+
+	free_cache(l);
+
+	return TCL_OK;
+}
+
+//}}}
+static int jsonNopCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	return TCL_OK;
+}
+
+//}}}
+static int jsonPrettyCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int			retval = TCL_OK;
+	Tcl_DString	ds;
+	Tcl_Obj*	indent = NULL;
+	Tcl_Obj*	pad = NULL;
+
+	if (objc < 2 || objc > 3)
+		CHECK_ARGS(2, "pretty json_val ?indent?");
+
+	if (objc >= 3) {
+		indent = objv[2];
+	} else {
+		indent = Tcl_NewStringObj("    ", 4);
+	}
+	Tcl_IncrRefCount(indent);
+
+	Tcl_IncrRefCount(pad = Tcl_NewStringObj("", 0));
+	Tcl_DStringInit(&ds);
+	if ((retval = json_pretty(interp, objv[1], indent, pad, &ds)) == TCL_OK)
+		Tcl_DStringResult(interp, &ds);
+
+	RELEASE(pad);
+	RELEASE(indent);
+	Tcl_DStringFree(&ds);
+
+	return retval;
+}
+
+//}}}
+static int jsonDebugCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int			retval = TCL_OK;
+	Tcl_DString	ds;
+	Tcl_Obj*	indent = NULL;
+	Tcl_Obj*	pad = NULL;
+
+	if (objc < 2 || objc > 3)
+		CHECK_ARGS(2, "pretty json_val ?indent?");
+
+	if (objc >= 3) {
+		indent = objv[2];
+	} else {
+		indent = Tcl_NewStringObj("    ", 4);
+	}
+	Tcl_IncrRefCount(indent);
+
+	Tcl_IncrRefCount(pad = Tcl_NewStringObj("", 0));
+	Tcl_DStringInit(&ds);
+	if ((retval = json_pretty_dbg(interp, objv[1], indent, pad, &ds)) == TCL_OK)
+		Tcl_DStringResult(interp, &ds);
+
+	RELEASE(pad);
+	RELEASE(indent);
+	Tcl_DStringFree(&ds);
+
+	return retval;
+}
+
+//}}}
+#if 0
+static int jsonMergeCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	int		i=2, deep=0, checking_flags=1, str_len;
+	const char*	str;
+	Tcl_Obj*	res = NULL;
+	Tcl_Obj*	patch;
+	Tcl_Obj*	new;
+	static const char* flags[] = {
+		"--",
+		"-deep",
+		(char*)NULL
+	};
+	enum {
+		FLAG_ENDARGS,
+		FLAG_DEEP
+	};
+	int	index;
+
+	THROW_ERROR("merge method is not functional yet, sorry");
+
+	if (objc < 1) CHECK_ARGS(0, "?flag ...? ?json_val ...?");
+
+	while (i < objc) {
+		patch = objv[i++];
+
+		// Nasty optimization - prevent generating string rep of
+		// a pure JSON value to check if it is a flag (can never
+		// be: "-" isn't valid as the first char of a JSON value)
+		if (patch->typePtr == &json_type)
+			checking_flags = 0;
+
+		if (checking_flags) {
+			str = Tcl_GetStringFromObj(patch, &str_len);
+			if (str_len > 0 && str[0] == '-') {
+				TEST_OK(Tcl_GetIndexFromObj(interp, patch, flags,
+							"flag", TCL_EXACT, &index));
+				switch (index) {
+					case FLAG_ENDARGS: checking_flags = 0; break;
+					case FLAG_DEEP:    deep = 1;           break;
+					default: THROW_ERROR("Invalid flag");
+				}
+				continue;
+			}
+		}
+
+		if (res == NULL) {
+			res = patch;
+		} else {
+			TEST_OK(merge(interp, deep, res, patch, &new));
+			if (new != res)
+				res = new;
+		}
+	}
+
+	if (res != NULL)
+		Tcl_SetObjResult(interp, res);
+}
+
+//}}}
+#endif
+
 static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	int method, retcode=TCL_OK;
-	static const char *methods[] = {
+	int subcommand;
+	static const char *subcommands[] = {
 		"parse",		// DEPRECATED
 		"normalize",
 		"extract",
@@ -3189,605 +3913,51 @@ static int jsonNRObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 		M_NOP
 	};
 
-	if (objc < 2)
-		CHECK_ARGS(1, "method ?arg ...?");
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "subcommand ?arg ...?");
+		return TCL_ERROR;
+	}
 
-	TEST_OK(Tcl_GetIndexFromObj(interp, objv[1], methods, "method", TCL_EXACT, &method));
+	TEST_OK(Tcl_GetIndexFromObj(interp, objv[1], subcommands, "subcommand", TCL_EXACT, &subcommand));
 
-	switch (method) {
-		case M_PARSE: //{{{
-			CHECK_ARGS(2, "parse json_val");
-			{
-				Tcl_Obj*	res = NULL;
-				TEST_OK(convert_to_tcl(interp, objv[2], &res));
-				Tcl_SetObjResult(interp, res);
-			}
-			break;
-			//}}}
-		case M_NORMALIZE: //{{{
-			//DEBUGGER;
-			CHECK_ARGS(2, "normalize json_val");
-			{
-				enum json_types	type;
-				Tcl_Obj*		json = objv[2];
-				Tcl_Obj*		val;
-
-				if (Tcl_IsShared(json))
-					json = Tcl_DuplicateObj(json);
-
-				TEST_OK(JSON_GetJvalFromObj(interp, json, &type, &val));
-				Tcl_InvalidateStringRep(json);
-
-				// Defer string rep generation to our caller
-				Tcl_SetObjResult(interp, json);
-			}
-			break;
-			//}}}
-		case M_TYPE: //{{{
-			{
-				enum json_types	type;
-				Tcl_Obj*			val;
-				Tcl_Obj*			target = NULL;
-				struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-
-				if (objc < 3) CHECK_ARGS(2, "type json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
-				} else {
-					target = objv[2];
-				}
-
-				TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-				Tcl_SetObjResult(interp, l->type[type]);
-			}
-			break;
-			//}}}
-		case M_LENGTH: //{{{
-			{
-				enum json_types	type;
-				Tcl_Obj*		val;
-				Tcl_Obj*		target = NULL;
-
-				if (objc < 3) CHECK_ARGS(2, "length json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
-				} else {
-					target = objv[2];
-				}
-
-				TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-				switch (type) {
-					case JSON_ARRAY:
-						{
-							int			oc;
-							Tcl_Obj**	ov = NULL;
-
-							TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
-							Tcl_SetObjResult(interp, Tcl_NewIntObj(oc));
-						}
-						break;
-					case JSON_OBJECT:
-						{
-							int			size;
-							TEST_OK(Tcl_DictObjSize(interp, val, &size));
-							Tcl_SetObjResult(interp, Tcl_NewIntObj(size));
-						}
-						break;
-					case JSON_STRING:
-						{
-							int len;
-
-							Tcl_GetStringFromObj(val, &len);
-							Tcl_SetObjResult(interp, Tcl_NewIntObj(len));
-						}
-						break;
-					case JSON_DYN_STRING:
-					case JSON_DYN_NUMBER:
-					case JSON_DYN_BOOL:
-					case JSON_DYN_JSON:
-					case JSON_DYN_TEMPLATE:
-					case JSON_DYN_LITERAL:
-						{
-							int len;
-
-							Tcl_GetStringFromObj(val, &len);
-							Tcl_SetObjResult(interp, Tcl_NewIntObj(len+3));
-						}
-						break;
-
-					default:
-						THROW_ERROR("Named JSON value type isn't supported: ", type_names[type]);
-				}
-			}
-			break;
-			//}}}
-		case M_KEYS: //{{{
-			{
-				enum json_types	type;
-				int				done;
-				Tcl_Obj*		val;
-				Tcl_Obj*		target = NULL;
-				Tcl_Obj*		res = NULL;
-				Tcl_Obj*		k = NULL;
-				Tcl_Obj*		v = NULL;
-				Tcl_DictSearch	search;
-
-				if (objc < 3) CHECK_ARGS(2, "keys json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
-				} else {
-					target = objv[2];
-				}
-
-				TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-				if (type != JSON_OBJECT)
-					THROW_ERROR("Named JSON value type isn't supported: ", type_names[type]);
-
-				Tcl_IncrRefCount(res = Tcl_NewListObj(0, NULL));
-
-				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
-				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
-					if (Tcl_ListObjAppendElement(interp, res, k) != TCL_OK) {
-						Tcl_DictObjDone(&search);
-						Tcl_DecrRefCount(res); res = NULL;
-						return TCL_ERROR;
-					}
-				}
-				Tcl_SetObjResult(interp, res);
-				Tcl_DecrRefCount(res); res = NULL;
-			}
-			break;
-			//}}}
-		case M_EXISTS: //{{{
-			{
-				Tcl_Obj*		target = NULL;
-
-				if (objc < 3) CHECK_ARGS(2, "exists json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 1, 1));
-					// resolve_path sets the interp result in exists mode
-				} else {
-					enum json_types	type;
-					Tcl_Obj*		val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));
-					Tcl_SetObjResult(interp, Tcl_NewBooleanObj(type != JSON_NULL));
-				}
-			}
-			break;
-			//}}}
-		case M_GET: //{{{
-			{
-				Tcl_Obj*	target = NULL;
-				Tcl_Obj*	res = NULL;
-				int			convert = 1;
-
-				if (objc < 3) CHECK_ARGS(2, "get json_val ?path ...?");
-
-				if (objc >= 4) {
-					const char*		s = NULL;
-					int				l;
-
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 1));
-					s = Tcl_GetStringFromObj(objv[objc-1], &l);
-					if (s[0] == '?' && s[1] != '?') {
-						// If the last element of the path is an unquoted
-						// modifier, we need to skip the conversion from JSON
-						// (it won't be json, but the modifier result)
-						convert = 0;
-					}
-				} else {
-					enum json_types	type;
-					Tcl_ObjIntRep*	ir;
-					target = objv[2];
-					TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));	// Force parsing objv[2] as JSON
-				}
-
-				if (convert) {
-					TEST_OK(convert_to_tcl(interp, target, &res));
-				} else {
-					res = target;
-				}
-
-				Tcl_SetObjResult(interp, res);
-			}
-			break;
-			//}}}
-		case M_EXTRACT: //{{{
-			{
-				Tcl_Obj*		target = NULL;
-
-				if (objc < 3) CHECK_ARGS(2, "extract json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
-				} else {
-					enum json_types	type;
-					Tcl_Obj*		val;
-					TEST_OK(JSON_GetJvalFromObj(interp, objv[2], &type, &val));	// Just a validation, keeps the contract that we return JSON
-					target = objv[2];
-				}
-
-				Tcl_SetObjResult(interp, target);
-			}
-			break;
-			//}}}
-		case M_SET: //{{{
-			if (objc < 4) CHECK_ARGS(5, "set varname ?path ...? json_val");
-			TEST_OK(JSON_Set(interp, objv[2], objv+3, objc-4, objv[objc-1]));
-			break;
-			//}}}
-		case M_UNSET: //{{{
-			if (objc < 3) CHECK_ARGS(4, "unset varname ?path ...?");
-			TEST_OK(JSON_Unset(interp, objv[2], objv+3, objc-3));
-			break;
-			//}}}
+	switch (subcommand) {
+		case M_PARSE:		return jsonParseCmd(cdata, interp, objc-1, objv+1);
+		case M_NORMALIZE:	return jsonNormalizeCmd(cdata, interp, objc-1, objv+1);
+		case M_TYPE:		return jsonTypeCmd(cdata, interp, objc-1, objv+1);
+		case M_LENGTH:		return jsonLengthCmd(cdata, interp, objc-1, objv+1);
+		case M_KEYS:		return jsonKeysCmd(cdata, interp, objc-1, objv+1);
+		case M_EXISTS:		return jsonExistsCmd(cdata, interp, objc-1, objv+1);
+		case M_GET:			return jsonGetCmd(cdata, interp, objc-1, objv+1);
+		case M_EXTRACT:		return jsonExtractCmd(cdata, interp, objc-1, objv+1);
+		case M_SET:			return jsonSetCmd(cdata, interp, objc-1, objv+1);
+		case M_UNSET:		return jsonUnsetCmd(cdata, interp, objc-1, objv+1);
 		case M_FMT:
-		case M_NEW: //{{{
-			{
-				Tcl_Obj*	res = NULL;
-
-				if (objc < 3) CHECK_ARGS(2, "new type ?val?");
-
-				TEST_OK(new_json_value_from_list(interp, objc-2, objv+2, &res));
-				Tcl_SetObjResult(interp, res);
-				RELEASE(res);
-			}
-			break;
-			//}}}
-		case M_STRING: //{{{
-			{
-				int			l, type;
-				const char*	s;
-
-				CHECK_ARGS(2, "string val");
-				s = Tcl_GetStringFromObj(objv[2], &l);
-				if (
-						l >= 3 &&
-						s[0] == '~' &&
-						s[2] == ':'
-				) {
-					switch (s[1]) {
-						case 'S': type = JSON_DYN_STRING; break;
-						case 'N': type = JSON_DYN_NUMBER; break;
-						case 'B': type = JSON_DYN_BOOL; break;
-						case 'J': type = JSON_DYN_JSON; break;
-						case 'T': type = JSON_DYN_TEMPLATE; break;
-						case 'L': type = JSON_DYN_LITERAL; break;
-						default:  type = JSON_UNDEF; break;
-					}
-
-					if (type != JSON_UNDEF) {
-						Tcl_SetObjResult(interp, JSON_NewJvalObj(type, Tcl_NewStringObj((const char*)s+3, l-3)));
-						break;
-					}
-				}
-				Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_STRING, Tcl_NewStringObj(s, l)));
-			}
-			break;
-			//}}}
-		case M_NUMBER: //{{{
-			{
-				Tcl_Obj*	forced = NULL;
-				struct interp_cx* l = Tcl_GetAssocData(interp, "rl_json", NULL);
-				int			res = TCL_OK;
-
-				CHECK_ARGS(2, "number val");
-				if (likely((res = force_json_number(interp, l, objv[2], &forced)) == TCL_OK)) {
-					Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_NUMBER, forced));
-				}
-				RELEASE(forced);
-				return res;
-			}
-			break;
-			//}}}
-		case M_BOOLEAN: //{{{
-			{
-				int b;
-
-				CHECK_ARGS(2, "boolean val");
-				TEST_OK(Tcl_GetBooleanFromObj(interp, objv[2], &b));
-				Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_BOOL, Tcl_NewBooleanObj(b)));
-			}
-			break;
-			//}}}
-		case M_OBJECT: //{{{
-			{
-				int			oc;
-				Tcl_Obj**	ov;
-				Tcl_Obj*	res = NULL;
-
-				if (objc == 3) {
-					TEST_OK(Tcl_ListObjGetElements(interp, objv[2], &oc, &ov));
-					TEST_OK(_new_object(interp, oc, ov, &res));
-				} else {
-					TEST_OK(_new_object(interp, objc-2, objv+2, &res));
-				}
-				Tcl_SetObjResult(interp, res);
-				RELEASE(res);
-			}
-			break;
-			//}}}
-		case M_ARRAY: //{{{
-			{
-				int			i, ac, retval = TCL_OK;;
-				Tcl_Obj**	av;
-				Tcl_Obj*	elem;
-				Tcl_Obj*	val = NULL;
-
-				Tcl_IncrRefCount(val = Tcl_NewListObj(0, NULL));
-
-				for (i=2; i<objc; i++) {
-					TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjGetElements(interp, objv[i], &ac, &av));
-					TEST_OK_LABEL(end_new_array, retval, new_json_value_from_list(interp, ac, av, &elem));
-					TEST_OK_LABEL(end_new_array, retval, Tcl_ListObjAppendElement(interp, val, elem));
-				}
-				Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_ARRAY, val));
-end_new_array:
-				RELEASE(val);
-				if (retval != TCL_OK)
-					return retval;
-			}
-			break;
-			//}}}
-		case M_DECODE: //{{{
-			{
-				Tcl_Obj*			ov[4];
-				int					i, retval;
-				struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-
-				if (objc <= 2 || objc > 4) {
-					Tcl_WrongNumArgs(interp, 2, objv, "bytes ?encoding?");
-					return TCL_ERROR;
-				}
-
-				ov[0] = l->apply;
-				ov[1] = l->decode_bytes;
-				ov[2] = objv[2];
-				ov[3] = (objc >= 4) ? objv[3] : NULL;
-
-				for (i=0; i<4 && ov[i]; i++) if (ov[i]) Tcl_IncrRefCount(ov[i]);
-				retval = Tcl_EvalObjv(interp, i, ov, TCL_EVAL_GLOBAL);
-				for (i=0; i<4 && ov[i]; i++) RELEASE(ov[i]);
-
-				return retval;
-			}
-			break;
-			//}}}
-		case M_ISNULL: //{{{
-			{
-				Tcl_Obj*		target = NULL;
-				Tcl_Obj*		val;
-				enum json_types	type;
-
-				if (objc < 3) CHECK_ARGS(2, "isnull json_val ?path ...?");
-
-				if (objc >= 4) {
-					TEST_OK(resolve_path(interp, objv[2], objv+3, objc-3, &target, 0, 0));
-				} else {
-					target = objv[2];
-				}
-
-				TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-
-				Tcl_SetObjResult(interp, Tcl_NewBooleanObj(type == JSON_NULL));
-			}
-			break;
-			//}}}
-		case M_TEMPLATE: //{{{
-			{
-				int		res;
-				struct serialize_context	scx;
-				Tcl_DString					ds;
-
-				if (objc < 3 || objc > 4)
-					CHECK_ARGS(2, "template json_template ?source_dict?");
-
-				Tcl_DStringInit(&ds);
-
-				scx.ds = &ds;
-				scx.serialize_mode = SERIALIZE_TEMPLATE;
-				scx.fromdict = NULL;
-				scx.l = Tcl_GetAssocData(interp, "rl_json", NULL);
-				scx.allow_null = 1;
-
-				if (objc == 4)
-					Tcl_IncrRefCount(scx.fromdict = objv[3]);
-
-				res = serialize(interp, &scx, objv[2]);
-
-				if (scx.fromdict != NULL) {
-					Tcl_DecrRefCount(scx.fromdict); scx.fromdict = NULL;
-				}
-
-				if (res == TCL_OK)
-					Tcl_DStringResult(interp, scx.ds);
-
-				Tcl_DStringFree(scx.ds); scx.ds = NULL;
-
-				return res == TCL_OK ? TCL_OK : TCL_ERROR;
-			}
-
-			break;
-			//}}}
-		case M_TEMPLATE_NEW: //{{{
-			{
-				Tcl_Obj*	res = NULL;
-
-				if (objc < 3 || objc > 4)
-					CHECK_ARGS(2, "template json_template ?source_dict?");
-
-				TEST_OK(JSON_Template(interp, objv[2], objc >= 4 ? objv[3] : NULL, &res));
-
-				Tcl_SetObjResult(interp, res);
-				return TCL_OK;
-			}
-			break;
-			//}}}
-		case M_FOREACH:
-		case M_LMAP:
-		case M_AMAP:
-		case M_OMAP:
-			{ //{{{
-				enum collecting_mode	mode;
-
-				if (objc < 5 || (objc-5) % 2 != 0) {
-					Tcl_WrongNumArgs(interp, 2, objv, "?varlist datalist ...? script");
-					return TCL_ERROR;
-				}
-
-				switch (method) {
-					case M_FOREACH:	mode = COLLECT_NONE;	break;
-					case M_LMAP:	mode = COLLECT_LIST;	break;
-					case M_AMAP:	mode = COLLECT_ARRAY;	break;
-					case M_OMAP:	mode = COLLECT_OBJECT;	break;
-				}
-
-				retcode = foreach(interp, objc-2, objv+2, mode);
-			}
-			break;
-			//}}}
-		case M_FREE_CACHE: //{{{
-			{
-				struct interp_cx* l = Tcl_GetAssocData(interp, "rl_json", NULL);
-
-				CHECK_ARGS(1, "free_cache");
-
-				free_cache(l);
-
-				return TCL_OK;
-			}
-			break;
-			//}}}
-		case M_NOP: //{{{
-			break;
-			//}}}
-		case M_PRETTY: //{{{
-			{
-				Tcl_DString	ds;
-				Tcl_Obj*	indent = NULL;
-				Tcl_Obj*	pad = Tcl_NewStringObj("", 0);
-
-				if (objc < 3 || objc > 4)
-					CHECK_ARGS(2, "pretty json_val ?indent?");
-
-				if (objc > 3) {
-					indent = objv[3];
-				} else {
-					indent = Tcl_NewStringObj("    ", 4);
-				}
-				Tcl_IncrRefCount(indent);
-
-				Tcl_DStringInit(&ds);
-				if (json_pretty(interp, objv[2], indent, pad, &ds) != TCL_OK) {
-					Tcl_DecrRefCount(indent); indent=NULL;
-					Tcl_DStringFree(&ds);
-					return TCL_ERROR;
-				}
-				Tcl_DecrRefCount(indent); indent=NULL;
-				Tcl_DStringResult(interp, &ds);
-				Tcl_DStringFree(&ds);
-			}
-			break;
-			//}}}
-		case M_DEBUG: //{{{
-			{
-				Tcl_DString	ds;
-				Tcl_Obj*	indent = NULL;
-				Tcl_Obj*	pad = Tcl_NewStringObj("", 0);
-
-				if (objc < 3 || objc > 4)
-					CHECK_ARGS(2, "debug json_val ?indent?");
-
-				if (objc > 3) {
-					indent = objv[3];
-				} else {
-					indent = Tcl_NewStringObj("    ", 4);
-				}
-				Tcl_IncrRefCount(indent);
-
-				Tcl_DStringInit(&ds);
-				if (json_pretty_dbg(interp, objv[2], indent, pad, &ds) != TCL_OK) {
-					Tcl_DecrRefCount(indent); indent=NULL;
-					Tcl_DStringFree(&ds);
-					return TCL_ERROR;
-				}
-				Tcl_DecrRefCount(indent); indent=NULL;
-				Tcl_DStringResult(interp, &ds);
-				Tcl_DStringFree(&ds);
-			}
-			break;
-			//}}}
-			/*
-		case M_MERGE: //{{{
-			THROW_ERROR("merge method is not functional yet, sorry");
-			{
-				int		i=2, deep=0, checking_flags=1, str_len;
-				const char*	str;
-				Tcl_Obj*	res = NULL;
-				Tcl_Obj*	patch;
-				Tcl_Obj*	new;
-				static const char* flags[] = {
-					"--",
-					"-deep",
-					(char*)NULL
-				};
-				enum {
-					FLAG_ENDARGS,
-					FLAG_DEEP
-				};
-				int	index;
-
-				if (objc < 2) CHECK_ARGS(1, "merge ?flag ...? ?json_val ...?");
-
-				while (i < objc) {
-					patch = objv[i++];
-
-					// Nasty optimization - prevent generating string rep of
-					// a pure JSON value to check if it is a flag (can never
-					// be: "-" isn't valid as the first char of a JSON value)
-					if (patch->typePtr == &json_type)
-						checking_flags = 0;
-
-					if (checking_flags) {
-						str = Tcl_GetStringFromObj(patch, &str_len);
-						if (str_len > 0 && str[0] == '-') {
-							TEST_OK(Tcl_GetIndexFromObj(interp, patch, flags,
-										"flag", TCL_EXACT, &index));
-							switch (index) {
-								case FLAG_ENDARGS: checking_flags = 0; break;
-								case FLAG_DEEP:    deep = 1;           break;
-								default: THROW_ERROR("Invalid flag");
-							}
-							continue;
-						}
-					}
-
-					if (res == NULL) {
-						res = patch;
-					} else {
-						TEST_OK(merge(interp, deep, res, patch, &new));
-						if (new != res)
-							res = new;
-					}
-				}
-
-				if (res != NULL)
-					Tcl_SetObjResult(interp, res);
-			}
-			break;
-			//}}}
-			*/
+		case M_NEW:			return jsonNewCmd(cdata, interp, objc-1, objv+1);
+		case M_STRING:		return jsonStringCmd(cdata, interp, objc-1, objv+1);
+		case M_NUMBER:		return jsonNumberCmd(cdata, interp, objc-1, objv+1);
+		case M_BOOLEAN:		return jsonBooleanCmd(cdata, interp, objc-1, objv+1);
+		case M_OBJECT:		return jsonObjectCmd(cdata, interp, objc-1, objv+1);
+		case M_ARRAY:		return jsonArrayCmd(cdata, interp, objc-1, objv+1);
+		case M_DECODE:		return jsonDecodeCmd(cdata, interp, objc-1, objv+1);
+		case M_ISNULL:		return jsonIsNullCmd(cdata, interp, objc-1, objv+1);
+		case M_TEMPLATE:	return jsonTemplateCmd(cdata, interp, objc-1, objv+1);
+		case M_TEMPLATE_NEW:return jsonTemplateNewCmd(cdata, interp, objc-1, objv+1);
+		case M_FOREACH:		return jsonForeachCmd(cdata, interp, objc-1, objv+1);
+		case M_LMAP:		return jsonLmapCmd(cdata, interp, objc-1, objv+1);
+		case M_AMAP:		return jsonAmapCmd(cdata, interp, objc-1, objv+1);
+		case M_OMAP:		return jsonOmapCmd(cdata, interp, objc-1, objv+1);
+		case M_FREE_CACHE:	return jsonFreeCacheCmd(cdata, interp, objc-1, objv+1);
+		case M_NOP:			return jsonNopCmd(cdata, interp, objc-1, objv+1);
+		case M_PRETTY:		return jsonPrettyCmd(cdata, interp, objc-1, objv+1);
+		case M_DEBUG:		return jsonDebugCmd(cdata, interp, objc-1, objv+1);
+	//	case M_MERGE:		return jsonMergeCmd(cdata, interp, objc-1, objv+1);
 
 		default:
 			// Should be impossible to reach
-			THROW_ERROR("Invalid method");
+			THROW_ERROR("Invalid subcommand");
 	}
 
-	return retcode;
+	return TCL_OK;
 }
 
 //}}}
@@ -3797,6 +3967,7 @@ static int jsonObjCmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 }
 
 //}}}
+
 void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 {
 	struct interp_cx* l = cdata;
@@ -3837,6 +4008,7 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 }
 
 //}}}
+
 extern Rl_jsonStubs rl_jsonStubs;
 _DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 {
@@ -3993,11 +4165,92 @@ _DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 
 	{
 		Tcl_Namespace*	ns = NULL;
+#if ENSEMBLE
+		Tcl_Namespace*	ns_cmd = NULL;
+		Tcl_Command		ens_cmd = NULL;
+#endif
 
-		ns = Tcl_CreateNamespace(interp, "::rl_json", NULL, NULL);
+#define NS	"::rl_json"
+
+		ns = Tcl_CreateNamespace(interp, NS, NULL, NULL);
 		TEST_OK(Tcl_Export(interp, ns, "*", 0));
+
+#if ENSEMBLE
+#define ENS	NS "::json::"
+		ns_cmd = Tcl_CreateNamespace(interp, NS "::json", NULL, NULL);
+		ens_cmd = Tcl_CreateEnsemble(interp, NS "::json", ns_cmd, 0);
+#if 1
+		{
+			Tcl_Obj*		subcommands = Tcl_NewListObj(0, NULL);
+
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("parse",      -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("normalize",  -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("type",       -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("length",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("keys",       -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("exists",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("get",        -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("extract",    -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("set",        -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("unset",      -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("fmt",        -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("new",        -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("string",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("number",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("boolean",    -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("object",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("array",      -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("decode",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("isnull",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template",   -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("_template",  -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("foreach",    -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("lmap",       -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("amap",       -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("omap",       -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("free_cache", -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("nop",        -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("pretty",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("debug",      -1));
+			Tcl_SetEnsembleSubcommandList(interp, ens_cmd, subcommands);
+		}
+#endif
+		TEST_OK(Tcl_Export(interp, ns_cmd, "*", 0));
+
+		Tcl_CreateObjCommand(interp, ENS "parse",      jsonParseCmd, l, NULL);		// Deprecated
+		Tcl_CreateObjCommand(interp, ENS "normalize",  jsonNormalizeCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "type",       jsonTypeCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "length",     jsonLengthCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "keys",       jsonKeysCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "exists",     jsonExistsCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "get",        jsonGetCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "extract",    jsonExtractCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "set",        jsonSetCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "unset",      jsonUnsetCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "fmt",        jsonNewCmd, l, NULL);		// Deprecated
+		Tcl_CreateObjCommand(interp, ENS "new",        jsonNewCmd, l, NULL);		// Deprecated
+		Tcl_CreateObjCommand(interp, ENS "string",     jsonStringCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "number",     jsonNumberCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "boolean",    jsonBooleanCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "object",     jsonObjectCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "array",      jsonArrayCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "decode",     jsonDecodeCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "isnull",     jsonIsNullCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "template",   jsonTemplateCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "_template",  jsonTemplateNewCmd, l, NULL);
+		Tcl_NRCreateCommand(interp,  ENS "foreach",    jsonForeachCmd, jsonNRForeachCmd, l, NULL);
+		Tcl_NRCreateCommand(interp,  ENS "lmap",       jsonLmapCmd,    jsonNRLmapCmd,    l, NULL);
+		Tcl_NRCreateCommand(interp,  ENS "amap",       jsonAmapCmd,    jsonNRAmapCmd,    l, NULL);
+		Tcl_NRCreateCommand(interp,  ENS "omap",       jsonOmapCmd,    jsonNROmapCmd,    l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "free_cache", jsonFreeCacheCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "nop",        jsonNopCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "pretty",     jsonPrettyCmd, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "debug",      jsonDebugCmd, l, NULL);
+		//Tcl_CreateObjCommand(interp, ENS "merge",      jsonMergeCmd, l, NULL);
+#else
+		Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObjCmd, jsonNRObjCmd, l, NULL);
+#endif
 	}
-	Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObjCmd, jsonNRObjCmd, NULL, NULL);
 
 	TEST_OK(Tcl_PkgProvideEx(interp, PACKAGE_NAME, PACKAGE_VERSION, &rl_jsonStubs));
 

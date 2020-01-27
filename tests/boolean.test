@@ -82,14 +82,14 @@ test boolean-2.1 {Too few args} -body { #<<<
 		json boolean
 	} r o]
 	list $code $r [dict get $o -errorcode]
-} -result {1 {Wrong # of arguments.  Must be "boolean val"} NONE}
+} -result {1 {wrong # args: should be "*boolean value"} {TCL WRONGARGS}} -match glob
 #>>>
 test boolean-2.2 {Too many args} -body { #<<<
 	set code [catch {
 		json boolean foo bar
 	} r o]
 	list $code $r [dict get $o -errorcode]
-} -result {1 {Wrong # of arguments.  Must be "boolean val"} NONE}
+} -result {1 {wrong # args: should be "*boolean value"} {TCL WRONGARGS}} -match glob
 #>>>
 test boolean-2.3 {Empty string} -body { #<<<
 	set code [catch {

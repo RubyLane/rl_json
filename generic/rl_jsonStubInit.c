@@ -13,6 +13,7 @@ const Rl_jsonStubs rl_jsonStubs = {
     JSON_GetIntrepFromObj, /* 5 */
     JSON_IsJSON, /* 6 */
     JSON_SetIntRep, /* 7 */
+    JSON_ForceJSON, /* 8 */
 };
 
 /* !END!: Do not edit above this line. */

@@ -234,11 +234,11 @@ test template-5.1 {Not quite a template} -body { #<<<
 #>>>
 test template-6.1 {too few args} -body { #<<<
 	json template 
-} -returnCodes error -result {Wrong # of arguments.  Must be "template json_template ?source_dict?"}
+} -returnCodes error -result {wrong # args: should be "*template json_template ?source_dict?"} -match glob
 #>>>
 test template-6.2 {too many args} -body { #<<<
 	json template {"~S:foo"} bar baz
-} -returnCodes error -result {Wrong # of arguments.  Must be "template json_template ?source_dict?"}
+} -returnCodes error -result {wrong # args: should be "*template json_template ?source_dict?"} -match glob
 #>>>
 
 ::tcltest::cleanupTests

@@ -13,7 +13,7 @@ test keys-0.1 {too few args} -body { #<<<
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result {1 {Wrong # of arguments.  Must be "keys json_val ?path ...?"} NONE}
+} -result {1 {wrong # args: should be "*keys json_val ?path ...?"} {TCL WRONGARGS}} -match glob
 #>>>
 test keys-1.1 {type: object, no path} -body { #<<<
 	json keys {

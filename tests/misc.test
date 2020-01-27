@@ -10,13 +10,13 @@ test misc-1.1 {too few args} -body { #<<<
 	list [catch {json} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {Wrong # of arguments.  Must be "method ?arg ...?"} NONE}
+} -result {1 {wrong # args: should be "*subcommand ?arg ...?"} {TCL WRONGARGS}} -match glob
 #>>>
 test misc-1.2 {invalid subcommand} -body { #<<<
 	list [catch {json invalid_subcommand} r o] [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {TCL LOOKUP INDEX method invalid_subcommand}}
+} -result {^1 {(?:TCL LOOKUP SUBCOMMAND invalid_subcommand|TCL LOOKUP INDEX subcommand invalid_subcommand)}$} -match regexp
 #>>>
 test misc-2.1 {isnull, no path, true} -body { #<<<
 	json isnull null

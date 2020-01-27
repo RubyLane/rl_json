@@ -33,6 +33,8 @@ EXTERN int		JSON_IsJSON(Tcl_Obj*obj, enum json_types*type,
 /* 7 */
 EXTERN int		JSON_SetIntRep(Tcl_Obj*target, enum json_types type,
 				Tcl_Obj*replacement);
+/* 8 */
+EXTERN int		JSON_ForceJSON(Tcl_Interp*interp, Tcl_Obj*obj);
 
 typedef struct Rl_jsonStubs {
     int magic;
@@ -46,6 +48,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_GetIntrepFromObj) (Tcl_Interp*interp, Tcl_Obj*obj, enum json_types*type, Tcl_ObjIntRep**ir); /* 5 */
     int (*jSON_IsJSON) (Tcl_Obj*obj, enum json_types*type, Tcl_ObjIntRep**ir); /* 6 */
     int (*jSON_SetIntRep) (Tcl_Obj*target, enum json_types type, Tcl_Obj*replacement); /* 7 */
+    int (*jSON_ForceJSON) (Tcl_Interp*interp, Tcl_Obj*obj); /* 8 */
 } Rl_jsonStubs;
 
 extern const Rl_jsonStubs *rl_jsonStubsPtr;
@@ -76,6 +79,8 @@ extern const Rl_jsonStubs *rl_jsonStubsPtr;
 	(rl_jsonStubsPtr->jSON_IsJSON) /* 6 */
 #define JSON_SetIntRep \
 	(rl_jsonStubsPtr->jSON_SetIntRep) /* 7 */
+#define JSON_ForceJSON \
+	(rl_jsonStubsPtr->jSON_ForceJSON) /* 8 */
 
 #endif /* defined(USE_RL_JSON_STUBS) */
 

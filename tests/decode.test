@@ -71,13 +71,13 @@ test decode-0.1 {Too few args} -body { #<<<
 	list [catch {json decode} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {wrong # args: should be "json decode bytes ?encoding?"} {TCL WRONGARGS}}
+} -result {1 {wrong # args: should be "*decode bytes ?encoding?"} {TCL WRONGARGS}} -match glob
 #>>>
 test decode-0.2 {Too many args} -body { #<<<
 	list [catch {json decode foo auto bar} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {wrong # args: should be "json decode bytes ?encoding?"} {TCL WRONGARGS}}
+} -result {1 {wrong # args: should be "*decode bytes ?encoding?"} {TCL WRONGARGS}} -match glob
 #>>>
 test decode-0.3 {No optional encoding arg} -body { #<<<
 	json decode foo

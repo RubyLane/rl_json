@@ -224,14 +224,14 @@ test number-2.1 {Too few args} -body { #<<<
 		json number
 	} r o]
 	list $code $r [dict get $o -errorcode]
-} -result {1 {Wrong # of arguments.  Must be "number val"} NONE}
+} -result {1 {wrong # args: should be "*number value"} {TCL WRONGARGS}} -match glob
 #>>>
 test number-2.2 {Too many args} -body { #<<<
 	set code [catch {
 		json number foo bar
 	} r o]
 	list $code $r [dict get $o -errorcode]
-} -result {1 {Wrong # of arguments.  Must be "number val"} NONE}
+} -result {1 {wrong # args: should be "*number value"} {TCL WRONGARGS}} -match glob
 #>>>
 test number-2.3 {json number, not a number} -body { #<<<
 	set code [catch {json number foo} r o]

@@ -8,6 +8,7 @@ package require rl_json
 
 namespace import rl_json::json
 
+proc main {} {
 bench normalize-1.1 {Normalize a JSON doc} -setup { #<<<
 	set json {
 		{
@@ -23,5 +24,7 @@ bench normalize-1.1 {Normalize a JSON doc} -setup { #<<<
 	unset -nocomplain json
 } -result {{"foo":"bar","baz":["str",123,123.4,true,false,null,{"inner":"obj"}]}}
 #>>>
+}
+main
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

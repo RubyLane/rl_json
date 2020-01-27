@@ -262,6 +262,17 @@ Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val) //{{{
 }
 
 //}}}
+int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a JSON objtype, or throw an exception {{{
+{
+	Tcl_ObjIntRep*	ir;
+	enum json_types	type;
+
+	TEST_OK(JSON_GetIntrepFromObj(interp, obj, &type, &ir));
+
+	return TCL_OK;
+}
+
+//}}}
 
 static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 {

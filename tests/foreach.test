@@ -288,13 +288,13 @@ test foreach-20.5 {too few args} -body { #<<<
 	list [catch {json foreach x {[]}} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain x y r o
-} -result {1 {wrong # args: should be "json foreach ?varlist datalist ...? script"} {TCL WRONGARGS}}
+} -result {1 {wrong # args: should be "*foreach ?varlist datalist ...? script"} {TCL WRONGARGS}} -match glob
 #>>>
 test foreach-20.6 {too many args} -body { #<<<
 	list [catch {json foreach x {[]} y {}} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain x y r o
-} -result {1 {wrong # args: should be "json foreach ?varlist datalist ...? script"} {TCL WRONGARGS}}
+} -result {1 {wrong # args: should be "*foreach ?varlist datalist ...? script"} {TCL WRONGARGS}} -match glob
 #>>>
 
 ::tcltest::cleanupTests

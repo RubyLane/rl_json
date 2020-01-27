@@ -564,13 +564,13 @@ test omap-20.5 {too few args} -body { #<<<
 	list [catch {json omap x {[]}} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain x y r o
-} -result {1 {wrong # args: should be "json omap ?varlist datalist ...? script"} {TCL WRONGARGS}}
+} -result {1 {wrong # args: should be "*omap ?varlist datalist ...? script"} {TCL WRONGARGS}} -match glob
 #>>>
 test omap-20.6 {too many args} -body { #<<<
 	list [catch {json omap x {[]} y {}} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain x y r o
-} -result {1 {wrong # args: should be "json omap ?varlist datalist ...? script"} {TCL WRONGARGS}}
+} -result {1 {wrong # args: should be "*omap ?varlist datalist ...? script"} {TCL WRONGARGS}} -match glob
 #>>>
 
 ::tcltest::cleanupTests

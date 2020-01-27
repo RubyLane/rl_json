@@ -7,6 +7,7 @@ package require rl_json
 
 namespace import rl_json::json
 
+proc main {} {
 bench as_json-1.1 {[json boolean] vs implicit} -setup { #<<<
 } -compare {
 	explicit {
@@ -118,4 +119,7 @@ bench as_json-3.2 {[json string] vs implicit} -setup { #<<<
 	unset -nocomplain doc i
 } -result {["false0","false1","false2","false3","false4","false5","false6","false7","false8","false9"]}
 
+}
+
+main
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

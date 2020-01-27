@@ -7,6 +7,7 @@ package require rl_json
 
 namespace import rl_json::json
 
+proc main {} {
 bench template-1.1 {Basic templated document creation} -setup { #<<<
 	set tmpl {
 		{
@@ -245,5 +246,7 @@ bench template-3.1 {Test templated doc creation, including numbers, json set on 
 	}
 }]
 #>>>
+}
+main
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

@@ -24,3 +24,6 @@ declare 6 generic {
 declare 7 generic {
 	int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement)
 }
+declare 8 generic {
+	int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj)
+}

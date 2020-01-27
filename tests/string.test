@@ -66,14 +66,14 @@ test string-2.1 {Too few args} -body { #<<<
 		json string
 	} r o]
 	list $code $r [dict get $o -errorcode]
-} -result {1 {Wrong # of arguments.  Must be "string val"} NONE}
+} -result {1 {wrong # args: should be "*string value"} {TCL WRONGARGS}} -match glob
 #>>>
 test string-2.2 {Too many args} -body { #<<<
 	set code [catch {
 		json string foo bar
 	} r o]
 	list $code $r [dict get $o -errorcode]
-} -result {1 {Wrong # of arguments.  Must be "string val"} NONE}
+} -result {1 {wrong # args: should be "*string value"} {TCL WRONGARGS}} -match glob
 #>>>
 
 ::tcltest::cleanupTests
