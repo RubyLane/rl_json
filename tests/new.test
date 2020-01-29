@@ -10,16 +10,30 @@ source [file join [file dirname [info script]] helpers.tcl]
 test new-1.1 {Create an array from type-value pairs} -setup { #<<<
 	set typevalues [lmap v {a 1 c 2 e 3 g} {
 		if {[string is digit $v]} {
-			list number $v;
+			list number $v
 		} else {
-			list string $v;
+			list string $v
 		}
-	}];
+	}]
 } -body {
 	json new array {*}$typevalues
 } -cleanup {
-	unset -nocomplain typevalues;
+	unset -nocomplain typevalues
 } -result {["a",1,"c",2,"e",3,"g"]}
+#>>>
+test new-1.1.1 {Create an array from type-value pairs, syntax error in elem (too many args)} -setup { #<<<
+	set typevalues [lmap v {a 1 c 2 e 3 g} {
+		if {[string is digit $v]} {
+			list number $v x
+		} else {
+			list string $v
+		}
+	}]
+} -body {
+	json new array {*}$typevalues
+} -cleanup {
+	unset -nocomplain typevalues
+} -returnCodes error -result {wrong # args: should be "number value"}
 #>>>
 
 test new-1.2 {Create an array from JSON values} -setup { #<<<

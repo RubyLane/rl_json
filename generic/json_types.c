@@ -229,9 +229,17 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 }
 
 //}}}
-Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val) //{{{
-{
+#ifdef TCL_MEM_DEBUG
+Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line)
+#else
+Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val)
+#endif
+{ //{{{
+#ifdef TCL_MEM_DEBUG
+	Tcl_Obj*	res = Tcl_DbNewObj(file, line);
+#else
 	Tcl_Obj*	res = Tcl_NewObj();
+#endif
 
 	/*
 	switch (type) {
@@ -280,8 +288,29 @@ static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 
 	ir = Tcl_FetchIntRep(obj, objtype);
 	if (ir != NULL) {
-		if (ir->twoPtrValue.ptr1) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr1); ir->twoPtrValue.ptr1 = NULL;}
-		if (ir->twoPtrValue.ptr2) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2 = NULL;}
+		release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1);
+		release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
+
+#if 0
+		//Tcl_Obj* ir_obj = ir->twoPtrValue.ptr1;
+		Tcl_Obj* actions = ir->twoPtrValue.ptr2;
+		if (ir->twoPtrValue.ptr1) {
+			/*
+			fprintf(stderr, "%s Releasing ptr1 %p, refcount %d, which is %s\n",
+					objtype->name, ir->twoPtrValue.ptr1, ir_obj == NULL ? -42 : ir_obj->refCount,
+					ir_obj->typePtr ? ir_obj->typePtr->name : "pure string"
+				   );
+				   */
+			Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr1); ir->twoPtrValue.ptr1 = NULL;}
+		if (ir->twoPtrValue.ptr2 && actions->refCount > 0) {
+			/*
+			fprintf(stderr, "%s Releasing ptr2 %p, refcount %d, which is %s\n",
+					objtype->name, ir->twoPtrValue.ptr2, actions == NULL ? -42 : actions->refCount,
+					actions->typePtr ? actions->typePtr->name : "pure string"
+				   );
+				   */
+			Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2 = NULL;}
+#endif
 	}
 }
 
@@ -430,32 +459,37 @@ static void update_string_rep_dyn_literal(Tcl_Obj* obj) //{{{
 //}}}
 static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype, enum json_types* out_type) //{{{
 {
-	struct interp_cx*	l;
+	struct interp_cx*		l = NULL;
 	const unsigned char*	err_at = NULL;
 	const char*				errmsg = "Illegal character";
 	size_t					char_adj = 0;		// Offset addjustment to account for multibyte UTF-8 sequences
 	const unsigned char*	doc;
 	enum json_types			type;
-	Tcl_Obj*				val;
+	Tcl_Obj*				val = NULL;
 	const unsigned char*	p;
 	const unsigned char*	e;
 	const unsigned char*	val_start;
 	int						len;
 	struct parse_context	cx[CX_STACK_SIZE];
-	Tcl_ObjIntRep			ir;
 
-	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	if (interp)
+		l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
 #if 1
 	// Snoop on the intrep for clues on optimized conversions {{{
 	{
 		if (
-			Tcl_FetchIntRep(obj, l->typeInt)    != NULL ||
-			Tcl_FetchIntRep(obj, l->typeDouble) != NULL /*||
-			Tcl_FetchIntRep(obj, l->typeBignum) != NULL  Something weird going on with bignum */
+			l && (
+				(l->typeInt    && Tcl_FetchIntRep(obj, l->typeInt)    != NULL) ||
+				(l->typeDouble && Tcl_FetchIntRep(obj, l->typeDouble) != NULL) ||
+				(l->typeBignum && Tcl_FetchIntRep(obj, l->typeBignum) != NULL)
+			)
 		) {
-			Tcl_IncrRefCount((Tcl_Obj*)(ir.twoPtrValue.ptr1 = Tcl_DuplicateObj(obj)));	// Must dup because obj will soon be us, creating a circular ref
-			ir.twoPtrValue.ptr2 = NULL;
+			Tcl_ObjIntRep			ir = {.twoPtrValue = {}};
+
+			// Must dup because obj will soon be us, creating a circular ref
+			replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_DuplicateObj(obj));
+			release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
 
 			*out_type = JSON_NUMBER;
 			*objtype = g_objtype_for_type[JSON_NUMBER];
@@ -508,11 +542,15 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 					/* Add back the template format prefix, since we can't store the type
 					 * in the dict key.  The template generation code reparses it later.
 					 */
-					// Can do this because val's ref is on loan from new_stringobj_dedup
-					val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
+					{
+						Tcl_Obj*	new = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
+						REPLACE(val, new);
+						// Can do this because val's ref is on loan from new_stringobj_dedup
+						//val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
+					}
 					// Falls through
 				case JSON_STRING:
-					Tcl_IncrRefCount(cx[0].last->hold_key = val);
+					REPLACE(cx[0].last->hold_key, val);
 					break;
 
 				default:
@@ -574,8 +612,8 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 				break;
 
 			default:
-				free_cx(cx);
-				THROW_ERROR("Unexpected json value type: ", Tcl_GetString(Tcl_NewIntObj(type)));
+				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Unexpected json value type: %d", type));
+				goto err;
 		}
 
 after_value:	// Yeah, goto.  But the alternative abusing loops was worse
@@ -652,27 +690,29 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 	{
 		Tcl_ObjType*	top_objtype = g_objtype_for_type[cx[0].container];
 		Tcl_ObjIntRep*	top_ir = Tcl_FetchIntRep(cx[0].val, top_objtype);
+		Tcl_ObjIntRep	ir = {.twoPtrValue = {}};
 
 		if (unlikely(top_ir == NULL))
 			Tcl_Panic("Can't get intrep for the top container");
 
 		// We're transferring the ref from cx[0].val to our intrep
-		ir.twoPtrValue.ptr1 = top_ir->twoPtrValue.ptr1;
-		ir.twoPtrValue.ptr2 = NULL;
-		if (ir.twoPtrValue.ptr1) Tcl_IncrRefCount((Tcl_Obj*)ir.twoPtrValue.ptr1);
-		RELEASE(cx[0].val);
+		replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, top_ir->twoPtrValue.ptr1);
+		release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
+		release_tclobj(&cx[0].val);
 
 		Tcl_StoreIntRep(obj, top_objtype, &ir);
 		*objtype = top_objtype;
 		*out_type = cx[0].container;
 	}
 
+	RELEASE(val);
 	return TCL_OK;
 
 whitespace_err:
 	_parse_error(interp, errmsg, doc, (err_at - doc) - char_adj);
 
 err:
+	RELEASE(val);
 	free_cx(cx);
 	return TCL_ERROR;
 }

@@ -209,12 +209,35 @@ err_illegal_char:
 }
 
 //}}}
+int is_template(const char* s, int len) //{{{
+{
+	if (
+		len >= 3 &&
+		s[0] == '~' &&
+		s[2] == ':'
+	) {
+		switch (s[1]) {
+			case 'S':
+			case 'N':
+			case 'B':
+			case 'J':
+			case 'T':
+			case 'L':
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
+//}}}
 int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned char* p, const unsigned char* e, size_t* char_adj, const unsigned char** next, enum json_types *type, Tcl_Obj** val) //{{{
 {
 	const unsigned char*	err_at = NULL;
 	const char*				errmsg = NULL;
+	Tcl_Obj*				out = NULL;
 
-	*val = NULL;
+	release_tclobj(val);
 
 	if (unlikely(p >= e)) goto err;
 
@@ -222,7 +245,6 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 		case '"':
 			p++;	// Advance past the " to the first byte of the string
 			{
-				Tcl_Obj*					out = NULL;
 				const unsigned char*		chunk;
 				size_t						len;
 				char						mapped;
@@ -230,18 +252,7 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 				enum char_advance_status	status = CHAR_ADVANCE_OK;
 
 				// Peek ahead to detect template subst markers.
-				if (p[0] == '~' && e-p >= 3 && p[2] == ':') {
-					switch (p[1]) {
-						case 'S': stype = JSON_DYN_STRING; break;
-						case 'N': stype = JSON_DYN_NUMBER; break;
-						case 'B': stype = JSON_DYN_BOOL; break;
-						case 'J': stype = JSON_DYN_JSON; break;
-						case 'T': stype = JSON_DYN_TEMPLATE; break;
-						case 'L': stype = JSON_DYN_LITERAL; break;
-						default:  stype = JSON_STRING; p -= 3; break;
-					}
-					p += 3;
-				}
+				TEMPLATE_TYPE(p, e-p, stype);
 
 				while (1) {
 					chunk = p;
@@ -255,10 +266,10 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 					len = p-chunk;
 
 					if (likely(out == NULL)) {
-						out = new_stringobj_dedup(l, (const char*)chunk, len);
+						replace_tclobj(&out, get_string(l, (const char*)chunk, len));
 					} else if (len > 0) {
 						if (unlikely(Tcl_IsShared(out)))
-							out = Tcl_DuplicateObj(out);	// Can do this because the ref were were operating under is on loan from new_stringobj_dedup
+							replace_tclobj(&out, Tcl_DuplicateObj(out));
 
 						Tcl_AppendToObj(out, (const char*)chunk, len);
 					}
@@ -273,7 +284,7 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 					p++;	// Advance to the backquoted byte
 
 					if (unlikely(Tcl_IsShared(out)))
-						out = Tcl_DuplicateObj(out);	// Can do this because the ref were were operating under is on loan from new_stringobj_dedup
+						replace_tclobj(&out, Tcl_DuplicateObj(out));
 
 					switch (*p) {	// p could point at the NULL terminator at this point
 						case '\\':
@@ -345,7 +356,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 				}
 
 				*type = stype;
-				*val = out;
+				replace_tclobj(val, out);
 			}
 			break;
 
@@ -363,7 +374,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"true")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
-			*val = l->tcl_true;
+			replace_tclobj(val, l->tcl_true);
 			p += 4;
 			break;
 
@@ -371,7 +382,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != *(uint32_t*)"alse")) goto err;	// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
-			*val = l->tcl_false;
+			replace_tclobj(val, l->tcl_false);
 			p += 5;
 			break;
 
@@ -379,7 +390,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"null")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_NULL;
-			*val = l->tcl_empty;
+			replace_tclobj(val, l->tcl_empty);
 			p += 4;
 			break;
 
@@ -425,14 +436,17 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 				}
 
 				*type = JSON_NUMBER;
-				*val = new_stringobj_dedup(l, (const char*)start, p-start);
+				replace_tclobj(val, get_string(l, (const char*)start, p-start));
 			}
 	}
 
+	release_tclobj(&out);
 	*next = p;
 	return TCL_OK;
 
 err:
+	release_tclobj(&out);
+
 	if (err_at == NULL)
 		err_at = p;
 
