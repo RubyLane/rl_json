@@ -253,6 +253,12 @@ test_valgrind_full: binaries libraries
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
+test_vgdb_full: binaries libraries
+	$(TCLSH_VALGRIND_FULL) --read-var-info=yes --track-origins=yes --vgdb-error=1 \
+		`@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
+		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
+			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+
 tests/JSONTestSuite/test_parsing: binaries libraries
 	$(TCLSH) `@CYGPATH@ $(srcdir)/fetch_test_cases.tcl` \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
@@ -265,7 +271,7 @@ shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)
 
 vimgdb:
-	$(PKG_ENV) vim
+	$(PKG_ENV) TCLSH="$(TCLSH_PROG)" vim
 
 gdb:
 	$(PKG_ENV) gdb $(TCLSH_PROG) $(SCRIPT)
