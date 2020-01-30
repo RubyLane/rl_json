@@ -110,6 +110,7 @@ proc _make_stats times { #<<<
 	dict set res harmonic_mean [/ [llength $times] [+ {*}[lmap time $times {
 		/ 1.0 $time
 	}]]]
+	dict set res cv [expr {[dict get $res population_stddev] / [dict get $res arithmetic_mean]}]
 }
 
 #>>>
@@ -119,17 +120,27 @@ proc bench {name desc args} { #<<<
 	variable skipped
 	variable output
 
+	# -target_cv		- Run until the coefficient of variation is below this, up to -max_time
+	# -max_time 		- Maximum number of seconds to keep running while the cv is converging
+	# -min_time			- Keep accumulating samples for at least this many seconds
+	# -batch			- The number of samples to take in a tight loop and average to count as a single sample.  "auto" guesses a reasonable value to make a batch take at least 1000 usec.
+	# -window			- Consider at most the previous -window measurements for target_cv and the results
 	array set opts {
 		-setup			{}
 		-compare		{}
 		-cleanup		{}
-		-batch			100
+		-batch			auto
 		-match			exact
 		-returnCodes	{ok return}
+		-target_cv		{0.02}
+		-min_time		0.0
+		-max_time		4.0
+		-min_it			30
+		-window			30
 	}
 	array set opts $args
 	set badargs [lindex [_intersect3 [array names opts] {
-		-setup -compare -cleanup -batch -match -result -returnCodes
+		-setup -compare -cleanup -batch -match -result -returnCodes -target_cv -min_time -max_time -min_it -window
 	}] 0]
 
 	if {[llength $badargs] > 0} {
@@ -159,46 +170,111 @@ proc bench {name desc args} { #<<<
 		}
 	}
 
-	# Measure the instrumentation overhead to compensate for it
-	set start		[clock microseconds]	;# Prime [clock microseconds], start var
-	set times	{}
-	set script	[apply $make_script $opts(-batch) list]
-	for {set i 0} {$i < 1000} {incr i} {
-		set start [clock microseconds]
-		uplevel 1 [list if 1 $script]
-		lappend times [- [clock microseconds] $start]
-	}
-	set overhead	[::tcl::mathfunc::min {*}[lmap e $times {expr {$e / double($opts(-batch))}}]]
-	#apply $output debug [format {Overhead: %.3f usec} $overhead]
-
-
 	set variant_stats {}
 
 	_run_if_set $opts(-setup)
 	try {
 		dict for {variant script} $opts(-compare) {
-			set times	{}
-			set it		0
-			set begin	[clock microseconds]
-
+			set hint	[lindex [time {
+				catch {uplevel 1 $script} r o
+			}] 0]
 			if {[info exists opts(-result)]} {
-				set start	[clock microseconds]
-				catch {uplevel 1 [list if 1 $script]} r o
-				lappend times	[- [clock microseconds] $start]
-				incr it
 				_verify_res $variant $normalized_codes $opts(-result) $opts(-match) $r $o
 			}
 
-			set bscript	[apply $make_script $opts(-batch) $script]
-			while {[llength $times] < 10 || [- [clock microseconds] $begin] < 500000} {
+			set single_empty {
+				catch {uplevel 1 [list if 1 {}]}
+			}
+			set single_ex_s	{
+				catch {uplevel 1 [list if 1 $script]}
+			}
+			if 1 $single_empty	;# throw the first away
+			if 1 $single_ex_s	;# throw the first away
+
+			set single_overhead	[lindex [time $single_empty 1000] 0]
+			puts stderr "single overhead: $single_overhead"
+
+			# Verify the first result against -result (if given), and estimate an appropriate batchsize to target a batch time of 1 ms to reduce quantization noise <<<
+			set est_it	[expr {
+				max(1, int(round(
+					100.0/$hint
+				)))
+			}]
+			puts stderr "hint: $hint, est_it: $est_it"
+			set extime	[lindex [time $single_ex_s $est_it] 0]
+			set extime_comp	[expr {$extime - $single_overhead}]
+			puts stderr "extime: $extime, extime comp: $extime_comp"
+			if {$opts(-batch) eq "auto"} {
+				set batch	[expr {int(round(1000.0/$extime_comp))}]
+				puts stderr "Guessed batch size of $batch based on sample execution time $extime_comp usec"
+			} else {
+				set batch	$opts(-batch)
+			}
+			#>>>
+
+			# Measure the instrumentation overhead to compensate for it <<<
+			set times	{}
+			set start	[clock microseconds]	;# Prime [clock microseconds], start var
+			set bscript	[apply $make_script $batch {}]
+			uplevel 1 [list if 1 $script]
+			puts stderr "Measure overhead time, batch: $batch: [time {
+			for {set i 0} {$i < int(100000 / ($batch*0.15))} {incr i} {
+				set start [clock microseconds]
+				catch {uplevel 1 [list if 1 $bscript]}
+				lappend times [- [clock microseconds] $start]
+			}
+			}]"
+			set overhead	[::tcl::mathfunc::min {*}[lmap e $times {expr {$e / double($batch)}}]]
+			apply $output debug [format {Overhead: %.3f usec, mean: %.3f for batch %d} $overhead [expr {double([+ {*}$times]) / ([llength $times]*$batch)}] $batch]
+			# Measure the instrumentation overhead to compensate for it >>>
+
+			set cv {data { # Calculate the coefficient of variation of $data <<<
+				lassign [::math::statistics::basic-stats $data] \
+					arithmetic_mean min max number_of_data sample_stddev sample_var population_stddev population_var
+
+				expr {
+					$population_stddev / double($arithmetic_mean)
+				}
+			}}
+			#>>>
+
+			set begin	[clock microseconds]	;# Don't count the first run time or the overhead measurement into the total elapsed time
+			set it		0
+			set times	{}
+			set means	{}
+			set cvmeans	{}
+			set cvtimes	{}
+			set elapsed	0
+			set bscript	[apply $make_script $batch $script]
+			puts stderr "bscript $variant: $bscript"
+			# Run at least:
+			# - -min_it times
+			# - for half a second
+			# - until the coefficient of variability of the means has fallen below -target_cv, or a max of -max_time seconds
+			while {
+				[llength $times] < $opts(-min_it) ||
+				$elapsed < $opts(-min_time) ||
+				($elapsed < $opts(-max_time) && $cvmeans > $opts(-target_cv))
+			} {
 				set start [clock microseconds]
 				uplevel 1 [list if 1 $bscript]
+				set batchtime	[- [clock microseconds] $start]
 				lappend times [expr {
-					([clock microseconds] - $start) / double($opts(-batch)) - $overhead
+					$batchtime / double($batch) - $overhead
 				}]
+				set elapsed		[expr {([clock microseconds] - $begin)/1e6}]
+				set cvtimes		[lrange $times end-[+ 1 $opts(-window)] end]	;# Consider the last $opts(-window) data in estimating the variation
+				lappend means	[expr {[+ {*}$cvtimes]/[llength $cvtimes]}]
+				set _cv			[apply $cv $cvtimes]
+				set cvmeans		[apply $cv [lrange $means end-[+ 1 $opts(-window)] end]]
+				#puts stderr "Got time for $variant batch($batch), batchtime $batchtime usec: [format %.4f [lindex $times end]], elapsed: [format %.3f $elapsed] sec[if {[info exists cvmeans]} {format {, cvmeans: %.3f} $cvmeans}][if {[info exists _cv]} {format {, cv: %.3f} $_cv}], mean: [format %.5f [lindex $means end]]"
 			}
 
-			dict set variant_stats $variant [_make_stats $times]
+			dict set variant_stats $variant [_make_stats $cvtimes]
+			dict set variant_stats $variant cvmeans		$cvmeans
+			dict set variant_stats $variant cv			[apply $cv $cvtimes]
+			dict set variant_stats $variant runtime		$elapsed
+			dict set variant_stats $variant it			[llength $cvtimes]
 		}
 
 		lappend run $name $desc $variant_stats
@@ -251,11 +327,15 @@ namespace eval display_bench {
 					set val		[dict get $stats $variant $pick]
 					if {![info exists baseline]} {
 						set baseline	$val
-						format %.3f $val
+						format {%.3f%s} $val [expr {
+							[dict exists $stats $variant cvmeans] ? [format { cv:%.2f} [dict get $stats $variant cvmeans]] : ""
+						}]
 					} elseif {$baseline == 0} {
 						format x%s inf
 					} else {
-						format x%.3f [/ $val $baseline]
+						format {x%.3f%s} [/ $val $baseline] [expr {
+							[dict exists $stats $variant cvmeans] ? [format { cv:%.2f} [dict get $stats $variant cvmeans]] : ""
+						}]
 					}
 				}
 			}]
@@ -318,7 +398,6 @@ proc run_benchmarks {dir args} { #<<<
 	# Automatically save and compare with the previous run
 	set args [list {*}{
 		-relative last last
-		-save last
 	} {*}$args]
 
 	set i	0
@@ -358,11 +437,28 @@ proc run_benchmarks {dir args} { #<<<
 
 	set stats	{}
 	foreach f [glob -nocomplain -type f -dir $dir -tails *.bench] {
-		uplevel 1 [list source [file join $dir $f]]
+		uplevel 1 [list if 1 [list source [file join $dir $f]]]
 	}
 
+	set save {{save_fn run} {
+		set save_data	$run
+		if {[file readable $save_fn]} {
+			# If the save file already exists, merge this run's data with it
+			# rather than replacing it (keeps old tests that weren't executed
+			# in this run)
+			set newkeys	[lmap {relname - -} $save_data {set relname}]
+			set old		[_readfile $save_fn]
+			foreach {relname reldesc relstats} $old {
+				if {$relname in $newkeys} continue
+				lappend save_data $relname $reldesc $relstats
+			}
+		}
+		_writefile $save_fn $save_data
+	}}
+
+	apply $save last $run	;# Always save as "last", even if explicitly saving as something else too
 	if {[info exists save_fn]} {
-		_writefile $save_fn $run
+		apply $save $save_fn $run
 	}
 
 	foreach {name desc variant_stats} $run {
