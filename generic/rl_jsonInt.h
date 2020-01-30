@@ -109,7 +109,7 @@ extern const char* type_names_int[];
 #ifdef TCL_MEM_DEBUG
 #	undef JSON_NewJvalObj
 Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line);
-#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val,__FILE__ " (JVAL)", __LINE__)
+#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
 #endif
 
 #endif

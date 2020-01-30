@@ -108,6 +108,7 @@ struct foreach_state {
 #   endif
 #endif
 
+#include "tip445.h"
 #include "rl_jsonDecls.h"
 #include "parser.h"
 
