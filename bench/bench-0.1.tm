@@ -132,7 +132,7 @@ proc bench {name desc args} { #<<<
 		-batch			auto
 		-match			exact
 		-returnCodes	{ok return}
-		-target_cv		{0.02}
+		-target_cv		{0.0015}
 		-min_time		0.0
 		-max_time		4.0
 		-min_it			30
@@ -192,7 +192,7 @@ proc bench {name desc args} { #<<<
 			if 1 $single_ex_s	;# throw the first away
 
 			set single_overhead	[lindex [time $single_empty 1000] 0]
-			puts stderr "single overhead: $single_overhead"
+			#puts stderr "single overhead: $single_overhead"
 
 			# Verify the first result against -result (if given), and estimate an appropriate batchsize to target a batch time of 1 ms to reduce quantization noise <<<
 			set est_it	[expr {
@@ -200,13 +200,13 @@ proc bench {name desc args} { #<<<
 					100.0/$hint
 				)))
 			}]
-			puts stderr "hint: $hint, est_it: $est_it"
+			#puts stderr "hint: $hint, est_it: $est_it"
 			set extime	[lindex [time $single_ex_s $est_it] 0]
 			set extime_comp	[expr {$extime - $single_overhead}]
-			puts stderr "extime: $extime, extime comp: $extime_comp"
+			#puts stderr "extime: $extime, extime comp: $extime_comp"
 			if {$opts(-batch) eq "auto"} {
-				set batch	[expr {int(round(1000.0/$extime_comp))}]
-				puts stderr "Guessed batch size of $batch based on sample execution time $extime_comp usec"
+				set batch	[expr {int(round(max(1, 1000.0/$extime_comp)))}]
+				#puts stderr "Guessed batch size of $batch based on sample execution time $extime_comp usec"
 			} else {
 				set batch	$opts(-batch)
 			}
@@ -217,15 +217,13 @@ proc bench {name desc args} { #<<<
 			set start	[clock microseconds]	;# Prime [clock microseconds], start var
 			set bscript	[apply $make_script $batch {}]
 			uplevel 1 [list if 1 $script]
-			puts stderr "Measure overhead time, batch: $batch: [time {
 			for {set i 0} {$i < int(100000 / ($batch*0.15))} {incr i} {
 				set start [clock microseconds]
 				catch {uplevel 1 [list if 1 $bscript]}
 				lappend times [- [clock microseconds] $start]
 			}
-			}]"
 			set overhead	[::tcl::mathfunc::min {*}[lmap e $times {expr {$e / double($batch)}}]]
-			apply $output debug [format {Overhead: %.3f usec, mean: %.3f for batch %d} $overhead [expr {double([+ {*}$times]) / ([llength $times]*$batch)}] $batch]
+			#apply $output debug [format {Overhead: %.3f usec, mean: %.3f for batch %d} $overhead [expr {double([+ {*}$times]) / ([llength $times]*$batch)}] $batch]
 			# Measure the instrumentation overhead to compensate for it >>>
 
 			set cv {data { # Calculate the coefficient of variation of $data <<<
@@ -246,7 +244,7 @@ proc bench {name desc args} { #<<<
 			set cvtimes	{}
 			set elapsed	0
 			set bscript	[apply $make_script $batch $script]
-			puts stderr "bscript $variant: $bscript"
+			#puts stderr "bscript $variant: $bscript"
 			# Run at least:
 			# - -min_it times
 			# - for half a second
@@ -328,13 +326,13 @@ namespace eval display_bench {
 					if {![info exists baseline]} {
 						set baseline	$val
 						format {%.3f%s} $val [expr {
-							[dict exists $stats $variant cvmeans] ? [format { cv:%.2f} [dict get $stats $variant cvmeans]] : ""
+							[dict exists $stats $variant cv] ? [format { cv:%.1f%%} [expr {100*[dict get $stats $variant cv]}]] : ""
 						}]
 					} elseif {$baseline == 0} {
 						format x%s inf
 					} else {
 						format {x%.3f%s} [/ $val $baseline] [expr {
-							[dict exists $stats $variant cvmeans] ? [format { cv:%.2f} [dict get $stats $variant cvmeans]] : ""
+							[dict exists $stats $variant cv] ? [format { cv:%.1f%%} [expr {100*[dict get $stats $variant cv]}]] : ""
 						}]
 					}
 				}
