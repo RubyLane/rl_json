@@ -100,12 +100,6 @@ int is_template(const char* s, int len);
 extern Tcl_ObjType* g_objtype_for_type[];
 extern const char* type_names_int[];
 
-#ifdef DEDUP
-#	define get_string(l, bytes, length)	new_stringobj_dedup(l, bytes, length)
-#else
-#	define get_string(l, bytes, length) Tcl_NewStringObj(bytes, length)
-#endif
-
 #ifdef TCL_MEM_DEBUG
 #	undef JSON_NewJvalObj
 Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line);

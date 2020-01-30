@@ -1,8 +1,6 @@
 #ifndef _JSON_MAIN_H
 #define _JSON_MAIN_H
 
-#define _GNU_SOURCE
-
 #include <tcl.h>
 #include "tclstuff.h"
 #include <string.h>
@@ -110,6 +108,7 @@ struct foreach_state {
 
 #include "tip445.h"
 #include "rl_jsonDecls.h"
+#include "dedup.h"
 #include "parser.h"
 
 #endif

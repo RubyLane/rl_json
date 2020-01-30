@@ -4908,7 +4908,7 @@ $as_echo "#define AC_APPLE_UNIVERSAL_BUILD 1" >>confdefs.h
 #-----------------------------------------------------------------------
 
 
-    vars="parser.c rl_json.c json_types.c rl_jsonStubInit.c"
+    vars="parser.c rl_json.c json_types.c dedup.c rl_jsonStubInit.c"
     for i in $vars; do
 	case $i in
 	    \$*)
@@ -4943,7 +4943,7 @@ $as_echo "#define AC_APPLE_UNIVERSAL_BUILD 1" >>confdefs.h
 
 
 
-    vars="generic/rl_jsonDecls.h"
+    vars="generic/rl_jsonDecls.h generic/rl_json.h"
     for i in $vars; do
 	# check for existence, be strict because it is installed
 	if test ! -f "${srcdir}/$i" ; then
