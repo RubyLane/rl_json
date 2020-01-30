@@ -4,7 +4,7 @@
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.10.0 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.10.1 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
@@ -12,7 +12,7 @@
 json \- Parse and manipulate JSON documents 
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.10.0\fR? 
+\fBpackage require rl_json\fR ?\fB0.10.1\fR? 
 
 \fBjson get \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
