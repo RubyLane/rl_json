@@ -4,7 +4,7 @@ dnl	generate the file "configure", which is run during Tcl installation
 dnl	to configure the system for the local environment.
 
 #-----------------------------------------------------------------------
-# Sample configure.in for Tcl Extensions.  The only places you should
+# Sample configure.ac for Tcl Extensions.  The only places you should
 # need to modify this file are marked by the string __CHANGE__
 #-----------------------------------------------------------------------
 
@@ -19,7 +19,6 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_PREREQ(2.61)
 AC_INIT([rl_json], [0.10.1])
 
 #--------------------------------------------------------------------
@@ -28,7 +27,7 @@ AC_INIT([rl_json], [0.10.1])
 # as well as PKG_LIB_FILE and PKG_STUB_LIB_FILE.
 #--------------------------------------------------------------------
 
-TEA_INIT([3.9])
+TEA_INIT()
 
 AC_CONFIG_AUX_DIR(tclconfig)
 
@@ -62,6 +61,10 @@ TEA_PREFIX
 
 TEA_SETUP_COMPILER
 
+# Check for feature toggles
+ENABLE_ENSEMBLE
+ENABLE_DEDUP
+
 #-----------------------------------------------------------------------
 # __CHANGE__
 # Specify the C source files to compile in TEA_ADD_SOURCES,
@@ -72,7 +75,7 @@ TEA_SETUP_COMPILER
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c rl_jsonStubInit.c])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h generic/rl_json.h])
 TEA_ADD_INCLUDES([])
 TEA_ADD_LIBS([])
@@ -150,16 +153,6 @@ TEA_CONFIG_CFLAGS
 TEA_ENABLE_SYMBOLS
 
 #--------------------------------------------------------------------
-# Everyone should be linking against the Tcl stub library.  If you
-# can't for some reason, remove this definition.  If you aren't using
-# stubs, you also need to modify the SHLIB_LD_LIBS setting below to
-# link against the non-stubbed Tcl library.  Add Tk too if necessary.
-#--------------------------------------------------------------------
-
-AC_DEFINE(USE_TCL_STUBS, 1, [Use Tcl stubs])
-#AC_DEFINE(USE_TK_STUBS, 1, [Use Tk stubs])
-
-#--------------------------------------------------------------------
 # This macro generates a line to use when building a library.  It
 # depends on values set by the TEA_ENABLE_SHARED, TEA_ENABLE_SYMBOLS,
 # and TEA_LOAD_TCLCONFIG macros above.
@@ -178,16 +171,28 @@ TEA_MAKE_LIB
 TEA_PROG_TCLSH
 #TEA_PROG_WISH
 
-TEAX_SDX
-
-TEAX_CONFIG_INCLUDE_LINE(RL_JSON_INCLUDE_SPEC, [${includedir}])
-TEAX_CONFIG_LINK_LINE(RL_JSON_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}])
-TEAX_CONFIG_LINK_LINE(RL_JSON_STUB_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}stub])
-
 #--------------------------------------------------------------------
-# Finally, substitute all of the various values into the Makefile.
-# You may alternatively have a special pkgIndex.tcl.in or other files
-# which require substituting th AC variables in.  Include these here.
+# Setup a *Config.sh.in configuration file.
 #--------------------------------------------------------------------
 
-AC_OUTPUT([Makefile pkgIndex.tcl rl_jsonConfig.sh])
+#TEAX_CONFIG_INCLUDE_LINE(RL_JSON_INCLUDE_SPEC, [${includedir}])
+#TEAX_CONFIG_LINK_LINE(RL_JSON_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}])
+#TEAX_CONFIG_LINK_LINE(RL_JSON_STUB_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}stub])
+
+#TEA_EXPORT_CONFIG([rl_jsonConfig.sh])
+#AC_SUBST(SAMPLE_VAR)
+
+#--------------------------------------------------------------------
+# Specify files to substitute AC variables in. You may alternatively
+# have a special pkgIndex.tcl.in or other files which require
+# substituting the AC variables in. Include these here.
+#--------------------------------------------------------------------
+
+AC_CONFIG_FILES([Makefile pkgIndex.tcl])
+
+#--------------------------------------------------------------------
+# Finally, substitute all of the various values into the files
+# specified with AC_CONFIG_FILES.
+#--------------------------------------------------------------------
+
+AC_OUTPUT()

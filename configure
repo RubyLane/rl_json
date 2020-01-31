@@ -619,11 +619,6 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
-RL_JSON_STUB_LIB_SPEC
-RL_JSON_LIB_SPEC
-RL_JSON_INCLUDE_SPEC
-SDX_KIT
-SDX
 TCLSH_PROG
 VC_MANIFEST_EMBED_EXE
 VC_MANIFEST_EMBED_DLL
@@ -652,6 +647,8 @@ TCL_THREADS
 TCL_INCLUDES
 PKG_OBJECTS
 PKG_SOURCES
+DEDUP
+ENSEMBLE
 EGREP
 GREP
 RANLIB
@@ -739,6 +736,8 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_tcl
+enable_ensemble
+enable_dedup
 with_tclinclude
 enable_threads
 enable_shared
@@ -747,7 +746,6 @@ enable_64bit
 enable_64bit_vis
 enable_rpath
 enable_symbols
-with_sdx
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1378,6 +1376,13 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-ensemble       Provide the json command using a proper ensemble,
+                          otherwise handle the subcommand dispatch internally
+                          (default: no)
+  --enable-dedup          Parsing JSON involves allocating a lot of small
+                          string Tcl_Objs, many of which are duplicates. This
+                          mechanism helps reduce that duplication (default:
+                          no)
   --enable-threads        build with threads (default: on)
   --enable-shared         build and link with shared libraries (default: on)
   --enable-stubs          build and link with stub libraries. Always true for
@@ -1393,8 +1398,6 @@ Optional Packages:
   --with-tcl              directory containing tcl configuration
                           (tclConfig.sh)
   --with-tclinclude       directory containing the public Tcl header files
-  --with-sdx              where to find the Starkit Developer Extensions
-                          (default: search path)
 
 Some influential environment variables:
   CC          C compiler command
@@ -4897,6 +4900,60 @@ $as_echo "#define AC_APPLE_UNIVERSAL_BUILD 1" >>confdefs.h
 
 
 
+# Check for feature toggles
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to provide the json command as an ensemble" >&5
+$as_echo_n "checking whether to provide the json command as an ensemble... " >&6; }
+	# Check whether --enable-ensemble was given.
+if test "${enable_ensemble+set}" = set; then :
+  enableval=$enable_ensemble; ensemble_ok=$enableval
+else
+  ensemble_ok=yes
+fi
+
+
+	if test "${enable_ensemble+set}" = set; then
+		enableval="$enable_ensemble"
+		ensemble_ok=$enableval
+	else
+		ensemble_ok=yes
+	fi
+
+	if test "ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
+		ENSEMBLE=1
+	else
+		ENSEMBLE=0
+	fi
+
+
+
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to use a string deduplication mechanism for short strings" >&5
+$as_echo_n "checking whether to use a string deduplication mechanism for short strings... " >&6; }
+	# Check whether --enable-dedup was given.
+if test "${enable_dedup+set}" = set; then :
+  enableval=$enable_dedup; dedup_ok=$enableval
+else
+  dedup_ok=yes
+fi
+
+
+	if test "${enable_dedup+set}" = set; then
+		enableval="$enable_dedup"
+		dedup_ok=$enableval
+	else
+		dedup_ok=yes
+	fi
+
+	if test "dedup_ok" = "yes" -o "${DEDUP}" = 1; then
+		DEDUP=1
+	else
+		DEDUP=0
+	fi
+
+
+
+
 #-----------------------------------------------------------------------
 # __CHANGE__
 # Specify the C source files to compile in TEA_ADD_SOURCES,
@@ -4908,7 +4965,7 @@ $as_echo "#define AC_APPLE_UNIVERSAL_BUILD 1" >>confdefs.h
 #-----------------------------------------------------------------------
 
 
-    vars="parser.c rl_json.c json_types.c dedup.c rl_jsonStubInit.c"
+    vars="parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c"
     for i in $vars; do
 	case $i in
 	    \$*)
@@ -7966,18 +8023,6 @@ $as_echo "enabled $tcl_ok debugging" >&6; }
 
 
 #--------------------------------------------------------------------
-# Everyone should be linking against the Tcl stub library.  If you
-# can't for some reason, remove this definition.  If you aren't using
-# stubs, you also need to modify the SHLIB_LD_LIBS setting below to
-# link against the non-stubbed Tcl library.  Add Tk too if necessary.
-#--------------------------------------------------------------------
-
-
-$as_echo "#define USE_TCL_STUBS 1" >>confdefs.h
-
-#AC_DEFINE(USE_TK_STUBS, 1, [Use Tk stubs])
-
-#--------------------------------------------------------------------
 # This macro generates a line to use when building a library.  It
 # depends on values set by the TEA_ENABLE_SHARED, TEA_ENABLE_SYMBOLS,
 # and TEA_LOAD_TCLCONFIG macros above.
@@ -8136,200 +8181,30 @@ $as_echo "${TCLSH_PROG}" >&6; }
 
 #TEA_PROG_WISH
 
+#--------------------------------------------------------------------
+# Setup a *Config.sh.in configuration file.
+#--------------------------------------------------------------------
 
+#TEAX_CONFIG_INCLUDE_LINE(RL_JSON_INCLUDE_SPEC, [${includedir}])
+#TEAX_CONFIG_LINK_LINE(RL_JSON_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}])
+#TEAX_CONFIG_LINK_LINE(RL_JSON_STUB_LIB_SPEC, [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}stub])
 
-# Check whether --with-sdx was given.
-if test "${with_sdx+set}" = set; then :
-  withval=$with_sdx; :
-else
-  with_sdx=search
-fi
+#TEA_EXPORT_CONFIG([rl_jsonConfig.sh])
+#AC_SUBST(SAMPLE_VAR)
 
-    case "$with_sdx" in  no)
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: configured without sdx; building starkits will fail" >&5
-$as_echo "$as_me: configured without sdx; building starkits will fail" >&6;}
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: building as a normal library still supported" >&5
-$as_echo "$as_me: building as a normal library still supported" >&6;};; search)
-	    # Extract the first word of "sdx", so it can be a program name with args.
-set dummy sdx; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_SDX+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $SDX in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_SDX="$SDX" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_SDX="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
+#--------------------------------------------------------------------
+# Specify files to substitute AC variables in. You may alternatively
+# have a special pkgIndex.tcl.in or other files which require
+# substituting the AC variables in. Include these here.
+#--------------------------------------------------------------------
 
-  test -z "$ac_cv_path_SDX" && ac_cv_path_SDX="none"
-  ;;
-esac
-fi
-SDX=$ac_cv_path_SDX
-if test -n "$SDX"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SDX" >&5
-$as_echo "$SDX" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-	    if test "x$SDX" = "xnone"; then :
-
-		# Extract the first word of "sdx.kit", so it can be a program name with args.
-set dummy sdx.kit; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_SDX_KIT+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $SDX_KIT in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_SDX_KIT="$SDX_KIT" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_SDX_KIT="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_SDX_KIT" && ac_cv_path_SDX_KIT="none"
-  ;;
-esac
-fi
-SDX_KIT=$ac_cv_path_SDX_KIT
-if test -n "$SDX_KIT"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SDX_KIT" >&5
-$as_echo "$SDX_KIT" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-		if test "x$SDX_KIT" != "xnone"; then :
-
-		    # We assume that sdx.kit is on the path, and that the
-		    # default tclsh is activetcl
-		    SDX="tclsh '${SDX_KIT}'"
-fi
-fi
-	    if test "x$SDX" = "xnone"; then :
-
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: cannot find sdx; building starkits will fail" >&5
-$as_echo "$as_me: WARNING: cannot find sdx; building starkits will fail" >&2;}
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: building as a normal library still supported" >&5
-$as_echo "$as_me: building as a normal library still supported" >&6;}
-fi;; *)
-	    # Extract the first word of "$with_sdx", so it can be a program name with args.
-set dummy $with_sdx; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_SDX+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $SDX in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_SDX="$SDX" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_SDX="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_SDX" && ac_cv_path_SDX="none"
-  ;;
-esac
-fi
-SDX=$ac_cv_path_SDX
-if test -n "$SDX"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SDX" >&5
-$as_echo "$SDX" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-	    if test "x$SDX" = "xnone"; then :
-
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: cannot find $with_sdx; building starkits may fail" >&5
-$as_echo "$as_me: WARNING: cannot find $with_sdx; building starkits may fail" >&2;}
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: building as a normal library still supported" >&5
-$as_echo "$as_me: building as a normal library still supported" >&6;}
-fi;; esac
-
-
-    eval "RL_JSON_INCLUDE_SPEC=\"-I`${CYGPATH} ${includedir}`\""
-
-
-    if test ${TCL_LIB_VERSIONS_OK} = nodots; then :
-
-	eval "RL_JSON_LIB_SPEC=\"-L`${CYGPATH} ${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}` -l${PACKAGE_NAME}${TCL_TRIM_DOTS}\""
-
-else
-
-	eval "RL_JSON_LIB_SPEC=\"-L`${CYGPATH} ${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}` -l${PACKAGE_NAME}${PACKAGE_VERSION}\""
-
-fi
-
-
-    if test ${TCL_LIB_VERSIONS_OK} = nodots; then :
-
-	eval "RL_JSON_STUB_LIB_SPEC=\"-L`${CYGPATH} ${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}` -l${PACKAGE_NAME}stub${TCL_TRIM_DOTS}\""
-
-else
-
-	eval "RL_JSON_STUB_LIB_SPEC=\"-L`${CYGPATH} ${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}` -l${PACKAGE_NAME}stub${PACKAGE_VERSION}\""
-
-fi
+ac_config_files="$ac_config_files Makefile pkgIndex.tcl"
 
 
 #--------------------------------------------------------------------
-# Finally, substitute all of the various values into the Makefile.
-# You may alternatively have a special pkgIndex.tcl.in or other files
-# which require substituting th AC variables in.  Include these here.
+# Finally, substitute all of the various values into the files
+# specified with AC_CONFIG_FILES.
 #--------------------------------------------------------------------
-
-ac_config_files="$ac_config_files Makefile pkgIndex.tcl rl_jsonConfig.sh"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -9040,7 +8915,6 @@ do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "pkgIndex.tcl") CONFIG_FILES="$CONFIG_FILES pkgIndex.tcl" ;;
-    "rl_jsonConfig.sh") CONFIG_FILES="$CONFIG_FILES rl_jsonConfig.sh" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

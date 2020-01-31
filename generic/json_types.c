@@ -1,5 +1,5 @@
-#include "rl_json.h"
 #include "rl_jsonInt.h"
+#include "parser.h"
 
 static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype);
 static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype);
@@ -267,17 +267,6 @@ Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val)
 		Tcl_Panic("Couldn't set JSON intrep");
 
 	return res;
-}
-
-//}}}
-int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a JSON objtype, or throw an exception {{{
-{
-	Tcl_ObjIntRep*	ir;
-	enum json_types	type;
-
-	TEST_OK(JSON_GetIntrepFromObj(interp, obj, &type, &ir));
-
-	return TCL_OK;
 }
 
 //}}}
@@ -715,6 +704,39 @@ err:
 	RELEASE(val);
 	free_cx(cx);
 	return TCL_ERROR;
+}
+
+//}}}
+int type_is_dynamic(const enum json_types type) //{{{
+{
+	switch (type) {
+		case JSON_DYN_STRING:
+		case JSON_DYN_NUMBER:
+		case JSON_DYN_BOOL:
+		case JSON_DYN_JSON:
+		case JSON_DYN_TEMPLATE:
+		case JSON_DYN_LITERAL:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+//}}}
+Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir) //{{{
+{
+	if (ir->twoPtrValue.ptr1 != NULL && Tcl_IsShared((Tcl_Obj*)ir->twoPtrValue.ptr1)) {
+		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1, Tcl_DuplicateObj(ir->twoPtrValue.ptr1));
+	}
+
+	if (ir->twoPtrValue.ptr2) {
+		// The caller wants val unshared, which implies that they intend to
+		// change it, which would invalidate our cached template actions, so
+		// release those if we have them
+		release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
+	}
+
+	return ir->twoPtrValue.ptr1;
 }
 
 //}}}

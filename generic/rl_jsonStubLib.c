@@ -1,18 +1,13 @@
-/*
- * Based on tclOOStubLib.c
- */
-
 #include "rl_json.h"
 
 MODULE_SCOPE const Rl_jsonStubs *rl_jsonStubsPtr;
 
 const Rl_jsonStubs *Rl_jsonStubsPtr = NULL;
 
-#undef rl_jsonInitializeStubs
+#undef rl_jsonInitStubs
 
-MODULE_SCOPE const char* rl_jsonInitializeStubs(Tcl_Interp* interp, const char* version)
+EXTERN CONST const char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* version, int exact)
 {
-	int				exact = 0;
 	const char*		packageName = "rl_json";
 	const char* 	errMsg = NULL;
 	Rl_jsonStubs*	stubsPtr = NULL;

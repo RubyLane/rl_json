@@ -1,5 +1,5 @@
-#ifdef DEDUP
-#include "rl_json.h"
+#if DEDUP
+#include "rl_jsonInt.h"
 
 //#define _GNU_SOURCE
 

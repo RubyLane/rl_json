@@ -1,5 +1,10 @@
-#include "rl_json.h"
 #include "rl_jsonInt.h"
+#include "parser.h"
+
+enum char_advance_status {
+	CHAR_ADVANCE_OK,
+	CHAR_ADVANCE_UNESCAPED_NULL
+};
 
 void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
 {

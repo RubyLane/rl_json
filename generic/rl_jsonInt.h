@@ -1,11 +1,65 @@
 #ifndef _RL_JSONINT
 #define _RL_JSONINT
 
-#define KC_ENTRIES		384		// Must be an integer multiple of 8*sizeof(long long)
+#include "rl_json.h"
+#include "tclstuff.h"
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <tclTomMath.h>
+#include "tip445.h"
+#include "dedup.h"
 
-struct kc_entry {
-	Tcl_Obj			*val;
-	unsigned int	hits;
+#define CX_STACK_SIZE	6
+
+#ifdef __builtin_expect
+#	define likely(exp)   __builtin_expect(!!(exp), 1)
+#	define unlikely(exp) __builtin_expect(!!(exp), 0)
+#else
+#	define likely(exp)   (exp)
+#	define unlikely(exp) (exp)
+#endif
+
+struct parse_context {
+	struct parse_context*	last;		// Only valid for the first entry
+	struct parse_context*	prev;
+
+	Tcl_Obj*		val;
+	Tcl_Obj*		hold_key;
+	size_t			char_ofs;
+	enum json_types	container;
+	int				closed;
+	Tcl_ObjType*	objtype;
+};
+
+struct foreach_iterator {
+	int				data_c;
+	Tcl_Obj**		data_v;
+	int				data_i;
+	Tcl_Obj*		varlist;
+	int				var_c;
+	Tcl_Obj**		var_v;
+	int				is_array;
+
+	// Dict search related state - when iterating over JSON objects
+	Tcl_DictSearch	search;
+	Tcl_Obj*		k;
+	Tcl_Obj*		v;
+	int				done;
+};
+
+struct foreach_state {
+	unsigned int				loop_num;
+	unsigned int				max_loops;
+	unsigned int				iterators;
+	struct foreach_iterator*	it;
+	Tcl_Obj*					script;
+	Tcl_Obj*					res;
+	int							collecting;
 };
 
 enum serialize_modes {
@@ -73,14 +127,18 @@ struct interp_cx {
 	Tcl_Obj*		json_false;
 	Tcl_Obj*		json_null;
 	Tcl_Obj*		json_empty_string;
+	Tcl_Obj*		tcl_empty_dict;
+	Tcl_Obj*		tcl_empty_list;
 	Tcl_Obj*		action[TEMPLATE_ACTIONS_END];
 	Tcl_Obj*		force_num_cmd[3];
 	Tcl_Obj*		type_int[JSON_TYPE_MAX];	// Tcl_Obj for JSON_STRING, JSON_ARRAY, etc
 	Tcl_Obj*		type[JSON_TYPE_MAX];		// Holds the Tcl_Obj values returned for [json type ...]
+#if DEDUP
 	Tcl_HashTable	kc;
 	int				kc_count;
 	long long		freemap[(KC_ENTRIES / (8*sizeof(long long)))+1];	// long long for ffsll
 	struct kc_entry	kc_entries[KC_ENTRIES];
+#endif
 	const Tcl_ObjType*	typeDict;		// Evil hack to identify objects of type dict, used to choose whether to iterate over a list of pairs as a dict or a list, for efficiency
 
 	const Tcl_ObjType*	typeInt;		// Evil hack to snoop on the type of a number, so that we don't have to add 0 to a candidate to know if it's a valid number
@@ -105,5 +163,53 @@ extern const char* type_names_int[];
 Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line);
 #	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
 #endif
+
+// Taken from tclInt.h:
+#if !defined(INT2PTR) && !defined(PTR2INT)
+#   if defined(HAVE_INTPTR_T) || defined(intptr_t)
+#       define INT2PTR(p) ((void *)(intptr_t)(p))
+#       define PTR2INT(p) ((int)(intptr_t)(p))
+#   else
+#       define INT2PTR(p) ((void *)(p))
+#       define PTR2INT(p) ((int)(p))
+#   endif
+#endif
+#if !defined(UINT2PTR) && !defined(PTR2UINT)
+#   if defined(HAVE_UINTPTR_T) || defined(uintptr_t)
+#       define UINT2PTR(p) ((void *)(uintptr_t)(p))
+#       define PTR2UINT(p) ((unsigned int)(uintptr_t)(p))
+#   else
+#       define UINT2PTR(p) ((void *)(p))
+#       define PTR2UINT(p) ((unsigned int)(p))
+#   endif
+#endif
+
+Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val);
+int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement);
+int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir);
+int JSON_GetJvalFromObj(Tcl_Interp *interp, Tcl_Obj *obj, enum json_types *type, Tcl_Obj **val);
+int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir);
+int type_is_dynamic(const enum json_types type);
+int force_json_number(Tcl_Interp* interp, struct interp_cx* l, Tcl_Obj* obj, Tcl_Obj** forced);
+Tcl_Obj* as_json(Tcl_Interp* interp, Tcl_Obj* from);
+const char* get_dyn_prefix(enum json_types type);
+const char* get_type_name(enum json_types type);
+Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir);
+int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actions, Tcl_Obj* dict, Tcl_Obj** res);
+int build_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj** actions);
+
+#define TEMPLATE_TYPE(s, len, out) \
+	if (s[0] == '~' && (len) >= 3 && s[2] == ':') { \
+		switch (s[1]) { \
+			case 'S': out = JSON_DYN_STRING;    break; \
+			case 'N': out = JSON_DYN_NUMBER;     break; \
+			case 'B': out = JSON_DYN_BOOL;       break; \
+			case 'J': out = JSON_DYN_JSON;       break; \
+			case 'T': out = JSON_DYN_TEMPLATE;   break; \
+			case 'L': out = JSON_DYN_LITERAL;    break; \
+			default:  out = JSON_STRING; s -= 3; break; \
+		} \
+		s += 3; \
+	} else {out = JSON_STRING;}
 
 #endif
