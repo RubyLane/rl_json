@@ -7968,7 +7968,6 @@ $as_echo "no" >&6; }
 $as_echo_n "checking whether we need to polyfill TIP 445... " >&6; }
 	saved_CFLAGS="$CFLAGS"
 	CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
-
 	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <tcl.h>

@@ -197,6 +197,9 @@ const char* get_type_name(enum json_types type);
 Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir);
 int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actions, Tcl_Obj* dict, Tcl_Obj** res);
 int build_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj** actions);
+int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out);
+int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers);
+int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds);
 
 #define TEMPLATE_TYPE(s, len, out) \
 	if (s[0] == '~' && (len) >= 3 && s[2] == ':') { \

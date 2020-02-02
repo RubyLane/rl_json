@@ -360,21 +360,76 @@ int JSON_JArrayObjReplace(Tcl_Interp* interp, Tcl_Obj* arrayObj, int first, int 
 //}}}
 // TODO: JObject interface, similar to DictObj
 
-int JSON_Get(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
+int JSON_Get(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	int			retval = TCL_OK;
+	Tcl_Obj*	jval = NULL;
+	Tcl_Obj*	astcl = NULL;
+
+	retval = JSON_Extract(interp, obj, path, &jval);
+
+	if (retval == TCL_OK)
+		retval = convert_to_tcl(interp, jval, &astcl);
+
+	if (retval == TCL_OK)
+		replace_tclobj(res, astcl);
+
+	release_tclobj(&astcl);
+	release_tclobj(&jval);
+
+	return retval;
 }
 
-int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
+//}}}
+int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	Tcl_Obj*	target = NULL;
+	int			retval=TCL_OK;
+	Tcl_Obj**	pathv = NULL;
+	int			pathc;
+
+	TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
+
+	if (pathc > 0) {
+		TEST_OK(resolve_path(interp, obj, pathv, pathc, &target, 0, 0));
+	} else {
+		TEST_OK(JSON_ForceJSON(interp, obj));
+		replace_tclobj(&target, obj);
+	}
+
+	if (retval == TCL_OK)
+		replace_tclobj(res, target);
+
+	release_tclobj(&target);
+
+	return retval;
 }
 
-int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists)
+//}}}
+int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	Tcl_Obj*			target = NULL;
+	Tcl_Obj**			pathv = NULL;
+	int					pathc;
+
+	TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
+
+	if (pathc > 0) {
+		TEST_OK(resolve_path(interp, obj, pathv, pathc, &target, 1, 0));
+		release_tclobj(&target);
+		// resolve_path sets the interp result in exists mode
+		*exists = (Tcl_GetObjResult(interp) == l->json_true);
+		Tcl_ResetResult(interp);
+	} else {
+		enum json_types	type = JSON_GetJSONType(obj);
+		*exists = (type != JSON_UNDEF && type != JSON_NULL);
+	}
+
+	return TCL_OK;
 }
 
+//}}}
 int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replacement) //{{{
 {
 	int				i, pathc;
@@ -833,16 +888,60 @@ bad_path:
 }
 
 //}}}
-int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* normalized)
+int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** normalized) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	int				retval = TCL_OK;
+	Tcl_Obj*		json = NULL;
+	enum json_types	type;
+
+	type = JSON_GetJSONType(obj);
+
+	if (type != JSON_UNDEF && !Tcl_HasStringRep(obj))
+		return TCL_OK;		// Nothing to do - already parsed as json and have no string rep
+
+	if (Tcl_IsShared(obj)) {
+		replace_tclobj(&json, Tcl_DuplicateObj(obj));
+	} else {
+		replace_tclobj(&json, obj);
+	}
+
+	retval = JSON_ForceJSON(interp, json);
+	Tcl_InvalidateStringRep(json);			// Defer string rep generation to our caller
+
+	if (retval == TCL_OK)
+		replace_tclobj(normalized, json);
+
+	release_tclobj(&json);
+
+	return retval;
 }
 
-int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** prettyString)
+//}}}
+int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** prettyString) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	int					retval = TCL_OK;
+	Tcl_DString			ds;
+	Tcl_Obj*			pad = NULL;
+	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+
+	if (indent == NULL)
+		replace_tclobj(&indent, Tcl_NewStringObj("    ", 4));
+
+	replace_tclobj(&pad, l->tcl_empty);
+	Tcl_DStringInit(&ds);
+	retval = json_pretty(interp, obj, indent, pad, &ds);
+
+	if (retval == TCL_OK)
+		replace_tclobj(prettyString, Tcl_NewStringObj(Tcl_DStringValue(&ds), Tcl_DStringLength(&ds)));
+
+	Tcl_DStringFree(&ds);
+	release_tclobj(&pad);
+	release_tclobj(&indent);
+
+	return retval;
 }
 
+//}}}
 int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj** res) //{{{
 {
 	//struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
@@ -866,31 +965,137 @@ int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj*
 }
 
 //}}}
-int JSON_IsNULL(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* isnull)
+int JSON_IsNULL(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* isnull) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	int			retval = TCL_OK;
+	Tcl_Obj*	jval = NULL;
+
+	retval = JSON_Extract(interp, obj, path, &jval);
+
+	if (retval == TCL_OK)
+		*isnull = (JSON_NULL == JSON_GetJSONType(jval));
+
+	release_tclobj(&jval);
+
+	return retval;
 }
 
-int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, enum json_types* type)
+//}}}
+int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, enum json_types* type) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	int			retval = TCL_OK;
+	Tcl_Obj*	jval = NULL;
+
+	retval = JSON_Extract(interp, obj, path, &jval);
+
+	if (retval == TCL_OK)
+		*type = JSON_GetJSONType(jval);
+
+	release_tclobj(&jval);
+
+	return retval;
 }
 
-int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* type)
+//}}}
+int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* length) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types	type;
+	int				retval = TCL_OK;
+	Tcl_Obj*		val = NULL;
+	Tcl_Obj*		target = NULL;
+
+	TEST_OK_LABEL(finally, retval, JSON_Extract(interp, obj, path, &target));
+
+	TEST_OK_LABEL(finally, retval, JSON_GetJvalFromObj(interp, target, &type, &val));
+
+	switch (type) {
+		case JSON_ARRAY:  retval = Tcl_ListObjLength(interp, val, length); break;
+		case JSON_OBJECT: retval = Tcl_DictObjSize(interp, val, length);   break;
+
+		case JSON_DYN_STRING:
+		case JSON_DYN_NUMBER:
+		case JSON_DYN_BOOL:
+		case JSON_DYN_JSON:
+		case JSON_DYN_TEMPLATE:
+		case JSON_DYN_LITERAL:   *length = Tcl_GetCharLength(val) + 3; break;	// dynamic types have a 3 character prefix
+		case JSON_STRING:        *length = Tcl_GetCharLength(val);     break;
+
+		default:
+			Tcl_SetObjResult(interp, Tcl_ObjPrintf("Named JSON value type isn't supported: %s", get_type_name(type)));
+			retval = TCL_ERROR;
+	}
+
+finally:
+	release_tclobj(&target);
+
+	return retval;
 }
 
-int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** keyslist)
+//}}}
+int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** keyslist) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types		type;
+	int					retval = TCL_OK;
+	Tcl_Obj*			val = NULL;
+	Tcl_Obj*			target = NULL;
+
+	TEST_OK_LABEL(finally, retval, JSON_Extract(interp, obj, path, &target));
+	TEST_OK_LABEL(finally, retval, JSON_GetJvalFromObj(interp, target, &type, &val));
+
+	if (type != JSON_OBJECT) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Named JSON value type isn't supported: %s", get_type_name(type)));
+		retval = TCL_ERROR;
+	} else {
+		Tcl_Obj*		res = NULL;
+		Tcl_Obj*		k = NULL;
+		Tcl_Obj*		v = NULL;
+		Tcl_DictSearch	search;
+		int				done;
+
+		replace_tclobj(&res, Tcl_NewListObj(0, NULL));
+
+		TEST_OK_LABEL(finally, retval, Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
+		for (; !done; Tcl_DictObjNext(&search, &k, &v, &done))
+			TEST_OK_BREAK(retval, Tcl_ListObjAppendElement(interp, res, k));
+		Tcl_DictObjDone(&search);
+
+		if (retval == TCL_OK)
+			replace_tclobj(keyslist, res);
+
+		release_tclobj(&res);
+	}
+
+finally:
+	release_tclobj(&target);
+
+	return retval;
 }
 
-int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** keys)
+//}}}
+int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj** decodedstring) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	Tcl_Obj*			ov[4];
+	int					i, retval;
+
+	ov[0] = l->apply;
+	ov[1] = l->decode_bytes;
+	ov[2] = bytes;
+	ov[3] = encoding;
+
+	for (i=0; i<4 && ov[i]; i++) if (ov[i]) Tcl_IncrRefCount(ov[i]);
+	retval = Tcl_EvalObjv(interp, i, ov, TCL_EVAL_GLOBAL);
+	for (i=0; i<4 && ov[i]; i++) release_tclobj(&ov[i]);
+
+	if (retval == TCL_OK) {
+		replace_tclobj(decodedstring, Tcl_GetObjResult(interp));
+		Tcl_ResetResult(interp);
+	}
+
+	return retval;
 }
 
+//}}}
 int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, int* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata)
 {
 	THROW_ERROR("Not implemented yet");

@@ -587,7 +587,7 @@ static int get_modifier(Tcl_Interp* interp, Tcl_Obj* modobj, enum modifiers* mod
 }
 
 //}}}
-static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers) //{{{
+int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers) //{{{
 {
 	int					i, modstrlen;
 	enum json_types		type;
@@ -826,7 +826,7 @@ static int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[]
 }
 
 //}}}
-static int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out) //{{{
+int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out) //{{{
 {
 	enum json_types	type;
 	int				res = TCL_OK;
@@ -1251,7 +1251,7 @@ done:
 }
 
 //}}}
-static int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
+int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
 {
 	int							indent_len, pad_len, next_pad_len, count;
 	enum json_types				type;
@@ -2408,64 +2408,28 @@ static int jsonType(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 //}}}
 static int jsonLength(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	enum json_types	type;
-	int				retval = TCL_OK;
-	Tcl_Obj*		val;
-	Tcl_Obj*		target = NULL;
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	int					length;
+	int					retval = TCL_OK;
+	Tcl_Obj*			target = NULL;
+	Tcl_Obj*			path = NULL;
 
 	if (objc < 2) CHECK_ARGS(2, "length json_val ?path ...?");
 
-	if (objc >= 3) {
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
-	} else {
-		replace_tclobj(&target, objv[1]);
+	replace_tclobj(&path,
+			objc >= 3 ?  Tcl_NewListObj(objc-2, objv+2)  :  l->tcl_empty_list
+	);
+
+	retval = JSON_Length(interp, objv[1], path, &length);
+
+	if (retval == TCL_OK) {
+		switch (length) {
+			case 0:  Tcl_SetObjResult(interp, l->tcl_zero);           break;
+			case 1:  Tcl_SetObjResult(interp, l->tcl_one);            break;
+			default: Tcl_SetObjResult(interp, Tcl_NewIntObj(length)); break;
+		}
 	}
 
-	TEST_OK_LABEL(finally, retval, JSON_GetJvalFromObj(interp, target, &type, &val));
-	switch (type) {
-		case JSON_ARRAY:
-			{
-				int			oc;
-				Tcl_Obj**	ov = NULL;
-
-				TEST_OK_LABEL(finally, retval, Tcl_ListObjGetElements(interp, val, &oc, &ov));
-				Tcl_SetObjResult(interp, Tcl_NewIntObj(oc));
-			}
-			break;
-		case JSON_OBJECT:
-			{
-				int			size;
-				TEST_OK_LABEL(finally, retval, Tcl_DictObjSize(interp, val, &size));
-				Tcl_SetObjResult(interp, Tcl_NewIntObj(size));
-			}
-			break;
-		case JSON_STRING:
-			{
-				int len;
-
-				Tcl_GetStringFromObj(val, &len);
-				Tcl_SetObjResult(interp, Tcl_NewIntObj(len));
-			}
-			break;
-		case JSON_DYN_STRING:
-		case JSON_DYN_NUMBER:
-		case JSON_DYN_BOOL:
-		case JSON_DYN_JSON:
-		case JSON_DYN_TEMPLATE:
-		case JSON_DYN_LITERAL:
-			{
-				int len;
-
-				Tcl_GetStringFromObj(val, &len);
-				Tcl_SetObjResult(interp, Tcl_NewIntObj(len+3));
-			}
-			break;
-
-		default:
-			THROW_ERROR_LABEL(finally, retval, "Named JSON value type isn't supported: ", type_names[type]);
-	}
-
-finally:
 	release_tclobj(&target);
 
 	return retval;
@@ -2474,14 +2438,10 @@ finally:
 //}}}
 static int jsonKeys(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	enum json_types	type;
-	int				done, retval=TCL_OK;
-	Tcl_Obj*		val;
-	Tcl_Obj*		target = NULL;
-	Tcl_Obj*		res = NULL;
-	Tcl_Obj*		k = NULL;
-	Tcl_Obj*		v = NULL;
-	Tcl_DictSearch	search;
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	Tcl_Obj*			path = NULL;
+	Tcl_Obj*			keylist = NULL;
+	int					retval = TCL_OK;
 
 	if (objc < 2) {
 		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
@@ -2489,30 +2449,18 @@ static int jsonKeys(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	}
 
 	if (objc >= 3) {
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+		replace_tclobj(&path, Tcl_NewListObj(objc-2, objv+2));
 	} else {
-		replace_tclobj(&target, objv[1]);
+		replace_tclobj(&path, l->tcl_empty_list);
 	}
 
-	TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
-	if (type != JSON_OBJECT)
-		THROW_ERROR_LABEL(finally, retval, "Named JSON value type isn't supported: ", type_names[type]);
-
-	replace_tclobj(&res, Tcl_NewListObj(0, NULL));
-
-	TEST_OK_LABEL(finally, retval, Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
-	for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
-		TEST_OK_BREAK(retval, Tcl_ListObjAppendElement(interp, res, k));
-	}
-	Tcl_DictObjDone(&search);
-
+	retval = JSON_Keys(interp, objv[1], path, &keylist);
+	
 	if (retval == TCL_OK)
-		Tcl_SetObjResult(interp, res);
-
-finally:
-	release_tclobj(&target);
-	release_tclobj(&res);
-
+		Tcl_SetObjResult(interp, keylist);
+	
+	release_tclobj(&keylist);
+	
 	return retval;
 }
 
@@ -2772,23 +2720,25 @@ end_new_array:
 //}}}
 static int jsonDecode(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	struct interp_cx*	l = (struct interp_cx*)cdata;
-	Tcl_Obj*			ov[4];
-	int					i, retval;
+	Tcl_Obj*	encoding = NULL;
+	Tcl_Obj*	res = NULL;
+	int			retval = TCL_OK;
 
 	if (objc < 2 || objc > 3) {
 		Tcl_WrongNumArgs(interp, 1, objv, "bytes ?encoding?");
 		return TCL_ERROR;
 	}
 
-	ov[0] = l->apply;
-	ov[1] = l->decode_bytes;
-	ov[2] = objv[1];
-	ov[3] = (objc >= 3) ? objv[2] : NULL;
+	if (objc >= 3)
+		replace_tclobj(&encoding, objv[2]);
 
-	for (i=0; i<4 && ov[i]; i++) if (ov[i]) Tcl_IncrRefCount(ov[i]);
-	retval = Tcl_EvalObjv(interp, i, ov, TCL_EVAL_GLOBAL);
-	for (i=0; i<4 && ov[i]; i++) RELEASE(ov[i]);
+	retval = JSON_Decode(interp, objv[1], encoding, &res);
+
+	if (retval == TCL_OK)
+		Tcl_SetObjResult(interp, res);
+
+	release_tclobj(&res);
+	release_tclobj(&encoding);
 
 	return retval;
 }
@@ -2964,29 +2914,22 @@ static int jsonNop(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 //}}}
 static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	Tcl_Obj*	pretty = NULL;
 	int			retval = TCL_OK;
-	Tcl_DString	ds;
 	Tcl_Obj*	indent = NULL;
-	Tcl_Obj*	pad = NULL;
 
 	if (objc < 2 || objc > 3)
 		CHECK_ARGS(2, "pretty json_val ?indent?");
 
-	if (objc >= 3) {
-		indent = objv[2];
-	} else {
-		indent = Tcl_NewStringObj("    ", 4);
-	}
-	Tcl_IncrRefCount(indent);
+	if (objc >= 3)
+		replace_tclobj(&indent, objv[2]);
 
-	Tcl_IncrRefCount(pad = Tcl_NewStringObj("", 0));
-	Tcl_DStringInit(&ds);
-	if ((retval = json_pretty(interp, objv[1], indent, pad, &ds)) == TCL_OK)
-		Tcl_DStringResult(interp, &ds);
+	retval = JSON_Pretty(interp, objv[1], indent, &pretty);
 
-	RELEASE(pad);
-	RELEASE(indent);
-	Tcl_DStringFree(&ds);
+	if (retval == TCL_OK)
+		Tcl_SetObjResult(interp, pretty);
+
+	release_tclobj(&pretty);
 
 	return retval;
 }

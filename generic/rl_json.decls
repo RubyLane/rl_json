@@ -84,10 +84,10 @@ declare 23 generic {
 }
 
 declare 24 generic {
-	int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* normalized)
+	int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** normalized)
 }
 declare 25 generic {
-	int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** prettyString)
+	int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** prettyString)
 }
 declare 26 generic {
 	int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj** res)
@@ -100,13 +100,13 @@ declare 28 generic {
 	int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, enum json_types* type)
 }
 declare 29 generic {
-	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* type)
+	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* length)
 }
 declare 30 generic {
 	int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** keyslist)
 }
 declare 31 generic {
-	int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** keys)
+	int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj** decodedstring)
 }
 
 declare 32 generic {
