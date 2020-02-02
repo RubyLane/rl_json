@@ -66,6 +66,8 @@
 		goto label; \
 	}
 
+#define TEST_OK_BREAK(var, cmd) if (TCL_OK != (var=(cmd))) break;
+
 static inline void release_tclobj(Tcl_Obj** obj)
 {
 	if (*obj) {

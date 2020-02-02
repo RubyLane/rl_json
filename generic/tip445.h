@@ -1,6 +1,8 @@
 #ifndef _TIP445_H
 #define _TIP445_H
 
+#if TIP445_SHIM
+
 /* Just enough of TIP445 to build rl_json on Tcl 8.6 */
 
 #ifndef Tcl_ObjIntRep
@@ -35,6 +37,8 @@ static inline void Tcl_StoreIntRep(Tcl_Obj* objPtr, const Tcl_ObjType* typePtr, 
 
 #ifndef Tcl_HasStringRep
 #define Tcl_HasStringRep(obj)	((obj)->bytes != NULL)
+#endif
+
 #endif
 
 #endif

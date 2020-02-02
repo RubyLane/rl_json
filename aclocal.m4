@@ -15,17 +15,12 @@ AC_DEFUN([ENABLE_ENSEMBLE], [
 			[Provide the json command using a proper ensemble, otherwise handle the subcommand dispatch internally (default: no)]),
 		[ensemble_ok=$enableval], [ensemble_ok=yes])
 
-	if test "${enable_ensemble+set}" = set; then
-		enableval="$enable_ensemble"
-		ensemble_ok=$enableval
-	else
-		ensemble_ok=yes
-	fi
-
 	if test "ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
 		ENSEMBLE=1
+		AC_MSG_RESULT([yes])
 	else
 		ENSEMBLE=0
+		AC_MSG_RESULT([no])
 	fi
 
 	AC_SUBST(ENSEMBLE)
@@ -38,20 +33,32 @@ AC_DEFUN([ENABLE_DEDUP], [
 			[Parsing JSON involves allocating a lot of small string Tcl_Objs, many of which are duplicates.  This mechanism helps reduce that duplication (default: no)]),
 		[dedup_ok=$enableval], [dedup_ok=yes])
 
-	if test "${enable_dedup+set}" = set; then
-		enableval="$enable_dedup"
-		dedup_ok=$enableval
-	else
-		dedup_ok=yes
-	fi
-
 	if test "dedup_ok" = "yes" -o "${DEDUP}" = 1; then
 		DEDUP=1
+		AC_MSG_RESULT([yes])
 	else
 		DEDUP=0
+		AC_MSG_RESULT([no])
 	fi
 
 	AC_SUBST(DEDUP)
+])
+
+AC_DEFUN([TIP445], [
+	AC_MSG_CHECKING([whether we need to polyfill TIP 445])
+	saved_CFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
+	AC_TRY_COMPILE([#include <tcl.h>], [Tcl_ObjIntRep ir;],
+	    have_tcl_objintrep=yes, have_tcl_objintrep=no)
+	CFLAGS="$saved_CFLAGS"
+
+	if test "$have_tcl_objintrep" = yes; then
+		AC_DEFINE(TIP445_SHIM, 0, [Do we need to polyfill TIP 445?])
+		AC_MSG_RESULT([no])
+	else
+		AC_DEFINE(TIP445_SHIM, 1, [Do we need to polyfill TIP 445?])
+		AC_MSG_RESULT([yes])
+	fi
 ])
 
 AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [

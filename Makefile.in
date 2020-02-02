@@ -270,7 +270,10 @@ benchmark: binaries libraries
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)
 
-vimgdb:
+tags:
+	ctags-exuberant generic/*
+
+vimgdb: tags
 	$(PKG_ENV) TCLSH="$(TCLSH_PROG)" vim
 
 gdb:

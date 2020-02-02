@@ -4912,17 +4912,14 @@ else
 fi
 
 
-	if test "${enable_ensemble+set}" = set; then
-		enableval="$enable_ensemble"
-		ensemble_ok=$enableval
-	else
-		ensemble_ok=yes
-	fi
-
 	if test "ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
 		ENSEMBLE=1
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
 	else
 		ENSEMBLE=0
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 	fi
 
 
@@ -4938,17 +4935,14 @@ else
 fi
 
 
-	if test "${enable_dedup+set}" = set; then
-		enableval="$enable_dedup"
-		dedup_ok=$enableval
-	else
-		dedup_ok=yes
-	fi
-
 	if test "dedup_ok" = "yes" -o "${DEDUP}" = 1; then
 		DEDUP=1
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
 	else
 		DEDUP=0
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 	fi
 
 
@@ -7966,6 +7960,47 @@ $as_echo "no" >&6; }
 	fi
     fi
 
+
+
+# Check for required polyfill
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether we need to polyfill TIP 445" >&5
+$as_echo_n "checking whether we need to polyfill TIP 445... " >&6; }
+	saved_CFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
+
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <tcl.h>
+int
+main ()
+{
+Tcl_ObjIntRep ir;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  have_tcl_objintrep=yes
+else
+  have_tcl_objintrep=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+	CFLAGS="$saved_CFLAGS"
+
+	if test "$have_tcl_objintrep" = yes; then
+
+$as_echo "#define TIP445_SHIM 0" >>confdefs.h
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	else
+
+$as_echo "#define TIP445_SHIM 1" >>confdefs.h
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	fi
 
 
 #--------------------------------------------------------------------

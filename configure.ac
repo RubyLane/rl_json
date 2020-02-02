@@ -146,6 +146,9 @@ TEA_ENABLE_SHARED
 
 TEA_CONFIG_CFLAGS
 
+# Check for required polyfill
+TIP445
+
 #--------------------------------------------------------------------
 # Set the default compiler switches based on the --enable-symbols option.
 #--------------------------------------------------------------------

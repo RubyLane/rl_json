@@ -54,7 +54,7 @@ EXTERN int		JSON_SetJArrayObj(Tcl_Interp*interp, Tcl_Obj*obj,
 				int objc, Tcl_Obj*objv[]);
 /* 16 */
 EXTERN int		JSON_JArrayObjGetElements(Tcl_Interp*interp,
-				Tcl_Obj*arrayObj, int*objc, Tcl_Obj**objv);
+				Tcl_Obj*arrayObj, int*objc, Tcl_Obj***objv);
 /* 17 */
 EXTERN int		JSON_JArrayObjIndex(Tcl_Interp*interp,
 				Tcl_Obj*arrayObj, int index, Tcl_Obj**elem);
@@ -126,7 +126,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_JArrayObjAppendElement) (Tcl_Interp*interp, Tcl_Obj*arrayObj, Tcl_Obj*elem); /* 13 */
     int (*jSON_JArrayObjAppendList) (Tcl_Interp*interp, Tcl_Obj*arrayObj, Tcl_Obj* elems /* a JArrayObj or ListObj */); /* 14 */
     int (*jSON_SetJArrayObj) (Tcl_Interp*interp, Tcl_Obj*obj, int objc, Tcl_Obj*objv[]); /* 15 */
-    int (*jSON_JArrayObjGetElements) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int*objc, Tcl_Obj**objv); /* 16 */
+    int (*jSON_JArrayObjGetElements) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int*objc, Tcl_Obj***objv); /* 16 */
     int (*jSON_JArrayObjIndex) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int index, Tcl_Obj**elem); /* 17 */
     int (*jSON_JArrayObjReplace) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int first, int count, int objc, Tcl_Obj*objv[]); /* 18 */
     int (*jSON_Get) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, Tcl_Obj**res); /* 19 */

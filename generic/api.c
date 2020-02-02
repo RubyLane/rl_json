@@ -183,10 +183,11 @@ int JSON_JArrayObjAppendElement(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* 
 	}
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, arrayObj, &type, &ir));
-	val = get_unshared_val(ir);
 
 	if (type != JSON_ARRAY) // Turn it into one by creating a new array with a single element containing the old value
 		TEST_OK(JSON_SetIntRep(arrayObj, JSON_ARRAY, Tcl_NewListObj(1, &val)));
+
+	val = get_unshared_val(ir);
 
 	TEST_OK(Tcl_ListObjAppendElement(interp, val, as_json(interp, elem)));
 
@@ -197,31 +198,166 @@ int JSON_JArrayObjAppendElement(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* 
 }
 
 //}}}
-int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* elems /* a JArrayObj or ListObj */ )
+int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* elems /* a JArrayObj or ListObj */ ) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types	type, elems_type;
+	Tcl_ObjIntRep*	ir = NULL;
+	Tcl_Obj*		val = NULL;
+	Tcl_Obj*		elems_val = NULL;
+	int				retval = TCL_OK;
+
+	if (Tcl_IsShared(arrayObj)) {
+		// Tcl_Panic?
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("JSON_JArrayObjAppendElement called with shared object"));
+		return TCL_ERROR;
+	}
+
+	TEST_OK(JSON_GetIntrepFromObj(interp, arrayObj, &type, &ir));
+
+	if (type != JSON_ARRAY) // Turn it into one by creating a new array with a single element containing the old value
+		TEST_OK(JSON_SetIntRep(arrayObj, JSON_ARRAY, Tcl_NewListObj(1, &val)));
+
+	val = get_unshared_val(ir);
+
+	if (JSON_GetJvalFromObj(interp, elems, &elems_type, &elems_val) == TCL_OK) {
+		switch (elems_type) {
+			case JSON_ARRAY:	// Given a JSON array, append its elements
+				TEST_OK(Tcl_ListObjAppendList(interp, val, elems_val));
+				break;
+
+			case JSON_OBJECT:	// Given a JSON object, append its keys as strings and values as whatever they were
+				{
+					Tcl_DictSearch search;
+					Tcl_Obj*		k = NULL;
+					Tcl_Obj*		kjstring = NULL;
+					Tcl_Obj*		v = NULL;
+					int				done;
+
+					TEST_OK(Tcl_DictObjFirst(interp, elems_val, &search, &k, &v, &done));
+					for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+						TEST_OK_BREAK(retval, JSON_NewJStringObj(interp, k, &kjstring));
+						TEST_OK_BREAK(retval, Tcl_ListObjAppendElement(interp, val, kjstring));
+						TEST_OK_BREAK(retval, Tcl_ListObjAppendElement(interp, val, v));
+					}
+					release_tclobj(&kjstring);
+					Tcl_DictObjDone(&search);
+				}
+				break;
+
+			default:			// elems is JSON, but not a sensible type for this call
+				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Could not append elements - not a JSON array, JSON object or list: %s", get_type_name(elems_type)));
+				return TCL_ERROR;
+		}
+	} else {
+		TEST_OK(Tcl_ListObjAppendList(interp, val, elems));
+	}
+
+	return retval;
 }
 
-int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, int objc, Tcl_Obj* objv[])
+//}}}
+int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, const int objc, Tcl_Obj* objv[]) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types	type;
+	Tcl_ObjIntRep*	ir = NULL;
+	Tcl_Obj*		val = NULL;
+	int				i, retval = TCL_OK;
+	Tcl_Obj**		jov = NULL;
+	Tcl_Obj*		newlist = NULL;
+
+	if (Tcl_IsShared(obj)) {
+		// Tcl_Panic?
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("JSON_SetJArrayObj called with shared object"));
+		return TCL_ERROR;
+	}
+
+	jov = ckalloc(sizeof(Tcl_Obj*) * objc);
+	for (i=0; i<objc; i++)
+		Tcl_IncrRefCount(jov[i] = as_json(interp, objv[i]));
+
+	// Possibly silly optimization: if obj is already a JSON array, call Tcl_SetListObj on its intrep list.
+	// All this saves is freeing the old intrep list and creating a fresh one, at the cost of some other overhead
+	if (JSON_IsJSON(obj, &type, &ir)) {
+		val = get_unshared_val(ir);
+		Tcl_SetListObj(val, objc, jov);
+	} else {
+		replace_tclobj(&newlist, Tcl_NewListObj(objc, jov));
+		retval = JSON_SetIntRep(obj, JSON_ARRAY, newlist);
+	}
+
+	release_tclobj(&newlist);
+
+	if (jov) {
+		for (i=0; i<objc; i++) release_tclobj(&jov[i]);
+		ckfree(jov);
+		jov = NULL;
+	}
+
+	return retval;
 }
 
-int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, int* objc, Tcl_Obj** objv)
+//}}}
+int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, int* objc, Tcl_Obj*** objv) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types	type;
+	Tcl_Obj*		val = NULL;
+
+	TEST_OK(JSON_GetJvalFromObj(interp, arrayObj, &type, &val));
+	if (type != JSON_ARRAY) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Expecting a JSON array, but got a JSON %s", get_type_name(type)));
+		return TCL_ERROR;
+	}
+	TEST_OK(Tcl_ListObjGetElements(interp, val, objc, objv));
+
+	return TCL_OK;
 }
 
-int JSON_JArrayObjIndex(Tcl_Interp* interp, Tcl_Obj* arrayObj, int index, Tcl_Obj** elem)
+//}}}
+int JSON_JArrayObjIndex(Tcl_Interp* interp, Tcl_Obj* arrayObj, int index, Tcl_Obj** elem) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types	type;
+	Tcl_Obj*		val = NULL;
+
+	TEST_OK(JSON_GetJvalFromObj(interp, arrayObj, &type, &val));
+	if (type != JSON_ARRAY) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Expecting a JSON array, but got a JSON %s", get_type_name(type)));
+		return TCL_ERROR;
+	}
+	TEST_OK(Tcl_ListObjIndex(interp, val, index, elem));
+
+	return TCL_OK;
 }
 
-int JSON_JArrayObjReplace(Tcl_Interp* interp, Tcl_Obj* arrayObj, int first, int count, int objc, Tcl_Obj* objv[])
+//}}}
+int JSON_JArrayObjReplace(Tcl_Interp* interp, Tcl_Obj* arrayObj, int first, int count, int objc, Tcl_Obj* objv[]) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+	enum json_types	type;
+	Tcl_Obj*		val = NULL;
+	Tcl_Obj**		jov = NULL;
+	int				i, retval=TCL_OK;
+
+	TEST_OK(JSON_GetJvalFromObj(interp, arrayObj, &type, &val));
+	if (type != JSON_ARRAY) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Expecting a JSON array, but got a JSON %s", get_type_name(type)));
+		return TCL_ERROR;
+	}
+
+	jov = ckalloc(sizeof(Tcl_Obj*) * objc);
+	for (i=0; i<objc; i++)
+		Tcl_IncrRefCount(jov[i] = as_json(interp, objv[i]));
+
+	retval = Tcl_ListObjReplace(interp, val, first, count, objc, jov);
+
+	if (jov) {
+		for (i=0; i<objc; i++) release_tclobj(&jov[i]);
+		ckfree(jov);
+		jov = NULL;
+	}
+
+	return retval;
 }
 
+//}}}
 // TODO: JObject interface, similar to DictObj
 
 int JSON_Get(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
