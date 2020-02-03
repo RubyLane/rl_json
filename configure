@@ -647,8 +647,6 @@ TCL_THREADS
 TCL_INCLUDES
 PKG_OBJECTS
 PKG_SOURCES
-DEDUP
-ENSEMBLE
 EGREP
 GREP
 RANLIB
@@ -4902,17 +4900,18 @@ $as_echo "#define AC_APPLE_UNIVERSAL_BUILD 1" >>confdefs.h
 
 # Check for feature toggles
 
+	#trap 'echo "val: (${enable_ensemble+set}), ensemble_ok: ($ensemble_ok), ensemble: ($ENSEMBLE)"' DEBUG
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to provide the json command as an ensemble" >&5
 $as_echo_n "checking whether to provide the json command as an ensemble... " >&6; }
 	# Check whether --enable-ensemble was given.
 if test "${enable_ensemble+set}" = set; then :
   enableval=$enable_ensemble; ensemble_ok=$enableval
 else
-  ensemble_ok=yes
+  ensemble_ok=no
 fi
 
 
-	if test "ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
+	if test "$ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
 		ENSEMBLE=1
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
@@ -4923,19 +4922,25 @@ $as_echo "no" >&6; }
 	fi
 
 
+cat >>confdefs.h <<_ACEOF
+#define ENSEMBLE $ENSEMBLE
+_ACEOF
+
+	#trap '' DEBUG
 
 
+	#trap 'echo "val: (${enable_dedup+set}), dedup_ok: ($dedup_ok), DEDUP: ($DEDUP)"' DEBUG
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to use a string deduplication mechanism for short strings" >&5
 $as_echo_n "checking whether to use a string deduplication mechanism for short strings... " >&6; }
 	# Check whether --enable-dedup was given.
 if test "${enable_dedup+set}" = set; then :
   enableval=$enable_dedup; dedup_ok=$enableval
 else
-  dedup_ok=yes
+  dedup_ok=no
 fi
 
 
-	if test "dedup_ok" = "yes" -o "${DEDUP}" = 1; then
+	if test "$dedup_ok" = "yes" -o "${DEDUP}" = 1; then
 		DEDUP=1
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
@@ -4946,6 +4951,11 @@ $as_echo "no" >&6; }
 	fi
 
 
+cat >>confdefs.h <<_ACEOF
+#define DEDUP $DEDUP
+_ACEOF
+
+	#trap '' DEBUG
 
 
 #-----------------------------------------------------------------------

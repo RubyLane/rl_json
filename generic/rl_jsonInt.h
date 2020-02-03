@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <tclTomMath.h>
 #include "tip445.h"
-#include "dedup.h"
 
 #define CX_STACK_SIZE	6
 
@@ -116,6 +115,14 @@ enum action_opcode {
 	TEMPLATE_ACTIONS_END
 };
 
+#if DEDUP
+#define KC_ENTRIES		384		// Must be an integer multiple of 8*sizeof(long long)
+struct kc_entry {
+	Tcl_Obj			*val;
+	unsigned int	hits;
+};
+#endif
+
 struct interp_cx {
 	Tcl_Interp*		interp;
 	Tcl_Obj*		tcl_true;
@@ -214,5 +221,7 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 		} \
 		s += 3; \
 	} else {out = JSON_STRING;}
+
+#include "dedup.h"
 
 #endif

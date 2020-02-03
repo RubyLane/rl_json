@@ -9,13 +9,14 @@ builtin(include,tclconfig/tcl.m4)
 #
 
 AC_DEFUN([ENABLE_ENSEMBLE], [
+	#trap 'echo "val: (${enable_ensemble+set}), ensemble_ok: ($ensemble_ok), ensemble: ($ENSEMBLE)"' DEBUG
 	AC_MSG_CHECKING([whether to provide the json command as an ensemble])
 	AC_ARG_ENABLE(ensemble,
 		AC_HELP_STRING([--enable-ensemble],
 			[Provide the json command using a proper ensemble, otherwise handle the subcommand dispatch internally (default: no)]),
-		[ensemble_ok=$enableval], [ensemble_ok=yes])
+		[ensemble_ok=$enableval], [ensemble_ok=no])
 
-	if test "ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
+	if test "$ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
 		ENSEMBLE=1
 		AC_MSG_RESULT([yes])
 	else
@@ -23,17 +24,19 @@ AC_DEFUN([ENABLE_ENSEMBLE], [
 		AC_MSG_RESULT([no])
 	fi
 
-	AC_SUBST(ENSEMBLE)
+	AC_DEFINE_UNQUOTED([ENSEMBLE], [$ENSEMBLE], [Ensemble enabled?])
+	#trap '' DEBUG
 ])
 
 AC_DEFUN([ENABLE_DEDUP], [
+	#trap 'echo "val: (${enable_dedup+set}), dedup_ok: ($dedup_ok), DEDUP: ($DEDUP)"' DEBUG
 	AC_MSG_CHECKING([whether to use a string deduplication mechanism for short strings])
 	AC_ARG_ENABLE(dedup,
 		AC_HELP_STRING([--enable-dedup],
 			[Parsing JSON involves allocating a lot of small string Tcl_Objs, many of which are duplicates.  This mechanism helps reduce that duplication (default: no)]),
-		[dedup_ok=$enableval], [dedup_ok=yes])
+		[dedup_ok=$enableval], [dedup_ok=no])
 
-	if test "dedup_ok" = "yes" -o "${DEDUP}" = 1; then
+	if test "$dedup_ok" = "yes" -o "${DEDUP}" = 1; then
 		DEDUP=1
 		AC_MSG_RESULT([yes])
 	else
@@ -41,7 +44,8 @@ AC_DEFUN([ENABLE_DEDUP], [
 		AC_MSG_RESULT([no])
 	fi
 
-	AC_SUBST(DEDUP)
+	AC_DEFINE_UNQUOTED([DEDUP], [$DEDUP], [Dedup enabled?])
+	#trap '' DEBUG
 ])
 
 AC_DEFUN([TIP445], [

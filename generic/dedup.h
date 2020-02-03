@@ -3,13 +3,6 @@
 
 #if DEDUP
 
-#define KC_ENTRIES		384		// Must be an integer multiple of 8*sizeof(long long)
-
-struct kc_entry {
-	Tcl_Obj			*val;
-	unsigned int	hits;
-};
-
 #define STRING_DEDUP_MAX	16
 
 void free_cache(struct interp_cx* l);
