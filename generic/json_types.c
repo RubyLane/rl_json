@@ -319,7 +319,6 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 		// Don't know how this happens yet, but it's bad news - we get into an endless recursion of duplicateobj calls until the stack blows up
 
 		// Panic and go via the string rep
-		destir.twoPtrValue.ptr1 = Tcl_NewStringObj(str, len);
 		Tcl_IncrRefCount((Tcl_Obj*)(destir.twoPtrValue.ptr1 = Tcl_NewStringObj(str, len)));
 	} else {
 		destir.twoPtrValue.ptr1 = srcir->twoPtrValue.ptr1;

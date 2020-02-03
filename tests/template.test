@@ -131,7 +131,7 @@ test template-3.1 {Non-string key subst: number} -body { #<<<
 } r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
-} -result [list 1 NONE {Only strings allowed as object keys}]
+} -result [list 1 NONE {Only strings allowed as object keys, got ~N:v}]
 #>>>
 test template-3.2 {Non-string key subst: true} -body { #<<<
 	list [catch {
@@ -139,7 +139,7 @@ test template-3.2 {Non-string key subst: true} -body { #<<<
 } r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
-} -result [list 1 NONE {Only strings allowed as object keys}]
+} -result [list 1 NONE {Only strings allowed as object keys, got ~B:v}]
 #>>>
 test template-3.3 {Non-string key subst: false} -body { #<<<
 	list [catch {
@@ -147,7 +147,7 @@ test template-3.3 {Non-string key subst: false} -body { #<<<
 } r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
 } -cleanup {
 	unset -nocomplain r o
-} -result [list 1 NONE {Only strings allowed as object keys}]
+} -result [list 1 NONE {Only strings allowed as object keys, got ~B:v}]
 #>>>
 test template-3.4 {Non-string key subst: null} -body { #<<<
 	list [catch {

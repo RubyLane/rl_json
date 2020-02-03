@@ -1,48 +1,34 @@
 #if DEDUP
-#include "rl_jsonInt.h"
 
-//#define _GNU_SOURCE
-
-#ifndef ffsll
-#define ffsll	ffsll_polyfill
-static int ffsll_polyfill(long long x) //{{{
-{
-	int i=0;
-	long long mask = 1;
-	for(i=0; i<sizeof(long long)*8;++i, mask <<= 1) {
-		if(x & mask) {
-			return i+1;
-		}
-	}
-	return 0;
-}
-
-//}}}
+#if FFS == ffsll
+#define _GNU_SOURCE		// For glibc extension ffsll
 #endif
 
-static int first_free(long long* freemap) //{{{
+#include "rl_jsonInt.h"
+
+static int first_free(FREEMAP_TYPE* freemap) //{{{
 {
 	int	i=0, bit, res;
-	while ((bit = ffsll(freemap[i])) == 0) {
+	while ((bit = FFS(freemap[i])) == 0) {
 		i++;
 	}
-	res = i * (sizeof(long long)*8) + (bit-1);
+	res = i * (sizeof(FREEMAP_TYPE)*8) + (bit-1);
 	return res;
 }
 
 //}}}
-static void mark_used(long long* freemap, int idx) //{{{
+static void mark_used(FREEMAP_TYPE* freemap, int idx) //{{{
 {
-	int	i = idx / (sizeof(long long)*8);
-	int bit = idx - (i * (sizeof(long long)*8));
+	int	i = idx / (sizeof(FREEMAP_TYPE)*8);
+	int bit = idx - (i * (sizeof(FREEMAP_TYPE)*8));
 	freemap[i] &= ~(1LL << bit);
 }
 
 //}}}
-static void mark_free(long long* freemap, int idx) //{{{
+static void mark_free(FREEMAP_TYPE* freemap, int idx) //{{{
 {
-	int	i = idx / (sizeof(long long)*8);
-	int bit = idx - (i * (sizeof(long long)*8));
+	int	i = idx / (sizeof(FREEMAP_TYPE)*8);
+	int bit = idx - (i * (sizeof(FREEMAP_TYPE)*8));
 	freemap[i] |= 1LL << bit;
 }
 

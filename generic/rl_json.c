@@ -318,13 +318,13 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 					// Have to do the template subst here rather than at
 					// parse time since the dict keys would be broken otherwise
 					if (scx->serialize_mode == SERIALIZE_TEMPLATE) {
-						int			l, stype;
+						int			len, stype;
 						const char*	s;
 
-						s = Tcl_GetStringFromObj(k, &l);
+						s = Tcl_GetStringFromObj(k, &len);
 
 						if (
-								l >= 3 &&
+								len >= 3 &&
 								s[0] == '~' &&
 								s[2] == ':'
 						) {
@@ -336,8 +336,7 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 								case 'B':
 								case 'J':
 								case 'T':
-									Tcl_SetObjResult(interp, Tcl_NewStringObj(
-												"Only strings allowed as object keys", -1));
+									Tcl_SetObjResult(interp, Tcl_ObjPrintf("Only strings allowed as object keys, got %s", s));
 									res = TCL_ERROR;
 									goto done;
 
@@ -347,7 +346,7 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 							if (stype != JSON_UNDEF) {
 								int hold = scx->allow_null;
 								scx->allow_null = 0;
-								if (serialize_json_val(interp, scx, stype, Tcl_GetRange(k, 3, l-1)) != TCL_OK) {
+								if (serialize_json_val(interp, scx, stype, Tcl_GetRange(k, 3, len-1)) != TCL_OK) {
 									scx->allow_null = hold;
 									res = TCL_ERROR;
 									break;
@@ -2937,10 +2936,11 @@ static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 //}}}
 static int jsonDebug(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	int			retval = TCL_OK;
-	Tcl_DString	ds;
-	Tcl_Obj*	indent = NULL;
-	Tcl_Obj*	pad = NULL;
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	int					retval = TCL_OK;
+	Tcl_DString			ds;
+	Tcl_Obj*			indent = NULL;
+	Tcl_Obj*			pad = NULL;
 
 	if (objc < 2 || objc > 3)
 		CHECK_ARGS(2, "pretty json_val ?indent?");
@@ -2948,11 +2948,11 @@ static int jsonDebug(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 	if (objc >= 3) {
 		indent = objv[2];
 	} else {
-		indent = Tcl_NewStringObj("    ", 4);
+		indent = get_string(l, "    ", 4);
 	}
 	Tcl_IncrRefCount(indent);
 
-	Tcl_IncrRefCount(pad = Tcl_NewStringObj("", 0));
+	Tcl_IncrRefCount(pad = l->tcl_empty);
 	Tcl_DStringInit(&ds);
 	if ((retval = json_pretty_dbg(interp, objv[1], indent, pad, &ds)) == TCL_OK)
 		Tcl_DStringResult(interp, &ds);

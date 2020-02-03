@@ -116,11 +116,33 @@ enum action_opcode {
 };
 
 #if DEDUP
-#define KC_ENTRIES		384		// Must be an integer multiple of 8*sizeof(long long)
 struct kc_entry {
 	Tcl_Obj			*val;
 	unsigned int	hits;
 };
+
+/* Find the best BSF (bit-scan-forward) implementation available:
+ * In order of preference:
+ *    - __builtin_ffsll     - provided by gcc >= 3.4 and clang >= 5.x
+ *    - ffsll               - glibc extension, freebsd libc >= 7.1
+ *    - ffs                 - POSIX, but only on int
+ * TODO: possibly provide _BitScanForward implementation for Visual Studio >= 2005?
+ */
+#if defined(HAVE___BUILTIN_FFSLL) || defined(HAVE_FFSLL)
+#	if defined(HAVE___BUILTIN_FFSLL)
+#		define FFS				__builtin_ffsll
+#	else
+#		define FFS				ffsll
+#	endif
+#	define FREEMAP_TYPE		long long
+#else
+#	define FFS				ffs
+#	define FREEMAP_TYPE		int
+#endif
+
+
+#define KC_ENTRIES		384		// Must be an integer multiple of 8*sizeof(FREEMAP_TYPE)
+
 #endif
 
 struct interp_cx {
@@ -143,7 +165,7 @@ struct interp_cx {
 #if DEDUP
 	Tcl_HashTable	kc;
 	int				kc_count;
-	long long		freemap[(KC_ENTRIES / (8*sizeof(long long)))+1];	// long long for ffsll
+	FREEMAP_TYPE	freemap[(KC_ENTRIES / (8*sizeof(FREEMAP_TYPE)))+1];	// long long for ffsll
 	struct kc_entry	kc_entries[KC_ENTRIES];
 #endif
 	const Tcl_ObjType*	typeDict;		// Evil hack to identify objects of type dict, used to choose whether to iterate over a list of pairs as a dict or a list, for efficiency

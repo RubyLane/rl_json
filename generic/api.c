@@ -925,7 +925,7 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
 	if (indent == NULL)
-		replace_tclobj(&indent, Tcl_NewStringObj("    ", 4));
+		replace_tclobj(&indent, get_string(l, "    ", 4));
 
 	replace_tclobj(&pad, l->tcl_empty);
 	Tcl_DStringInit(&ds);
