@@ -1,4 +1,5 @@
 #include "rl_jsonInt.h"
+#include "parser.h"
 
 Tcl_Obj* JSON_NewJSONObj(Tcl_Interp* interp, Tcl_Obj* from) //{{{
 {
@@ -1099,6 +1100,231 @@ int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj**
 int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, int* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata)
 {
 	THROW_ERROR("Not implemented yet");
+}
+int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions extensions, struct parse_error* details)
+{
+	struct interp_cx*		l = NULL;
+	const unsigned char*	err_at = NULL;
+	const char*				errmsg = "Illegal character";
+	size_t					char_adj = 0;		// Offset addjustment to account for multibyte UTF-8 sequences
+	const unsigned char*	doc;
+	enum json_types			type;
+	const unsigned char*	p;
+	const unsigned char*	e;
+	const unsigned char*	val_start;
+	int						len;
+	struct parse_context	cx[CX_STACK_SIZE];
+
+	if (interp)
+		l = Tcl_GetAssocData(interp, "rl_json", NULL);
+
+#if 1
+	// Snoop on the intrep for clues on optimized conversions {{{
+	{
+		if (
+			l && (
+				(l->typeInt    && Tcl_FetchIntRep(json, l->typeInt)    != NULL) ||
+				(l->typeDouble && Tcl_FetchIntRep(json, l->typeDouble) != NULL) ||
+				(l->typeBignum && Tcl_FetchIntRep(json, l->typeBignum) != NULL)
+			)
+		) {
+			*valid = 1;
+			return TCL_OK;
+		}
+	}
+	// Snoop on the intrep for clues on optimized conversions }}}
+#endif
+
+	cx[0].prev = NULL;
+	cx[0].last = cx;
+	cx[0].hold_key = NULL;
+	cx[0].container = JSON_UNDEF;
+	cx[0].val = NULL;
+	cx[0].char_ofs = 0;
+	cx[0].closed = 0;
+	cx[0].l = l;
+	cx[0].mode = VALIDATE;
+
+	p = doc = (const unsigned char*)Tcl_GetStringFromObj(json, &len);
+	e = p + len;
+
+	// Skip BOM
+	if (
+		len >= 3 &&
+		p[0] == 0xef &&
+		p[1] == 0xbb &&
+		p[2] == 0xbf
+	) {
+		p += 3;
+	}	
+
+	// Skip leading whitespace and comments
+	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0) goto whitespace_err;
+
+	if (unlikely(p >= e)) {
+		err_at = p;
+		errmsg = "No JSON value found";
+		goto whitespace_err;
+	}
+
+	while (p < e) {
+		if (cx[0].last->container == JSON_OBJECT) { // Read the key if in object mode {{{
+			const unsigned char*	key_start = p;
+			size_t					key_start_char_adj = char_adj;
+
+			if (value_type(l, doc, p, e, &char_adj, &p, &type, NULL, details) != TCL_OK) goto invalid;
+
+			switch (type) {
+				case JSON_DYN_STRING:
+				case JSON_DYN_NUMBER:
+				case JSON_DYN_BOOL:
+				case JSON_DYN_JSON:
+				case JSON_DYN_TEMPLATE:
+				case JSON_DYN_LITERAL:
+				case JSON_STRING:
+					break;
+
+				default:
+					parse_error(details, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
+					goto invalid;
+			}
+
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
+
+			if (unlikely(*p != ':')) {
+				parse_error(details, "Expecting : after object key", doc, (p-doc) - char_adj);
+				goto invalid;
+			}
+			p++;
+
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
+		}
+		//}}}
+
+		val_start = p;
+		if (value_type(l, doc, p, e, &char_adj, &p, &type, NULL, details) != TCL_OK) goto invalid;
+
+		switch (type) {
+			case JSON_OBJECT:
+				push_parse_context(cx, JSON_OBJECT, (val_start - doc) - char_adj);
+				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
+
+				if (*p == '}') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				}
+				continue;
+
+			case JSON_ARRAY:
+				push_parse_context(cx, JSON_ARRAY, (val_start - doc) - char_adj);
+				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
+
+				if (*p == ']') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				}
+				continue;
+
+			case JSON_DYN_STRING:
+			case JSON_DYN_NUMBER:
+			case JSON_DYN_BOOL:
+			case JSON_DYN_JSON:
+			case JSON_DYN_TEMPLATE:
+			case JSON_DYN_LITERAL:
+			case JSON_STRING:
+			case JSON_BOOL:
+			case JSON_NULL:
+			case JSON_NUMBER:
+				if (unlikely(cx->last->container != JSON_OBJECT && cx->last->container != JSON_ARRAY))
+					cx->last->container = type;	// Record our type (at the document top-level)
+				break;
+
+			default:
+				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Unexpected json value type: %d", type));
+				goto err;
+		}
+
+after_value:	// Yeah, goto.  But the alternative abusing loops was worse
+		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
+		if (p >= e) break;
+
+		if (unlikely(cx[0].last->closed)) {
+			parse_error(details, "Trailing garbage after value", doc, (p-doc) - char_adj);
+			goto invalid;
+		}
+
+		switch (cx[0].last->container) { // Handle eof and end-of-context or comma for array and object {{{
+			case JSON_OBJECT:
+				if (*p == '}') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				} else if (unlikely(*p != ',')) {
+					parse_error(details, "Expecting } or ,", doc, (p-doc) - char_adj);
+					goto invalid;
+				}
+
+				p++;
+				break;
+
+			case JSON_ARRAY:
+				if (*p == ']') {
+					pop_parse_context(cx);
+					p++;
+					goto after_value;
+				} else if (unlikely(*p != ',')) {
+					parse_error(details, "Expecting ] or ,", doc, (p-doc) - char_adj);
+					goto invalid;
+				}
+
+				p++;
+				break;
+
+			default:
+				if (unlikely(p < e)) {
+					parse_error(details, "Trailing garbage after value", doc, (p - doc) - char_adj);
+					goto invalid;
+				}
+		}
+
+		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
+		//}}}
+	}
+
+	if (unlikely(cx != cx[0].last || !cx[0].closed)) { // Unterminated object or array context {{{
+		switch (cx[0].last->container) {
+			case JSON_OBJECT:
+				parse_error(details, "Unterminated object", doc, cx[0].last->char_ofs);
+				goto invalid;
+
+			case JSON_ARRAY:
+				parse_error(details, "Unterminated array", doc, cx[0].last->char_ofs);
+				goto invalid;
+
+			default:	// Suppress compiler warning
+				break;
+		}
+	}
+	//}}}
+
+	*valid = 1;
+	return TCL_OK;
+
+whitespace_err:
+	parse_error(details, errmsg, doc, (err_at - doc) - char_adj);
+
+invalid:
+	free_cx(cx);
+
+	// This was a parse error, which is a successful outcome for us
+	*valid = 0;
+	return TCL_OK;
+
+err:
+	free_cx(cx);
+	return TCL_ERROR;
 }
 
 /* Local Variables: */

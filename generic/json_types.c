@@ -459,6 +459,8 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	const unsigned char*	val_start;
 	int						len;
 	struct parse_context	cx[CX_STACK_SIZE];
+	enum extensions			extensions = EXT_COMMENTS;
+	struct parse_error		details = {};
 
 	if (interp)
 		l = Tcl_GetAssocData(interp, "rl_json", NULL);
@@ -496,6 +498,8 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	cx[0].val = NULL;
 	cx[0].char_ofs = 0;
 	cx[0].closed = 0;
+	cx[0].l = l;
+	cx[0].mode = PARSE;
 
 	p = doc = (const unsigned char*)Tcl_GetStringFromObj(obj, &len);
 	e = p + len;
@@ -511,14 +515,14 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	}	
 
 	// Skip leading whitespace and comments
-	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0) goto whitespace_err;
+	if (skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0) goto whitespace_err;
 
 	while (p < e) {
 		if (cx[0].last->container == JSON_OBJECT) { // Read the key if in object mode {{{
 			const unsigned char*	key_start = p;
 			size_t					key_start_char_adj = char_adj;
 
-			if (value_type(l, doc, p, e, &char_adj, &p, &type, &val) != TCL_OK) goto err;
+			if (value_type(l, doc, p, e, &char_adj, &p, &type, &val, &details) != TCL_OK) goto err;
 
 			switch (type) {
 				case JSON_DYN_STRING:
@@ -542,29 +546,29 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 					break;
 
 				default:
-					_parse_error(interp, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
+					parse_error(&details, "Object key is not a string", doc, (key_start-doc) - key_start_char_adj);
 					goto err;
 			}
 
-			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
 
 			if (unlikely(*p != ':')) {
-				_parse_error(interp, "Expecting : after object key", doc, (p-doc) - char_adj);
+				parse_error(&details, "Expecting : after object key", doc, (p-doc) - char_adj);
 				goto err;
 			}
 			p++;
 
-			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+			if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
 		}
 		//}}}
 
 		val_start = p;
-		if (value_type(l, doc, p, e, &char_adj, &p, &type, &val) != TCL_OK) goto err;
+		if (value_type(l, doc, p, e, &char_adj, &p, &type, &val, &details) != TCL_OK) goto err;
 
 		switch (type) {
 			case JSON_OBJECT:
 				push_parse_context(cx, JSON_OBJECT, (val_start - doc) - char_adj);
-				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
 
 				if (*p == '}') {
 					pop_parse_context(cx);
@@ -575,7 +579,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 
 			case JSON_ARRAY:
 				push_parse_context(cx, JSON_ARRAY, (val_start - doc) - char_adj);
-				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+				if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
 
 				if (*p == ']') {
 					pop_parse_context(cx);
@@ -605,11 +609,11 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 		}
 
 after_value:	// Yeah, goto.  But the alternative abusing loops was worse
-		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
 		if (p >= e) break;
 
 		if (unlikely(cx[0].last->closed)) {
-			_parse_error(interp, "Trailing garbage after value", doc, (p-doc) - char_adj);
+			parse_error(&details, "Trailing garbage after value", doc, (p-doc) - char_adj);
 			goto err;
 		}
 
@@ -620,7 +624,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 					p++;
 					goto after_value;
 				} else if (unlikely(*p != ',')) {
-					_parse_error(interp, "Expecting } or ,", doc, (p-doc) - char_adj);
+					parse_error(&details, "Expecting } or ,", doc, (p-doc) - char_adj);
 					goto err;
 				}
 
@@ -633,7 +637,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 					p++;
 					goto after_value;
 				} else if (unlikely(*p != ',')) {
-					_parse_error(interp, "Expecting ] or ,", doc, (p-doc) - char_adj);
+					parse_error(&details, "Expecting ] or ,", doc, (p-doc) - char_adj);
 					goto err;
 				}
 
@@ -642,23 +646,23 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 
 			default:
 				if (unlikely(p < e)) {
-					_parse_error(interp, "Trailing garbage after value", doc, (p - doc) - char_adj);
+					parse_error(&details, "Trailing garbage after value", doc, (p - doc) - char_adj);
 					goto err;
 				}
 		}
 
-		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj) != 0)) goto whitespace_err;
+		if (unlikely(skip_whitespace(&p, e, &errmsg, &err_at, &char_adj, extensions) != 0)) goto whitespace_err;
 		//}}}
 	}
 
 	if (unlikely(cx != cx[0].last || !cx[0].closed)) { // Unterminated object or array context {{{
 		switch (cx[0].last->container) {
 			case JSON_OBJECT:
-				_parse_error(interp, "Unterminated object", doc, cx[0].last->char_ofs);
+				parse_error(&details, "Unterminated object", doc, cx[0].last->char_ofs);
 				goto err;
 
 			case JSON_ARRAY:
-				_parse_error(interp, "Unterminated array", doc, cx[0].last->char_ofs);
+				parse_error(&details, "Unterminated array", doc, cx[0].last->char_ofs);
 				goto err;
 
 			default:	// Suppress compiler warning
@@ -697,9 +701,12 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 	return TCL_OK;
 
 whitespace_err:
-	_parse_error(interp, errmsg, doc, (err_at - doc) - char_adj);
+	parse_error(&details, errmsg, doc, (err_at - doc) - char_adj);
 
 err:
+	if (details.errmsg)
+		throw_parse_error(interp, &details);
+
 	RELEASE(val);
 	free_cx(cx);
 	return TCL_ERROR;

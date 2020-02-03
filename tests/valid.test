@@ -1,0 +1,1387 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace path {::rl_json}
+
+test valid-0.1 {Too few args} -body { #<<<
+	list [catch {json valid} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {wrong # args: should be "valid ?-extensions extensionslist -details detailsvar? json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.2 {Too few args: missing value for -extensions} -body { #<<<
+	list [catch {json valid -extensions true} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {wrong # args: should be "valid -extensions extensionslist json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.3 {Too few args: missing value for -details} -body { #<<<
+	list [catch {json valid -details true} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {wrong # args: should be "valid -details detailsvar json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.4 {Too few args: missing json_val folling -extensions} -body { #<<<
+	list [catch {json valid -extensions {}} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o
+} -result {1 {wrong # args: should be "valid -extensions extensionslist json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.5 {Too few args: missing json_val folling -details} -body { #<<<
+	list [catch {json valid -details d} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {wrong # args: should be "valid -details detailsvar json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.6 {Too few args: missing json_val folling -extensions -details} -body { #<<<
+	list [catch {json valid -extensions {} -details d} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {wrong # args: should be "valid -extensions {} -details detailsvar json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.7 {Too few args: missing json_val folling -details -extensions} -body { #<<<
+	list [catch {json valid -details d -extensions {}} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {wrong # args: should be "valid -details d -extensions extensionslist json_val"} {TCL WRONGARGS}}
+#>>>
+test valid-0.8 {Too many args: no options} -body { #<<<
+	list [catch {json valid true false} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {bad option "true": must be -extensions or -details} {TCL LOOKUP INDEX option true}}
+#>>>
+test valid-0.9 {Too many args: with -extensions} -body { #<<<
+	list [catch {json valid -extensions {} true false} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {bad option "true": must be -extensions or -details} {TCL LOOKUP INDEX option true}}
+#>>>
+test valid-0.10 {Too many args: with -details} -body { #<<<
+	list [catch {json valid -details d true false} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {bad option "true": must be -extensions or -details} {TCL LOOKUP INDEX option true}}
+#>>>
+test valid-0.11 {Too many args: with -details and -extensions} -body { #<<<
+	list [catch {json valid -details d -extensions {} true false} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {bad option "true": must be -extensions or -details} {TCL LOOKUP INDEX option true}}
+#>>>
+
+test valid-1.0.1 {extensions: invalid extension} -body { #<<<
+	list [catch {json valid -extensions {nonesuch} true} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain r o d
+} -result {1 {bad extension "nonesuch": must be comments} {TCL LOOKUP INDEX extension nonesuch}}
+#>>>
+test valid-1.1.1 {extensions: comments included} -body { #<<<
+	json valid -extensions comments {true // Allowed?}
+} -result 1
+#>>>
+test valid-1.1.2 {extensions: comments excluded} -body { #<<<
+	json valid -extensions {} {true // Allowed?}
+} -result 0
+#>>>
+test valid-1.1.3 {extensions: comments default} -body { #<<<
+	json valid {true // Allowed?}
+} -result 1
+#>>>
+test valid-1.1.4 {extensions: comments default with -details} -body { #<<<
+	json valid -details d {true // Allowed?}
+} -cleanup {
+	unset -nocomplain d
+} -result 1
+#>>>
+test valid-1.2.0.1 {details: bad detailsvar} -body { #<<<
+	set d	"already a scalar"
+	list [catch {json valid -details d(foo) "true \x1f"} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain d
+} -result {1 {can't set "d(foo)": variable isn't array} {TCL LOOKUP VARNAME d}}
+#>>>
+test valid-1.2.0.2 {details: bad detailsvar} -body { #<<<
+	set d(foo)	"already an array"
+	list [catch {json valid -details d "true \x1f"} r o] $r [dict get $o -errorcode]
+} -cleanup {
+	unset -nocomplain d
+} -result {1 {can't set "d": variable is array} {TCL WRITE VARNAME}}
+#>>>
+test valid-1.2.1 {details: scalar detailsvar} -body { #<<<
+	unset -nocomplain d
+	list [json valid -details d "true \x1f"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc "true \x1f" char_ofs 5]]
+#>>>
+test valid-1.2.1 {details: array detailsvar} -body { #<<<
+	unset -nocomplain d
+	list [json valid -details d(foo) "true \x1f"] $d(foo)
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc "true \x1f" char_ofs 5]]
+#>>>
+test valid-1.2.2 {details: don't set on valid} -body { #<<<
+	unset -nocomplain d
+	list [json valid -details d true] [info exists d]
+} -cleanup {
+	unset -nocomplain d
+} -result {1 0}
+#>>>
+test valid-1.2.3 {no details} -body { #<<<
+	list [json valid "true \x1f"]
+} -result 0
+#>>>
+
+test valid-2.1 {Truncated string} -body { #<<<
+	list [json valid -details d "\"foo"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Document truncated} doc {"foo} char_ofs 4}}
+#>>>
+test valid-2.2 {Empty document} -body { #<<<
+	list [json valid -details d ""] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {No JSON value found} doc {} char_ofs 0}}
+#>>>
+test valid-2.3 {Empty value} -body { #<<<
+	list [json valid -details d "\{\"foo\":"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Document truncated} doc \{\"foo\": char_ofs 7}}
+#>>>
+
+test valid/backslash-1.1 {\u in string value, no leading, no trailing} -body { #<<<
+	json valid {"\u306f"}
+} -result 1
+#>>>
+test valid/backslash-1.2 {\u in string value, leading, no trailing} -body { #<<<
+	json valid {"( \u306f"}
+} -result 1
+#>>>
+test valid/backslash-1.3 {\u in string value, no leading, trailing} -body { #<<<
+	json valid {"\u306f )"}
+} -result 1
+#>>>
+test valid/backslash-1.4 {\u in string value, leading, trailing} -body { #<<<
+	json valid {"( \u306f )"}
+} -result 1
+#>>>
+test valid/backslash-2.1 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [json valid -details d {"\u"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u"} char_ofs 3}}
+#>>>
+test valid/backslash-2.2 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [json valid -details d {"\u3"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3"} char_ofs 4}}
+#>>>
+test valid/backslash-2.3 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [json valid -details d {"\u30"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30"} char_ofs 5}}
+#>>>
+test valid/backslash-2.4 {\u in string value, too few digits, no trailing} -body { #<<<
+	list [json valid -details d {"\u306"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306"} char_ofs 6}}
+#>>>
+test valid/backslash-2.5 {\u in string value, too few digits, truncated} -body { #<<<
+	list [json valid -details d "\"\\u"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u} char_ofs 3}}
+#>>>
+test valid/backslash-2.6 {\u in string value, too few digits, truncated} -body { #<<<
+	list [json valid -details d "\"\\u3"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3} char_ofs 4}}
+#>>>
+test valid/backslash-2.7 {\u in string value, too few digits, truncated} -body { #<<<
+	list [json valid -details d "\"\\u30"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30} char_ofs 5}}
+#>>>
+test valid/backslash-2.8 {\u in string value, too few digits, truncated} -body { #<<<
+	list [json valid -details d "\"\\u306"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306} char_ofs 6}}
+#>>>
+test valid/backslash-3.1 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [json valid -details d {"\u/xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u/xxxx"} char_ofs 3}}
+#>>>
+test valid/backslash-3.2 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [json valid -details d {"\u3/xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3/xxxx"} char_ofs 4}}
+#>>>
+test valid/backslash-3.3 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [json valid -details d {"\u30/xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30/xxxx"} char_ofs 5}}
+#>>>
+test valid/backslash-3.4 {\u in string value, too few digits, trailing < '0'} -body { #<<<
+	list [json valid -details d {"\u306/xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306/xxxx"} char_ofs 6}}
+#>>>
+test valid/backslash-4.1 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [json valid -details d {"\u@xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u@xxxx"} char_ofs 3}}
+#>>>
+test valid/backslash-4.2 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [json valid -details d {"\u3@xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3@xxxx"} char_ofs 4}}
+#>>>
+test valid/backslash-4.3 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [json valid -details d {"\u30@xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30@xxxx"} char_ofs 5}}
+#>>>
+test valid/backslash-4.4 {\u in string value, too few digits, trailing < 'A'} -body { #<<<
+	list [json valid -details d {"\u306@xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306@xxxx"} char_ofs 6}}
+#>>>
+test valid/backslash-5.1 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [json valid -details d {"\u`xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u`xxxx"} char_ofs 3}}
+#>>>
+test valid/backslash-5.2 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [json valid -details d {"\u3`xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3`xxxx"} char_ofs 4}}
+#>>>
+test valid/backslash-5.3 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [json valid -details d {"\u30`xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30`xxxx"} char_ofs 5}}
+#>>>
+test valid/backslash-5.4 {\u in string value, too few digits, trailing < 'a'} -body { #<<<
+	list [json valid -details d {"\u306`xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306`xxxx"} char_ofs 6}}
+#>>>
+test valid/backslash-6.1 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [json valid -details d {"\u:xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u:xxxx"} char_ofs 3}}
+#>>>
+test valid/backslash-6.2 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [json valid -details d {"\u3:xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3:xxxx"} char_ofs 4}}
+#>>>
+test valid/backslash-6.3 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [json valid -details d {"\u30:xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30:xxxx"} char_ofs 5}}
+#>>>
+test valid/backslash-6.4 {\u in string value, too few digits, trailing > '9'} -body { #<<<
+	list [json valid -details d {"\u306:xxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306:xxxx"} char_ofs 6}}
+#>>>
+test valid/backslash-6.1 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [json valid -details d {"\uGxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\uGxxxx"} char_ofs 3}}
+#>>>
+test valid/backslash-6.2 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [json valid -details d {"\u3Gxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3Gxxxx"} char_ofs 4}}
+#>>>
+test valid/backslash-6.3 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [json valid -details d {"\u30Gxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30Gxxxx"} char_ofs 5}}
+#>>>
+test valid/backslash-6.4 {\u in string value, too few digits, trailing > 'F'} -body { #<<<
+	list [json valid -details d {"\u306Gxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306Gxxxx"} char_ofs 6}}
+#>>>
+test valid/backslash-6.1 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [json valid -details d {"\ugxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\ugxxxx"} char_ofs 3}}
+#>>>
+test valid/backslash-6.2 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [json valid -details d {"\u3gxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u3gxxxx"} char_ofs 4}}
+#>>>
+test valid/backslash-6.3 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [json valid -details d {"\u30gxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u30gxxxx"} char_ofs 5}}
+#>>>
+test valid/backslash-6.4 {\u in string value, too few digits, trailing > 'f'} -body { #<<<
+	list [json valid -details d {"\u306gxxxx"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u306gxxxx"} char_ofs 6}}
+#>>>
+test valid/backslash-7.1 {\u in string value, too many digits} -body { #<<<
+	json valid {"\u306F3"}
+} -result 1
+#>>>
+test valid/backslash-8.1 {\u in string value, reject leading sign} -body { #<<<
+	list [json valid -details d {"\u-306F"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u-306F"} char_ofs 3}}
+#>>>
+test valid/backslash-8.2 {\u in string value, reject leading sign} -body { #<<<
+	list [json valid -details d {"\u+306F"}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unicode sequence too short} doc {"\u+306F"} char_ofs 3}}
+#>>>
+test valid/backslash-10.1 {\u in string value, valid hex bounds} -body { #<<<
+	json valid {"\u0009"}
+} -result 1
+#>>>
+test valid/backslash-10.2 {\u in string value, valid hex bounds} -body { #<<<
+	json valid {"\uAfaF"}
+} -result 1
+#>>>
+test valid/backslash-10.3 {\u in string value, valid hex bounds} -body { #<<<
+	json valid {"\u0000"}
+} -result 1
+#>>>
+
+try { # Test every ASCII escape char other than u (tested above) <<<
+	set valid {
+		34	\u0022
+		92	\u005c
+		47	\u002f
+		98	\u0008
+		102	\u000c
+		110	\u000a
+		114	\u000d
+		116	\u0009
+	}
+	for {set c 0} {$c < 0x80} {incr c} {
+		if {[format %c $c] eq "u"} continue
+
+		if {[dict exists $valid $c]} {
+			test valid/backslash-20.$c.1 "test every non-u backquote: [format 0x%02x $c], no trailing" -body { #<<<
+				json valid [format {"\%c"} $c]
+			} -result 1
+			#>>>
+			test valid/backslash-20.$c.2 "test every non-u backquote: [format 0x%02x $c], trailing" -body { #<<<
+				json valid [format {"\%cx"} $c]
+			} -result 1
+			#>>>
+			test valid/backslash-20.$c.3 "test every non-u backquote: [format 0x%02x $c], truncated" -body { #<<<
+				list [json valid -details d [format "\"\\%c" $c]] $d
+			} -cleanup {
+				unset -nocomplain d
+			} -result [list 0 [list errmsg {Document truncated} doc [format "\"\\%c" $c] char_ofs 3]]
+			#>>>
+		} else {
+			test valid/backslash-20.$c.1 "test every non-u backquote: [format 0x%02x $c], no trailing" -body { #<<<
+				list [json valid -details d [format {"\%c"} $c]] $d
+			} -cleanup {
+				unset -nocomplain d
+			} -result [list 0 [list errmsg {Illegal character} doc [format "\"\\%c\"" $c] char_ofs 2]]
+			#>>>
+			test valid/backslash-20.$c.2 "test every non-u backquote: [format 0x%02x $c], trailing" -body { #<<<
+				list [json valid -details d [format {"\%cx"} $c]] $d
+			} -cleanup {
+				unset -nocomplain d
+			} -result [list 0 [list errmsg {Illegal character} doc [format "\"\\%cx\"" $c] char_ofs 2]]
+			#>>>
+			test valid/backslash-20.$c.3 "test every non-u backquote: [format 0x%02x $c], truncated" -body { #<<<
+				list [json valid -details d [format "\"\\%c" $c]] $d
+			} -cleanup {
+				unset -nocomplain d
+			} -result [list 0 [list errmsg {Illegal character} doc [format "\"\\%c" $c] char_ofs 2]]
+			#>>>
+		}
+	}
+} finally {
+	unset -nocomplain c valid
+}
+#>>>
+
+test valid/backslash-30.1 {single backslash, closing quote} -body { #<<<
+	list [json valid -details d "\"\\\""] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc "\"\\\"" char_ofs 3]]
+#>>>
+test valid/backslash-30.2 {single backslash, truncated} -body { #<<<
+	list [json valid -details d "\"\\"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc "\"\\" char_ofs 2]]
+#>>>
+
+test valid/controlchar-1.1 {Control char after valid chars, no trailing} -body { #<<<
+	list [json valid -details d "\"foo\x1F\""] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\"foo\x1F\"" char_ofs 4]]
+#>>>
+test valid/controlchar-1.2 {Control char after valid chars, trailing} -body { #<<<
+	list [json valid -details d "\"foo\x1Fx\""] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\"foo\x1Fx\"" char_ofs 4]]
+#>>>
+test valid/controlchar-1.3 {Control char after valid chars, truncated} -body { #<<<
+	list [json valid -details d "\"foo\x1F"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\"foo\x1F" char_ofs 4]]
+#>>>
+test valid/controlchar-2.1 {Control char at start, no trailing} -body { #<<<
+	list [json valid -details d "\"\x1F\""] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\"\x1F\"" char_ofs 1]]
+#>>>
+test valid/controlchar-2.2 {Control char at start, trailing} -body { #<<<
+	list [json valid -details d "\"\x1Fx\""] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\"\x1Fx\"" char_ofs 1]]
+#>>>
+test valid/controlchar-2.3 {Control char at start, truncated} -body { #<<<
+	list [json valid -details d "\"\x1F"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\"\x1F" char_ofs 1]]
+#>>>
+
+try { # Test all control chars except \0 (Tcl will always supply this as 0xC0 0x80) (RFC4627 excludes 0x7f) <<<
+	for {set c 1} {$c <= 0x1F} {incr c} {
+		test valid/controlchar-3.$c [format {Test control char 0x%02x} $c] -body { #<<<
+			list [json valid -details d [format {"%c"} $c]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format {"%c"} $c] char_ofs 1]]
+		#>>>
+	}
+} finally {
+	unset -nocomplain c
+}
+#>>>
+
+try { # Test all ASCII non-escape chars <<<
+	set str	""
+	for {set c 0x20} {$c < 0x80} {incr c} {
+		if {$c in {34 92 98 102 110 114 116}} continue
+		append str	[format %c $c]
+	}
+	test valid/controlchar-4.1 {Test all ASCII non-escape chars} -body {
+		json valid "\"$str\""
+	} -result 1
+} finally {
+	unset -nocomplain c str
+}
+#>>>
+
+test valid/numbers-1.1 {Bare number value - integer} -body { #<<<
+	json valid 42
+} -result 1
+#>>>
+test valid/numbers-1.2 {Bare number value - negative integer} -body { #<<<
+	json valid -42
+} -result 1
+#>>>
+test valid/numbers-1.3 {Bare number value - integer, postive sign} -body { #<<<
+	list [json valid -details d +42] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc +42 char_ofs 0]]
+#>>>
+test valid/numbers-1.4 {Bare number value - medium integer} -body { #<<<
+	json valid 1234567890
+} -result 1
+#>>>
+test valid/numbers-1.5 {Ranges in integer part} -body { #<<<
+	json valid 909090
+} -result 1
+#>>>
+test valid/numbers-1.6 {Ranges in fractional part} -body { #<<<
+	json valid 1.909090
+} -result 1
+#>>>
+test valid/numbers-1.7 {Ranges in exponent part} -body { #<<<
+	json valid 1e909090
+} -result 1
+#>>>
+test valid/numbers-2.1 {Invalid char - here because this is handled in the numeric case} -body { #<<<
+	list [json valid -details d x] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc x char_ofs 0]]
+#>>>
+test valid/numbers-2.2 {Document truncated after minus sign} -body { #<<<
+	list [json valid -details d -] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc - char_ofs 1]]
+#>>>
+test valid/numbers-2.3 {Invalid char after minus sign} -body { #<<<
+	list [json valid -details d -x] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc -x char_ofs 1]]
+#>>>
+test valid/numbers-3.1 {No integer part} -body { #<<<
+	list [json valid -details d .1] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc .1 char_ofs 0]]
+#>>>
+test valid/numbers-4.1 {Decimal point without decimal part} -body { #<<<
+	list [json valid -details d 12.] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc 12. char_ofs 3]]
+#>>>
+test valid/numbers-4.2 {Decimal point without decimal part} -body { #<<<
+	list [json valid -details d 12.] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc 12. char_ofs 3]]
+#>>>
+test valid/numbers-4.3 {Decimal point with decimal part} -body { #<<<
+	json valid 12.34
+} -result 1
+#>>>
+test valid/numbers-5.1 {Upper case exponent symbol, no exponent part, truncated} -body { #<<<
+	list [json valid -details d 12E] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc 12E char_ofs 3]]
+#>>>
+test valid/numbers-5.2 {Lower case exponent symbol, no exponent part, truncated} -body { #<<<
+	list [json valid -details d 12e] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Document truncated} doc 12e char_ofs 3]]
+#>>>
+test valid/numbers-5.3 {Lower case exponent symbol, no exponent part} -body { #<<<
+	list [json valid -details d {[12e,4]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {[12e,4]} char_ofs 4]]
+#>>>
+test valid/numbers-6.1 {Upper case exponent symbol, simple integer exponent part} -body { #<<<
+	json valid 12E3
+} -result 1
+#>>>
+test valid/numbers-6.2 {Lower case exponent symbol, simple integer exponent part} -body { #<<<
+	json valid 12e3
+} -result 1
+#>>>
+test valid/numbers-7.1 {Upper case exponent symbol, negative integer exponent part} -body { #<<<
+	json valid 12E-3
+} -result 1
+#>>>
+test valid/numbers-7.2 {Lower case exponent symbol, negative integer exponent part} -body { #<<<
+	json valid 12e-3
+} -result 1
+#>>>
+test valid/numbers-8.1 {Upper case exponent symbol, positive integer exponent part} -body { #<<<
+	json valid 12E+3
+} -result 1
+#>>>
+test valid/numbers-8.2 {Lower case exponent symbol, positive integer exponent part} -body { #<<<
+	json valid 12e+3
+} -result 1
+#>>>
+test valid/numbers-9.1 {Lower case exponent symbol, many digit exponent} -body { #<<<
+	json valid 12e+321
+} -result 1
+#>>>
+
+test valid/keywords-1.1 {true, incomplete} -body { #<<<
+	list [json valid -details d t] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc t char_ofs 0]]
+#>>>
+test valid/keywords-1.2 {true, incomplete} -body { #<<<
+	list [json valid -details d tr] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc tr char_ofs 0]]
+#>>>
+test valid/keywords-1.3 {true, incomplete} -body { #<<<
+	list [json valid -details d tru] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc tru char_ofs 0]]
+#>>>
+test valid/keywords-1.4 {true, complete} -body { #<<<
+	json valid true
+} -result 1
+#>>>
+test valid/keywords-1.5 {true, trailing garbage} -body { #<<<
+	list [json valid -details d truely] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc truely char_ofs 4]]
+#>>>
+test valid/keywords-1.6 {true, trailing whitespace} -body { #<<<
+	json valid "true "
+} -result 1
+#>>>
+test valid/keywords-1.7 {true, leading whitespace} -body { #<<<
+	json valid " true"
+} -result 1
+#>>>
+
+test valid/keywords-2.1 {false, incomplete} -body { #<<<
+	list [json valid -details d f] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc f char_ofs 0]]
+#>>>
+test valid/keywords-2.2 {false, incomplete} -body { #<<<
+	list [json valid -details d fa] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc fa char_ofs 0]]
+#>>>
+test valid/keywords-2.3 {false, incomplete} -body { #<<<
+	list [json valid -details d fal] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc fal char_ofs 0]]
+#>>>
+test valid/keywords-2.4 {false, incomplete} -body { #<<<
+	list [json valid -details d fals] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc fals char_ofs 0]]
+#>>>
+test valid/keywords-2.5 {false, complete} -body { #<<<
+	json valid false
+} -result 1
+#>>>
+test valid/keywords-2.6 {false, trailing garbage} -body { #<<<
+	list [json valid -details d falsely] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc falsely char_ofs 5]]
+#>>>
+test valid/keywords-2.6 {false, trailing whitespace} -body { #<<<
+	json valid "false "
+} -result 1
+#>>>
+test valid/keywords-2.7 {false, leading whitespace} -body { #<<<
+	json valid " false"
+} -result 1
+#>>>
+
+test valid/keywords-3.1 {null, incomplete} -body { #<<<
+	list [json valid -details d n] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc n char_ofs 0]]
+#>>>
+test valid/keywords-3.2 {null, incomplete} -body { #<<<
+	list [json valid -details d nu] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc nu char_ofs 0]]
+#>>>
+test valid/keywords-3.3 {null, incomplete} -body { #<<<
+	list [json valid -details d nul] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc nul char_ofs 0]]
+#>>>
+test valid/keywords-3.4 {null, complete} -body { #<<<
+	set j	[json normalize null]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list null 1]
+#>>>
+test valid/keywords-3.5 {null, trailing garbage} -body { #<<<
+	list [json valid -details d nullo] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc nullo char_ofs 4]]
+#>>>
+test valid/keywords-3.6 {null, trailing whitespace} -body { #<<<
+	json valid "null "
+} -result 1
+#>>>
+test valid/keywords-3.7 {null, leading whitespace} -body { #<<<
+	json valid " null"
+} -result 1
+#>>>
+
+test valid/structure-1.1 {start of object} -body { #<<<
+	set j	[json normalize "{}"]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list "{}" 1]
+#>>>
+test valid/structure-1.2 {start of array} -body { #<<<
+	set j	[json normalize {[]}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {[]} 1]
+#>>>
+test valid/structure-1.3 {nested empty structures} -body { #<<<
+	set j	[json normalize {[{}]}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {[{}]} 1]
+#>>>
+test valid/structure-1.4 {nested empty structures with whitespace} -body { #<<<
+	set j	[json normalize { [ { } ] } ]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {[{}]} 1]
+#>>>
+test valid/structure-1.5 {nested empty structures with error in whitespace} -body { #<<<
+	list [json valid -details d " \[ { /*\x1f*/ } \] "] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc " \[ { /*\x1f*/ } \] " char_ofs 7]]
+#>>>
+test valid/structure-1.6 {empty array with error in whitespace} -body { #<<<
+	list [json valid -details d " \[ /*\x1f*/ \] "] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc " \[ /*\x1f*/ \] " char_ofs 5]]
+#>>>
+test valid/structure-1.7 {No comma} -body { #<<<
+	list [json valid -details d {["foo" "bar"]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Expecting ] or ,} doc {["foo" "bar"]} char_ofs 7]]
+#>>>
+test valid/structure-1.8 {Error in whitespace after comma} -body { #<<<
+	list [json valid -details d "\[\"foo\",/*\x1f*/\"bar\"\]"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\[\"foo\",/*\x1f*/\"bar\"\]" char_ofs 9]]
+#>>>
+test valid/structure-1.9 {Unterminated object} -body { #<<<
+	list [json valid -details d "\{\"foo\":1.9,"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Unterminated object} doc "\{\"foo\":1.9," char_ofs 0]]
+#>>>
+test valid/structure-1.10 {Unterminated array} -body { #<<<
+	list [json valid -details d "\[1.10,"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Unterminated array} doc "\[1.10," char_ofs 0]]
+#>>>
+test valid/structure-2.1 {object, single key packed} -body { #<<<
+	set j	[json normalize {{"foo":"bar"}}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar"}} 1]
+#>>>
+test valid/structure-2.2 {object, single key whitespace} -body { #<<<
+	set j	[json normalize { 	{ 	"foo" 	: 	"bar" 	} 	}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar"}} 1]
+#>>>
+test valid/structure-2.3 {object, multi key packed} -body { #<<<
+	set j	[json normalize {{"foo":"bar","foo2":"bar2"}}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar","foo2":"bar2"}} 1]
+#>>>
+test valid/structure-2.4 {object, multi key whitespace} -body { #<<<
+	set j	[json normalize { 	{ 	"foo" 	: 	"bar" 	, 	"foo2": 	"bar2" 	} 	}]
+	list $j [json valid $j ]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {{"foo":"bar","foo2":"bar2"}} 1]
+#>>>
+test valid/structure-3.1 {array, single element packed} -body { #<<<
+	set j	[json normalize {["foo"]}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo"]} 1]
+#>>>
+test valid/structure-3.2 {array, single element whitespace} -body { #<<<
+	set j	[json normalize { 	[ 	"foo" 	] 	}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo"]} 1]
+#>>>
+test valid/structure-3.3 {array, multi element packed} -body { #<<<
+	set j	[json normalize {["foo","bar"]}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo","bar"]} 1]
+#>>>
+test valid/structure-3.4 {array, multi element whitespace} -body { #<<<
+	set j	[json normalize { 	[ 	"foo" 	, 	"bar" 	] 	}]
+	list $j [json valid $j]
+} -cleanup {
+	unset -nocomplain j
+} -result [list {["foo","bar"]} 1]
+#>>>
+test valid/structure-4.1 {orphaned hold_key} -body { #<<<
+	list [json valid -details d {{"structure-4.1"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Expecting : after object key} doc {{"structure-4.1"}} char_ofs 16]]
+#>>>
+test valid/structure-4.2 {orphaned hold_key} -body { #<<<
+	list [json valid -details d {{"structure-4.2":}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {{"structure-4.2":}} char_ofs 17]]
+#>>>
+test valid/structure-4.3 {nested orphaned hold_key} -body { #<<<
+	list [json valid -details d {{"x":"y","structure-4.3":{"nested-4.3":}}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {{"x":"y","structure-4.3":{"nested-4.3":}}} char_ofs 39]]
+#>>>
+test valid/structure-4.4 {nested orphaned hold_key, nested key parse error} -body { #<<<
+	list [json valid -details d {{"structure-4.4":{"nested-4.4\x":"bar"}}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {{"structure-4.4":{"nested-4.4\x":"bar"}}} char_ofs 30]]
+#>>>
+test valid/structure-5.4 {Deep nesting, ensure that this test nests deeper than CX_STACK_SIZE} -body { #<<<
+	json valid {
+		{
+			"first": {
+				"second": {
+					"third": {
+						"fourth": {
+							"fifth": {
+								"sixth": {
+									"seventh": {
+										"eighth": {
+											"ninth": {
+												"tenth": {
+													"eleventh": [1, 2, "structure-5.4"]
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+} -result 1
+#>>>
+test valid/structure-6.1 {Nesting error} -body { #<<<
+	list [json valid -details d {{"structure-6.1":[}]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {{"structure-6.1":[}]} char_ofs 18]]
+#>>>
+test valid/structure-6.2 {Nesting error} -body { #<<<
+	list [json valid -details d {{"structure-6.2":[null,}]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {{"structure-6.2":[null,}]} char_ofs 23]]
+#>>>
+test valid/structure-6.3 {Nesting error} -body { #<<<
+	list [json valid -details d {[{"structure-6.3"]}]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Expecting : after object key} doc {[{"structure-6.3"]}]} char_ofs 17]]
+#>>>
+test valid/structure-6.4 {Nesting error} -body { #<<<
+	list [json valid -details d {[{"structure-6.4":]}]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {[{"structure-6.4":]}]} char_ofs 18]]
+#>>>
+test valid/structure-6.5 {Nesting error} -body { #<<<
+	list [json valid -details d {[{"structure-6.5":1]}]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg "Expecting \} or ," doc {[{"structure-6.5":1]}]} char_ofs 19]]
+#>>>
+test valid/structure-6.6 {Nesting error} -body { #<<<
+	list [json valid -details d {[{"structure-6.6":1,]}]}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {[{"structure-6.6":1,]}]} char_ofs 20]]
+#>>>
+test valid/structure-7.1 {Object key not a string: number} -body { #<<<
+	list [json valid -details d {{7.1:"structure-7.1"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Object key is not a string} doc {{7.1:"structure-7.1"}} char_ofs 1]]
+#>>>
+test valid/structure-7.2 {Object key not a string: true} -body { #<<<
+	list [json valid -details d {{true:"structure-7.2"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Object key is not a string} doc {{true:"structure-7.2"}} char_ofs 1]]
+#>>>
+test valid/structure-7.3 {Object key not a string: false} -body { #<<<
+	list [json valid -details d {{false:"structure-7.3"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Object key is not a string} doc {{false:"structure-7.3"}} char_ofs 1]]
+#>>>
+test valid/structure-7.4 {Object key not a string: null} -body { #<<<
+	list [json valid -details d {{null:"structure-7.4"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Object key is not a string} doc {{null:"structure-7.4"}} char_ofs 1]]
+#>>>
+test valid/structure-7.5 {Object key not a string: object} -body { #<<<
+	list [json valid -details d {{{}:"structure-7.5"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Object key is not a string} doc {{{}:"structure-7.5"}} char_ofs 1]]
+#>>>
+test valid/structure-7.6 {Object key not a string: array} -body { #<<<
+	list [json valid -details d {{[]:"structure-7.6"}}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Object key is not a string} doc {{[]:"structure-7.6"}} char_ofs 1]]
+#>>>
+test valid/structure-8.1 {Object key not a string: dyn_number} -body { #<<<
+	json valid {{"~N:f":"structure-8.1"}}
+} -result 1
+#>>>
+test valid/structure-8.2 {Object key not a string: dyn_bool} -body { #<<<
+	json valid {{"~B:f":"structure-8.2"}}
+} -result 1
+#>>>
+test valid/structure-8.5 {Object key not a string: dyn_json} -body { #<<<
+	json valid {{"~J:f":"structure-8.5"}}
+} -result 1
+#>>>
+test valid/structure-8.6 {Object key not a string: dyn_template} -body { #<<<
+	json valid {{"~T:f":"structure-8.6"}}
+} -result 1
+#>>>
+test valid/structure-8.7 {Object key not a string: dyn_literal} -body { #<<<
+	json valid {{"~L:~S:f":"structure-8.7"}}
+} -result 1
+#>>>
+test valid/structure-8.8 {Object key not a string: dyn_string} -body { #<<<
+	json valid {{"~S:f":"structure-8.8"}}
+} -result 1
+#>>>
+
+test valid/utf-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
+	json valid {"helloは"}
+} -result 1
+#>>>
+test valid/utf-1.2 {Length calculation for 1, 2 and 3 byte UTF-8 sequences} -body { #<<<
+	json valid {"h¿は"}
+} -result 1
+#>>>
+try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (the BMP) by Tcl support) <<<
+	# 0x20 is used as the lower bound for the 1 byte case because 0x1F and
+	# below are control characters and not legal in JSON as unescaped chars
+	foreach {bytes lower upper} {
+		1	0x20	0x7f
+		2	0x80	0x7ff
+		3	0x800	0xffff
+	} {
+		test valid/utf-2.$bytes.1 "lower bound of $bytes byte chars" -body { #<<<
+			json valid [format {"%1$c%1$c"} $lower]
+		} -result 1
+		#>>>
+		test valid/utf-2.$bytes.2 "upper bound of $bytes byte chars" -body { #<<<
+			json valid [format {"%1$c%1$c"} $upper]
+		} -result 1
+		#>>>
+		test valid/utf-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars" -body { #<<<
+			list [json valid -details d [format {"%1$c%1$c%2$c"} $lower 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format {"%1$c%1$c%2$c"} $lower 0x1f] char_ofs 3]]
+		#>>>
+		test valid/utf-2.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars" -body { #<<<
+			list [json valid -details d [format {"%1$c%1$c%2$c"} $upper 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format {"%1$c%1$c%2$c"} $upper 0x1f] char_ofs 3]]
+		#>>>
+	}
+} finally {
+	unset -nocomplain bytes lower upper
+}
+#>>>
+
+test valid/whitespace-1.1 {String containing multibyte utf-8 encoding} -body { #<<<
+	json valid {	/*hello€*/  "helloは" //The rest is a comment ほ}
+} -result 1
+#>>>
+test valid/whitespace-1.1.1 {String containing multibyte utf-8 encoding, comments disabled} -body { #<<<
+	list [json valid -extensions {} -details d {	/*hello€*/  "helloは" //The rest is a comment ほ}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Illegal character} doc {	/*hello€*/  "helloは" //The rest is a comment ほ} char_ofs 1}}
+#>>>
+test valid/whitespace-1.2 {All whitespace chars and utf-8 char lengths in comments, no whitespace between comments and string} -body { #<<<
+	json valid "\n\t\r /*h¿は*/\"foo\"//h¿は\n"
+} -result 1
+#>>>
+test valid/whitespace-1.2.1 {All whitespace chars and utf-8 char lengths in comments, no whitespace between comments and string} -body { #<<<
+	list [json valid -extensions {} -details d "\n\t\r /*h¿は*/\"foo\"//h¿は\n"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\n\t\r /*h¿は*/\"foo\"//h¿は\n" char_ofs 4]]
+#>>>
+test valid/whitespace-1.3 {All whitespace chars and utf-8 char lengths in comments, leading whitespace between comments and string} -body { #<<<
+	json valid "\n\t\r /*h¿は*/\r\"foo\"//h¿は\n"
+} -result 1
+#>>>
+test valid/whitespace-1.3.1 {All whitespace chars and utf-8 char lengths in comments, leading whitespace between comments and string} -body { #<<<
+	list [json valid -extensions {} -details d "\n\t\r /*h¿は*/\r\"foo\"//h¿は\n"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\n\t\r /*h¿は*/\r\"foo\"//h¿は\n" char_ofs 4]]
+#>>>
+test valid/whitespace-1.4 {All whitespace chars and utf-8 char lengths in comments, trailing whitespace between comments and string} -body { #<<<
+	json valid "\n\t\r /*h¿は*/\"foo\"\r//h¿は\n"
+} -result 1
+#>>>
+test valid/whitespace-1.4.1 {All whitespace chars and utf-8 char lengths in comments, trailing whitespace between comments and string} -body { #<<<
+	list [json valid -extensions {} -details d "\n\t\r /*h¿は*/\"foo\"\r//h¿は\n"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\n\t\r /*h¿は*/\"foo\"\r//h¿は\n" char_ofs 4]]
+#>>>
+test valid/whitespace-1.5 {All whitespace chars and utf-8 char lengths in comments, leading and trailing whitespace between comments and string} -body { #<<<
+	json valid "\n\t\r /*h¿は*/\t\"foo\"\r//h¿は\n"
+} -result 1
+#>>>
+test valid/whitespace-1.5.1 {All whitespace chars and utf-8 char lengths in comments, leading and trailing whitespace between comments and string} -body { #<<<
+	list [json valid -extensions {} -details d "\n\t\r /*h¿は*/\t\"foo\"\r//h¿は\n"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\n\t\r /*h¿は*/\t\"foo\"\r//h¿は\n" char_ofs 4]]
+#>>>
+test valid/whitespace-1.6 {char offset counting for skipped chars in comments} -body { #<<<
+	list [json valid -details d "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar" char_ofs 22]]
+#>>>
+test valid/whitespace-1.6.1 {char offset counting for skipped chars in comments} -body { #<<<
+	list [json valid -extensions {} -details d "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc "\n\t\r /*h¿は*/\"foo\"//h¿は\nbar" char_ofs 4]]
+#>>>
+try { # Test the UTF-8 encoding length edge cases (limited to 3 byte sequences (the BMP) by Tcl support) <<<
+	# 0x20 is used as the lower bound for the 1 byte case because 0x1F and
+	# below are control characters and not legal in JSON as unescaped chars
+	foreach {bytes lower upper} {
+		1	0x20	0x7f
+		2	0x80	0x7ff
+		3	0x800	0xffff
+	} {
+		test valid/whitespace-2.$bytes.1 "lower bound of $bytes byte chars in // comment" -body { #<<<
+			json valid [format "//%1\$c%1\$c\nfalse" $lower]
+		} -result 1
+		#>>>
+		test valid/whitespace-2.$bytes.1.1 "lower bound of $bytes byte chars in // comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "//%1\$c%1\$c\nfalse" $lower]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "//%1\$c%1\$c\nfalse" $lower] char_ofs 0]]
+		#>>>
+		test valid/whitespace-2.$bytes.2 "upper bound of $bytes byte chars in // comment" -body { #<<<
+			json valid [format "//%1\$c%1\$c\nfalse" $upper]
+		} -result 1
+		#>>>
+		test valid/whitespace-2.$bytes.2.1 "upper bound of $bytes byte chars in // comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "//%1\$c%1\$c\nfalse" $upper]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "//%1\$c%1\$c\nfalse" $upper] char_ofs 0]]
+		#>>>
+		test valid/whitespace-2.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in // comment" -body { #<<<
+			list [json valid -details d [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f] char_ofs 4]]
+		#>>>
+		test valid/whitespace-2.$bytes.3.1 "error reporting char_ofs for lower bound of $bytes byte chars in // comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "//%1\$c%1\$c%2\$c\nfalse" $lower 0x1f] char_ofs 0]]
+		#>>>
+		test valid/whitespace-2.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars in // comment" -body { #<<<
+			list [json valid -details d [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f] char_ofs 4]]
+		#>>>
+		test valid/whitespace-2.$bytes.4.1 "error reporting char_ofs for upper bound of $bytes byte chars in // comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "//%1\$c%1\$c%2\$c\nfalse" $upper 0x1f] char_ofs 0]]
+		#>>>
+
+		test valid/whitespace-3.$bytes.1 "lower bound of $bytes byte chars in /* */ comment" -body { #<<<
+			json valid [format "/*%1\$c%1\$c*/false" $lower]
+		} -result 1
+		#>>>
+		test valid/whitespace-3.$bytes.1.1 "lower bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "/*%1\$c%1\$c*/false" $lower]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "/*%1\$c%1\$c*/false" $lower] char_ofs 0]]
+		#>>>
+		test valid/whitespace-3.$bytes.2 "upper bound of $bytes byte chars in /* */ comment" -body { #<<<
+			json valid [format "/*%1\$c%1\$c*/false" $upper]
+		} -result 1
+		#>>>
+		test valid/whitespace-3.$bytes.2.1 "upper bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "/*%1\$c%1\$c*/false" $upper]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "/*%1\$c%1\$c*/false" $upper] char_ofs 0]]
+		#>>>
+		test valid/whitespace-3.$bytes.3 "error reporting char_ofs for lower bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [json valid -details d [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f] char_ofs 4]]
+		#>>>
+		test valid/whitespace-3.$bytes.3.1 "error reporting char_ofs for lower bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "/*%1\$c%1\$c%2\$c*/false" $lower 0x1f] char_ofs 0]]
+		#>>>
+		test valid/whitespace-3.$bytes.4 "error reporting char_ofs for upper bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [json valid -details d [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f] char_ofs 4]]
+		#>>>
+		test valid/whitespace-3.$bytes.4.1 "error reporting char_ofs for upper bound of $bytes byte chars in /* */ comment" -body { #<<<
+			list [json valid -extensions {} -details d [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f]] $d
+		} -cleanup {
+			unset -nocomplain d
+		} -result [list 0 [list errmsg {Illegal character} doc [format "/*%1\$c%1\$c%2\$c*/false" $upper 0x1f] char_ofs 0]]
+		#>>>
+	}
+} finally {
+	unset -nocomplain bytes lower upper
+}
+#>>>
+test valid/whitespace-4.1 {Half opened // comment sequence} -body { #<<<
+	list [json valid -details d " /foo"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 {errmsg {Illegal character} doc { /foo} char_ofs 2}]
+#>>>
+test valid/whitespace-5.1 {Two comments, no whitespace} -body { #<<<
+	json valid {/*foo*//*bar*/123}
+} -result 1
+#>>>
+test valid/whitespace-5.1.1 {Two comments, no whitespace} -body { #<<<
+	list [json valid -extensions {} -details d {/*foo*//*bar*/123}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {/*foo*//*bar*/123} char_ofs 0]]
+#>>>
+test valid/whitespace-6.1 {Two comments, whitespace between} -body { #<<<
+	json valid {/*foo*/ /*bar*/123}
+} -result 1
+#>>>
+test valid/whitespace-6.1.1 {Two comments, whitespace between} -body { #<<<
+	list [json valid -extensions {} -details d {/*foo*/ /*bar*/123}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {/*foo*/ /*bar*/123} char_ofs 0]]
+#>>>
+test valid/whitespace-7.1 {Two // comments} -body { #<<<
+	json valid "321//foo\n//bar"
+} -result 1
+#>>>
+test valid/whitespace-7.1.1 {Two // comments} -body { #<<<
+	list [json valid -extensions {} -details d "321//foo\n//bar"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc "321//foo\n//bar" char_ofs 3]]
+#>>>
+test valid/whitespace-8.1 {// comment, no newline} -body { #<<<
+	json valid "8.1//bar"
+} -result 1
+#>>>
+test valid/whitespace-8.1.1 {// comment, no newline} -body { #<<<
+	list [json valid -extensions {} -details d "8.1//bar"] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc "8.1//bar" char_ofs 3]]
+#>>>
+test valid/whitespace-8.2 {// comment, no newline, no value} -body { #<<<
+	list [json valid -details d {//bar}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {No JSON value found} doc //bar char_ofs 5}}
+#>>>
+test valid/whitespace-8.2.1 {// comment, no newline, no value} -body { #<<<
+	list [json valid -extensions {} -details d {//bar}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Illegal character} doc //bar char_ofs 0}}
+#>>>
+test valid/whitespace-9.1 {Unterminated comment} -body { #<<<
+	list [json valid -details d {9.1/* はhello}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unterminated comment} doc {9.1/* はhello} char_ofs 3}}
+#>>>
+test valid/whitespace-9.1.1 {Unterminated comment} -body { #<<<
+	list [json valid -extensions {} -details d {9.1/* はhello}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Trailing garbage after value} doc {9.1/* はhello} char_ofs 3}}
+#>>>
+test valid/whitespace-9.2 {Unterminated comment} -body { #<<<
+	list [json valid -details d {9.2/* はhello*}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unterminated comment} doc {9.2/* はhello*} char_ofs 3}}
+#>>>
+test valid/whitespace-9.2.1 {Unterminated comment} -body { #<<<
+	list [json valid -extensions {} -details d {9.2/* はhello*}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Trailing garbage after value} doc {9.2/* はhello*} char_ofs 3}}
+#>>>
+test valid/whitespace-9.3 {Unterminated comment} -body { #<<<
+	list [json valid -details d {9.3/* はhello*x}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Unterminated comment} doc {9.3/* はhello*x} char_ofs 3}}
+#>>>
+test valid/whitespace-9.3.1 {Unterminated comment} -body { #<<<
+	list [json valid -extensions {} -details d {9.3/* はhello*x}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result {0 {errmsg {Trailing garbage after value} doc {9.3/* はhello*x} char_ofs 3}}
+#>>>
+test valid/whitespace-9.4 {Comment terminated at EOF} -body { #<<<
+	json valid {9.4/* はhello*/}
+} -result 1
+#>>>
+test valid/whitespace-9.4.1 {Comment terminated at EOF} -body { #<<<
+	list [json valid -extensions {} -details d {9.4/* はhello*/}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc {9.4/* はhello*/} char_ofs 3]]
+#>>>
+test valid/whitespace-9.5 {Multiline comment} -body { #<<<
+	json valid {9.5/* はhello
+					"foo"
+				  */}
+} -result 1
+#>>>
+test valid/whitespace-9.5.1 {Multiline comment} -body { #<<<
+	list [json valid -extensions {} -details d {9.5/* はhello
+					"foo"
+				  */}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Trailing garbage after value} doc {9.5/* はhello
+					"foo"
+				  */} char_ofs 3]]
+#>>>
+test valid/whitespace-9.6 {Commented object key} -body { #<<<
+	json valid {
+		{
+			//"foo":	{}
+		}
+	}
+} -result 1
+#>>>
+test valid/whitespace-9.6.1 {Commented object key} -body { #<<<
+	list [json valid -extensions {} -details d {
+		{
+			//"foo":	{}
+		}
+	}] $d
+} -cleanup {
+	unset -nocomplain d
+} -result [list 0 [list errmsg {Illegal character} doc {
+		{
+			//"foo":	{}
+		}
+	} char_ofs 8]]
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

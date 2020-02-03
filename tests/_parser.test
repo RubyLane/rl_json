@@ -928,24 +928,32 @@ test parser/structure-4.1 {orphaned hold_key} -body { #<<<
 	list [catch {
 		json normalize {{"structure-4.1"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Expecting : after object key} {{"structure-4.1"}} 16] {Error parsing JSON value: Expecting : after object key at offset 16}]
 #>>>
 test parser/structure-4.2 {orphaned hold_key} -body { #<<<
 	list [catch {
 		json normalize {{"structure-4.2":}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-4.2":}} 17] {Error parsing JSON value: Illegal character at offset 17}]
 #>>>
 test parser/structure-4.3 {nested orphaned hold_key} -body { #<<<
 	list [catch {
 		json normalize {{"x":"y","structure-4.3":{"nested-4.3":}}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"x":"y","structure-4.3":{"nested-4.3":}}} 39] {Error parsing JSON value: Illegal character at offset 39}]
 #>>>
 test parser/structure-4.4 {nested orphaned hold_key, nested key parse error} -body { #<<<
 	list [catch {
 		json normalize {{"structure-4.4":{"nested-4.4\x":"bar"}}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-4.4":{"nested-4.4\x":"bar"}}} 30] {Error parsing JSON value: Illegal character at offset 30}]
 #>>>
 test parser/structure-5.4 {Deep nesting, ensure that this test nests deeper than CX_STACK_SIZE} -body { #<<<
@@ -980,72 +988,96 @@ test parser/structure-6.1 {Nesting error} -body { #<<<
 	list [catch {
 		json normalize {{"structure-6.1":[}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-6.1":[}]} 18] {Error parsing JSON value: Illegal character at offset 18}]
 #>>>
 test parser/structure-6.2 {Nesting error} -body { #<<<
 	list [catch {
 		json normalize {{"structure-6.2":[null,}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {{"structure-6.2":[null,}]} 23] {Error parsing JSON value: Illegal character at offset 23}]
 #>>>
 test parser/structure-6.3 {Nesting error} -body { #<<<
 	list [catch {
 		json normalize {[{"structure-6.3"]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Expecting : after object key} {[{"structure-6.3"]}]} 17] {Error parsing JSON value: Expecting : after object key at offset 17}]
 #>>>
 test parser/structure-6.4 {Nesting error} -body { #<<<
 	list [catch {
 		json normalize {[{"structure-6.4":]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.4":]}]} 18] {Error parsing JSON value: Illegal character at offset 18}]
 #>>>
 test parser/structure-6.5 {Nesting error} -body { #<<<
 	list [catch {
 		json normalize {[{"structure-6.5":1]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE "Expecting \} or ," {[{"structure-6.5":1]}]} 19] "Error parsing JSON value: Expecting \} or , at offset 19"]
 #>>>
 test parser/structure-6.6 {Nesting error} -body { #<<<
 	list [catch {
 		json normalize {[{"structure-6.6":1,]}]}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Illegal character} {[{"structure-6.6":1,]}]} 20] {Error parsing JSON value: Illegal character at offset 20}]
 #>>>
 test parser/structure-7.1 {Object key not a string: number} -body { #<<<
 	list [catch {
 		json normalize {{7.1:"structure-7.1"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{7.1:"structure-7.1"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.2 {Object key not a string: true} -body { #<<<
 	list [catch {
 		json normalize {{true:"structure-7.2"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{true:"structure-7.2"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.3 {Object key not a string: false} -body { #<<<
 	list [catch {
 		json normalize {{false:"structure-7.3"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{false:"structure-7.3"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.4 {Object key not a string: null} -body { #<<<
 	list [catch {
 		json normalize {{null:"structure-7.4"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{null:"structure-7.4"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.5 {Object key not a string: object} -body { #<<<
 	list [catch {
 		json normalize {{{}:"structure-7.5"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{{}:"structure-7.5"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-7.6 {Object key not a string: array} -body { #<<<
 	list [catch {
 		json normalize {{[]:"structure-7.6"}}
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 [list RL JSON PARSE {Object key is not a string} {{[]:"structure-7.6"}} 1] {Error parsing JSON value: Object key is not a string at offset 1}]
 #>>>
 test parser/structure-8.1 {Object key not a string: dyn_number} -body { #<<<
@@ -1213,6 +1245,8 @@ test parser/whitespace-4.1 {Half opened // comment sequence} -body { #<<<
 	list [catch {
 		json normalize " /foo"
 	} r o] [expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}] $r
+} -cleanup {
+	unset -nocomplain r o
 } -result [list 1 {RL JSON PARSE {Illegal character} { /foo} 2} {Error parsing JSON value: Illegal character at offset 2}]
 #>>>
 test parser/whitespace-5.1 {Two comments, no whitespace} -body { #<<<
@@ -1280,6 +1314,7 @@ test parser/whitespace-9.6 {Commented object key} -body { #<<<
 		}
 	}
 } -result "{}"
+#>>>
 
 ::tcltest::cleanupTests
 return

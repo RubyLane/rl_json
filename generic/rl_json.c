@@ -101,6 +101,12 @@ static const char* action_opcode_str[] = { // Must match the order of the action
 	(char*)NULL
 };
 
+static const char *extension_str[] = {
+	"",
+	"comments",
+	(char*)NULL
+};
+
 static int new_json_value_from_list(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_Obj** res);
 static int NRforeach_next_loop_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode);
 static int json_pretty_dbg(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds);
@@ -513,6 +519,7 @@ done:
 void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 {
 	Tcl_ObjIntRep*	ir = NULL;
+	Tcl_Obj*		ir_val = NULL;
 
 	/*
 	fprintf(stderr, "append_to_cx, storing %s: \"%s\"\n",
@@ -520,30 +527,32 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 			val->internalRep.ptrAndLongRep.ptr == NULL ? "NULL" :
 			Tcl_GetString((Tcl_Obj*)val->internalRep.ptrAndLongRep.ptr));
 	*/
+	if (cx->mode == VALIDATE) return;
+
 	switch (cx->container) {
 		case JSON_OBJECT:
 			//fprintf(stderr, "append_to_cx, cx->hold_key->refCount: %d (%s)\n", cx->hold_key->refCount, Tcl_GetString(cx->hold_key));
 			ir = Tcl_FetchIntRep(cx->val, cx->objtype);
 			if (ir == NULL) Tcl_Panic("Can't get intrep for container");
-			Tcl_DictObjPut(NULL, ir->twoPtrValue.ptr1, cx->hold_key, val);
-			if (ir->twoPtrValue.ptr2) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2=NULL;}
+			ir_val = get_unshared_val(ir);
+			Tcl_DictObjPut(NULL, ir_val, cx->hold_key, val);
+			if (ir->twoPtrValue.ptr2) {release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);}
 			Tcl_InvalidateStringRep(cx->val);
-			Tcl_DecrRefCount(cx->hold_key);
-			cx->hold_key = NULL;
+			release_tclobj(&cx->hold_key);
 			break;
 
 		case JSON_ARRAY:
 			ir = Tcl_FetchIntRep(cx->val, cx->objtype);
 			if (ir == NULL) Tcl_Panic("Can't get intrep for container");
+			ir_val = get_unshared_val(ir);
 			//fprintf(stderr, "append_to_cx, appending to list: (%s)\n", Tcl_GetString(val));
-			Tcl_ListObjAppendElement(NULL, ir->twoPtrValue.ptr1, val);
-			if (ir->twoPtrValue.ptr2) {Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2=NULL;}
+			Tcl_ListObjAppendElement(NULL, ir_val, val);
+			if (ir->twoPtrValue.ptr2) {release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);}
 			Tcl_InvalidateStringRep(cx->val);
 			break;
 
 		default:
-			cx->val = val;
-			Tcl_IncrRefCount(cx->val);
+			replace_tclobj(&cx->val, val);
 	}
 }
 
@@ -2934,6 +2943,109 @@ static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 }
 
 //}}}
+static int jsonValid(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	int					i, valid, retval=TCL_OK;
+	struct parse_error	details = {};
+	Tcl_Obj*			detailsvar = NULL;
+	enum extensions	extensions = EXT_COMMENTS;		// By default, use the default set of extensions we accept
+	static const char *options[] = {
+		"-extensions",
+		"-details",
+		(char*)NULL
+	};
+	enum {
+		O_EXTENSIONS,
+		O_DETAILS
+	};
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "?-extensions extensionslist -details detailsvar? json_val");
+		return TCL_ERROR;
+	}
+
+	for (i=1; i<objc-1; i++) {
+		int		option;
+		TEST_OK(Tcl_GetIndexFromObj(interp, objv[i], options, "option", TCL_EXACT, &option));
+		switch (option) {
+			case O_EXTENSIONS:
+				{
+					Tcl_Obj**		ov;
+					int				oc, idx;
+
+					extensions = 0;		// An explicit list was supplied, reset the extensions
+
+					if (i >= objc-2) {
+						// Missing value for -extensions
+						Tcl_WrongNumArgs(interp, i+1, objv, "extensionslist json_val");
+						return TCL_ERROR;
+					}
+
+					i++;	// Point at the next arg: the extensionslist
+
+					TEST_OK(Tcl_ListObjGetElements(interp, objv[i], &oc, &ov));
+					for (idx=0; idx<oc; idx++) {
+						int	ext;
+						TEST_OK(Tcl_GetIndexFromObj(interp, ov[idx], extension_str, "extension", TCL_EXACT, &ext));
+						extensions |= ext;
+					}
+				}
+				break;
+
+			case O_DETAILS:
+				{
+					if (i >= objc-2) {
+						// Missing value for -extensions
+						Tcl_WrongNumArgs(interp, i+1, objv, "detailsvar json_val");
+						return TCL_ERROR;
+					}
+
+					i++;	// Point at the next arg: the extensionslist
+					detailsvar = objv[i];
+				}
+				break;
+
+			default:
+				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Unexpected option %d", option));
+				return TCL_ERROR;
+		}
+	}
+
+	TEST_OK(JSON_Valid(interp, objv[objc-1], &valid, extensions, &details));
+	Tcl_SetObjResult(interp, valid ? l->tcl_true : l->tcl_false);
+
+	if (!valid && detailsvar) {
+		Tcl_Obj*	details_obj = NULL;
+		Tcl_Obj*	k = NULL;
+		Tcl_Obj*	v = NULL;
+
+		replace_tclobj(&details_obj, Tcl_NewDictObj());
+
+		replace_tclobj(&k, get_string(l, "errmsg", 6));
+		replace_tclobj(&v, Tcl_NewStringObj(details.errmsg, -1));
+		TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, details_obj, k, v));
+
+		replace_tclobj(&k, get_string(l, "doc", 3));
+		replace_tclobj(&v, Tcl_NewStringObj(details.doc, -1));
+		TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, details_obj, k, v));
+
+		replace_tclobj(&k, get_string(l, "char_ofs", 8));
+		replace_tclobj(&v, Tcl_NewIntObj(details.char_ofs));
+		TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, details_obj, k, v));
+
+		if (NULL == Tcl_ObjSetVar2(interp, detailsvar, NULL, details_obj, TCL_LEAVE_ERR_MSG))
+			retval = TCL_ERROR;
+finally:
+		release_tclobj(&details_obj);
+		release_tclobj(&k);
+		release_tclobj(&v);
+	}
+
+	return retval;
+}
+
+//}}}
 static int jsonDebug(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	struct interp_cx*	l = (struct interp_cx*)cdata;
@@ -3157,6 +3269,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		"amap",
 		"omap",
 		"pretty",
+		"valid",
 		"debug",
 //		"merge",
 
@@ -3198,6 +3311,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		M_AMAP,
 		M_OMAP,
 		M_PRETTY,
+		M_VALID,
 		M_DEBUG,
 //		M_MERGE,
 		M_STRING,
@@ -3250,6 +3364,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_FREE_CACHE:	return jsonFreeCache(cdata, interp, objc-1, objv+1);
 		case M_NOP:			return jsonNop(cdata, interp, objc-1, objv+1);
 		case M_PRETTY:		return jsonPretty(cdata, interp, objc-1, objv+1);
+		case M_VALID:		return jsonValid(cdata, interp, objc-1, objv+1);
 		case M_DEBUG:		return jsonDebug(cdata, interp, objc-1, objv+1);
 	//	case M_MERGE:		return jsonMerge(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE_ACTIONS:	return jsonTemplateActions(cdata, interp, objc-1, objv+1);
@@ -3635,7 +3750,9 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("free_cache", -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("nop",        -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("pretty",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("valid",      -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("debug",      -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template_actions", -1));
 			Tcl_SetEnsembleSubcommandList(interp, ens_cmd, subcommands);
 		}
 #endif
@@ -3669,6 +3786,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, ENS "free_cache", jsonFreeCache, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "nop",        jsonNop, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "pretty",     jsonPretty, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "valid",      jsonValid, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "debug",      jsonDebug, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "template_actions",      jsonTemplateActions, l, NULL);
 		//Tcl_CreateObjCommand(interp, ENS "merge",      jsonMerge, l, NULL);

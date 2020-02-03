@@ -23,16 +23,23 @@
 #	define unlikely(exp) (exp)
 #endif
 
+enum parse_mode {
+	PARSE,
+	VALIDATE
+};
+
 struct parse_context {
 	struct parse_context*	last;		// Only valid for the first entry
 	struct parse_context*	prev;
 
-	Tcl_Obj*		val;
-	Tcl_Obj*		hold_key;
-	size_t			char_ofs;
-	enum json_types	container;
-	int				closed;
-	Tcl_ObjType*	objtype;
+	Tcl_Obj*			val;
+	Tcl_Obj*			hold_key;
+	size_t				char_ofs;
+	enum json_types		container;
+	int					closed;
+	Tcl_ObjType*		objtype;
+	struct interp_cx*	l;
+	enum parse_mode		mode;
 };
 
 struct foreach_iterator {

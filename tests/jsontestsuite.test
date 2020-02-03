@@ -24,8 +24,8 @@ foreach file [glob -nocomplain -type f [file join [file dirname [info script]] J
 		object_trailing_comment_slash_open -
 		structure_object_with_comment -
 		object_trailing_comment {
-			# Comments are explicitly supported
-			set expected y
+			# Comments are supported by default, but can be disabled - test both
+			set expected comment
 		}
 
 		string_utf16BE_no_BOM {
@@ -46,8 +46,43 @@ foreach file [glob -nocomplain -type f [file join [file dirname [info script]] J
 	if {$expected eq "n"} {
 		lappend cmd -returnCodes error
 	}
-
 	{*}$cmd
+
+	switch -- $expected {
+		y - i {
+			set cmd	[list test jsontestsuite_valid-$name ${expected}_$name -result 1 -body]
+			lappend cmd	[string map [list %file% [list $file] %encoding% [list $encoding]] {
+				json valid [json decode [readbin %file%] %encoding%]
+			}]
+			{*}$cmd
+		}
+
+		n {
+			set cmd	[list test jsontestsuite_valid-$name ${expected}_$name -result 0 -body]
+			lappend cmd	[string map [list %file% [list $file] %encoding% [list $encoding]] {
+				json valid [json decode [readbin %file%] %encoding%]
+			}]
+			{*}$cmd
+		}
+
+		comment {
+			set cmd	[list test jsontestsuite_valid-$name-1 ${expected}_$name -result 0 -body]
+			lappend cmd	[string map [list %file% [list $file] %encoding% [list $encoding]] {
+				json valid -extensions {} [json decode [readbin %file%] %encoding%]
+			}]
+			{*}$cmd
+
+			set cmd	[list test jsontestsuite_valid-$name-2 ${expected}_$name -result 1 -body]
+			lappend cmd	[string map [list %file% [list $file] %encoding% [list $encoding]] {
+				json valid -extensions {comments} [json decode [readbin %file%] %encoding%]
+			}]
+			{*}$cmd
+		}
+
+		default {
+			error "Unexpected expected value: \"$expected\""
+		}
+	}
 }
 
 foreach file [glob -nocomplain -type f [file join [file dirname [info script]] JSONTestSuite test_transform *.json]] {

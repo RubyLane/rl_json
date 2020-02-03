@@ -35,6 +35,17 @@ enum collecting_mode {
 	COLLECT_OBJECT
 };
 
+enum extensions {
+	EXT_NONE     = 0,
+	EXT_COMMENTS = (1 << 0)
+};
+
+struct parse_error {
+	const char*		errmsg;
+	const char*		doc;
+	size_t			char_ofs;	// Offset in chars, not bytes
+};
+
 // Stubs exported API
 #include "rl_jsonDecls.h"
 

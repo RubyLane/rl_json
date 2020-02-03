@@ -6,14 +6,24 @@ enum char_advance_status {
 	CHAR_ADVANCE_UNESCAPED_NULL
 };
 
-void _parse_error(Tcl_Interp* interp, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
+void parse_error(struct parse_error* details, const char* errmsg, const unsigned char* doc, size_t char_ofs) //{{{
+{
+	if (details == NULL) return;
+
+	details->errmsg = errmsg;
+	details->doc = (const char*)doc;
+	details->char_ofs = char_ofs;
+}
+
+//}}}
+void throw_parse_error(Tcl_Interp* interp, struct parse_error* details) //{{{
 {
 	char		char_ofs_buf[20];		// 20 bytes allows for 19 bytes of decimal max 64 bit size_t, plus null terminator
 
-	snprintf(char_ofs_buf, 20, "%ld", char_ofs);
+	snprintf(char_ofs_buf, 20, "%ld", details->char_ofs);
 
-	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", errmsg, char_ofs));
-	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", errmsg, doc, char_ofs_buf, NULL);
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", details->errmsg, details->char_ofs));
+	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", details->errmsg, details->doc, char_ofs_buf, NULL);
 }
 
 //}}}
@@ -33,16 +43,22 @@ struct parse_context* push_parse_context(struct parse_context* cx, const enum js
 
 
 	new->prev = last;
-	Tcl_IncrRefCount(
-		new->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?
-		   	Tcl_NewDictObj()  :
-		   	Tcl_NewListObj(0, NULL))
-	);
+	if (last->mode == VALIDATE) {
+		new->val = NULL;
+	} else {
+		Tcl_IncrRefCount(
+			new->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?
+				(cx->l ? cx->l->tcl_empty_dict : Tcl_NewDictObj())  :
+				(cx->l ? cx->l->tcl_empty_list : Tcl_NewListObj(0, NULL))
+		));
+	}
 	new->hold_key = NULL;
 	new->char_ofs = char_ofs;
 	new->container = container;
 	new->closed = 0;
 	new->objtype = g_objtype_for_type[container];
+	new->l = last->l;
+	new->mode = last->mode;
 
 	cx->last = new;
 
@@ -61,9 +77,11 @@ struct parse_context* pop_parse_context(struct parse_context* cx) //{{{
 	}
 
 	if (likely(last->val != NULL)) {
+		if (last->prev->val && Tcl_IsShared(last->prev->val))
+			replace_tclobj(&last->prev->val, Tcl_DuplicateObj(last->prev->val));
+
 		append_to_cx(last->prev, last->val);
-		Tcl_DecrRefCount(last->val);
-		last->val = NULL;
+		release_tclobj(&last->val);
 	}
 
 	if (likely((ptrdiff_t)last >= (ptrdiff_t)cx && (ptrdiff_t)last < (ptrdiff_t)(cx + CX_STACK_SIZE))) {
@@ -85,15 +103,8 @@ void free_cx(struct parse_context* cx) //{{{
 	struct parse_context*	tail = cx->last;
 
 	while (1) {
-		if (tail->hold_key != NULL) {
-			Tcl_DecrRefCount(tail->hold_key);
-			tail->hold_key = NULL;
-		}
-
-		if (tail->val != NULL) {
-			Tcl_DecrRefCount(tail->val);
-			tail->val = NULL;
-		}
+		release_tclobj(&tail->hold_key);
+		release_tclobj(&tail->val);
 
 		if (tail == cx) break;
 
@@ -160,7 +171,7 @@ static enum char_advance_status char_advance(const unsigned char** p, size_t* ch
 }
 
 //}}}
-int skip_whitespace(const unsigned char** s, const unsigned char* e, const char** errmsg, const unsigned char** err_at, size_t* char_adj) //{{{
+int skip_whitespace(const unsigned char** s, const unsigned char* e, const char** errmsg, const unsigned char** err_at, size_t* char_adj, enum extensions extensions) //{{{
 {
 	const unsigned char*		p = *s;
 	const unsigned char*		start;
@@ -170,7 +181,7 @@ int skip_whitespace(const unsigned char** s, const unsigned char* e, const char*
 consume_space_or_comment:
 	while (is_whitespace(*p)) p++;
 
-	if (unlikely(*p == '/')) {
+	if (unlikely((extensions & EXT_COMMENTS) && *p == '/')) {
 		start = p;
 		start_char_adj = *char_adj;
 		p++;
@@ -236,13 +247,14 @@ int is_template(const char* s, int len) //{{{
 }
 
 //}}}
-int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned char* p, const unsigned char* e, size_t* char_adj, const unsigned char** next, enum json_types *type, Tcl_Obj** val) //{{{
+int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned char* p, const unsigned char* e, size_t* char_adj, const unsigned char** next, enum json_types *type, Tcl_Obj** val, struct parse_error* details) //{{{
 {
 	const unsigned char*	err_at = NULL;
 	const char*				errmsg = NULL;
 	Tcl_Obj*				out = NULL;
 
-	release_tclobj(val);
+	if (val)
+		release_tclobj(val);
 
 	if (unlikely(p >= e)) goto err;
 
@@ -361,7 +373,8 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 				}
 
 				*type = stype;
-				replace_tclobj(val, out);
+				if (val)
+					replace_tclobj(val, out);
 			}
 			break;
 
@@ -379,7 +392,8 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"true")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
-			replace_tclobj(val, l->tcl_true);
+			if (val)
+				replace_tclobj(val, l->tcl_true);
 			p += 4;
 			break;
 
@@ -387,7 +401,8 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			if (unlikely(e-p < 5 || *(uint32_t*)(p+1) != *(uint32_t*)"alse")) goto err;	// Evil endian-compensated trick
 
 			*type = JSON_BOOL;
-			replace_tclobj(val, l->tcl_false);
+			if (val)
+				replace_tclobj(val, l->tcl_false);
 			p += 5;
 			break;
 
@@ -395,7 +410,8 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 			if (unlikely(e-p < 4 || *(uint32_t*)p != *(uint32_t*)"null")) goto err;		// Evil endian-compensated trick
 
 			*type = JSON_NULL;
-			replace_tclobj(val, l->tcl_empty);
+			if (val)
+				replace_tclobj(val, l->tcl_empty);
 			p += 4;
 			break;
 
@@ -441,7 +457,8 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 				}
 
 				*type = JSON_NUMBER;
-				replace_tclobj(val, get_string(l, (const char*)start, p-start));
+				if (val)
+					replace_tclobj(val, get_string(l, (const char*)start, p-start));
 			}
 	}
 
@@ -458,7 +475,7 @@ err:
 	if (errmsg == NULL)
 		errmsg = (err_at == e) ? "Document truncated" : "Illegal character";
 
-	_parse_error(l->interp, errmsg, doc, (err_at - doc) - *char_adj);
+	parse_error(details, errmsg, doc, (err_at - doc) - *char_adj);
 
 	return TCL_ERROR;
 }
