@@ -165,7 +165,7 @@ proc bench {name desc args} { #<<<
 
 	set make_script {
 		{batch script} {
-			format {set __bench_i %d; while {[incr __bench_i -1] > 0} %s} \
+			format {set __bench_i %d; while {[incr __bench_i -1] >= 0} %s} \
 				[list $batch] [list $script]
 		}
 	}
@@ -183,10 +183,10 @@ proc bench {name desc args} { #<<<
 			}
 
 			set single_empty {
-				catch {uplevel 1 [list if 1 {}]}
+				uplevel 1 [list if 1 {}]
 			}
 			set single_ex_s	{
-				catch {uplevel 1 [list if 1 $script]}
+				uplevel 1 [list if 1 $script]
 			}
 			if 1 $single_empty	;# throw the first away
 			if 1 $single_ex_s	;# throw the first away
@@ -219,7 +219,7 @@ proc bench {name desc args} { #<<<
 			uplevel 1 [list if 1 $script]
 			for {set i 0} {$i < int(100000 / ($batch*0.15))} {incr i} {
 				set start [clock microseconds]
-				catch {uplevel 1 [list if 1 $bscript]}
+				uplevel 1 [list if 1 $bscript]
 				lappend times [- [clock microseconds] $start]
 			}
 			set overhead	[::tcl::mathfunc::min {*}[lmap e $times {expr {$e / double($batch)}}]]

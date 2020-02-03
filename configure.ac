@@ -148,6 +148,8 @@ TEA_CONFIG_CFLAGS
 
 # Check for required polyfill
 TIP445
+AC_CHECK_FUNCS_ONCE([ffsll])
+AX_GCC_BUILTIN(__builtin_ffsll)
 
 #--------------------------------------------------------------------
 # Set the default compiler switches based on the --enable-symbols option.

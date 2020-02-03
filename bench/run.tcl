@@ -125,6 +125,7 @@ proc benchmark_mode script {
 			switch -glob -- [platform::generic] {
 				linux-* {
 					# Disable turbo boost <<<
+					#lappend restore_state_actions	[list sudo set_turbo 1]
 					lappend restore_state_actions	[list sudo set_turbo [sudo get_turbo]]
 					sudo set_turbo off
 					# Disable turbo boost >>>
@@ -132,6 +133,7 @@ proc benchmark_mode script {
 					# Disable frequency scaling <<<
 					foreach governor [glob -nocomplain -type f /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor] {
 						lappend restore_state_actions [list sudo writetext $governor [string trim [readtext $governor]]]
+						#lappend restore_state_actions [list sudo writetext $governor powersave]
 						sudo writetext $governor performance
 					}
 					# Disable frequency scaling >>>
@@ -147,6 +149,7 @@ proc benchmark_mode script {
 						if {![regexp {^cpu[0-9]+$} $core]} continue
 						if {[file readable /sys/devices/system/cpu/$core/online]} {
 							lappend restore_state_actions [list sudo writetext /sys/devices/system/cpu/$core/online [string trim [readtext /sys/devices/system/cpu/$core/online]]]
+							#lappend restore_state_actions [list sudo writetext /sys/devices/system/cpu/$core/online 1]
 						}
 						set sibs	[readtext /sys/devices/system/cpu/$core/topology/thread_siblings_list]
 						dict lappend siblings $sibs $core

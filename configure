@@ -618,6 +618,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
+ac_func_list=
 ac_subst_vars='LTLIBOBJS
 TCLSH_PROG
 VC_MANIFEST_EMBED_EXE
@@ -1380,7 +1381,7 @@ Optional Features:
   --enable-dedup          Parsing JSON involves allocating a lot of small
                           string Tcl_Objs, many of which are duplicates. This
                           mechanism helps reduce that duplication (default:
-                          no)
+                          yes)
   --enable-threads        build with threads (default: on)
   --enable-shared         build and link with shared libraries (default: on)
   --enable-stubs          build and link with stub libraries. Always true for
@@ -2118,6 +2119,7 @@ $as_echo "$as_me: creating cache $cache_file" >&6;}
   >$cache_file
 fi
 
+as_fn_append ac_func_list " ffsll"
 # Check that the precious variables saved in the cache have kept the same
 # value.
 ac_cache_corrupted=false
@@ -4936,7 +4938,7 @@ $as_echo_n "checking whether to use a string deduplication mechanism for short s
 if test "${enable_dedup+set}" = set; then :
   enableval=$enable_dedup; dedup_ok=$enableval
 else
-  dedup_ok=no
+  dedup_ok=yes
 fi
 
 
@@ -8010,6 +8012,68 @@ $as_echo "#define TIP445_SHIM 1" >>confdefs.h
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 	fi
+
+
+
+
+  for ac_func in $ac_func_list
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+
+
+
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_ffsll" >&5
+$as_echo_n "checking for __builtin_ffsll... " >&6; }
+if ${ax_cv_have___builtin_ffsll+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+            __builtin_ffsll(0)
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ax_cv_have___builtin_ffsll=yes
+else
+  ax_cv_have___builtin_ffsll=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_have___builtin_ffsll" >&5
+$as_echo "$ax_cv_have___builtin_ffsll" >&6; }
+
+    if test yes = $ax_cv_have___builtin_ffsll; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE___BUILTIN_FFSLL 1
+_ACEOF
+
+fi
+
+
 
 
 #--------------------------------------------------------------------
