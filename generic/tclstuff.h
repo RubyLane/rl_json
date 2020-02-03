@@ -75,11 +75,10 @@ static inline void release_tclobj(Tcl_Obj** obj)
 		*obj = NULL;
 	}
 }
-#define RELEASE(obj)			release_tclobj(&obj)
 #define RELEASE_MACRO(obj)		if (obj) {Tcl_DecrRefCount(obj); obj=NULL;}
 #define REPLACE_MACRO(target, replacement)	\
 { \
-	RELEASE(target); \
+	release_tclobj(&target); \
 	if (replacement) Tcl_IncrRefCount(target = replacement); \
 }
 static inline void replace_tclobj(Tcl_Obj** target, Tcl_Obj* replacement)
@@ -91,7 +90,6 @@ static inline void replace_tclobj(Tcl_Obj** target, Tcl_Obj* replacement)
 	*target = replacement;
 	if (*target) Tcl_IncrRefCount(*target);
 }
-#define REPLACE(target, replacement)	replace_tclobj(&target, replacement)
 
 #include <signal.h>
 #define DEBUGGER raise(SIGTRAP)

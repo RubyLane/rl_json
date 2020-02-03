@@ -4,15 +4,15 @@
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.10.1 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.11.0 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
 .SH NAME
-json \- Parse and manipulate JSON documents 
+json \- Parse, manipulate and produce JSON documents 
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.10.1\fR? 
+\fBpackage require rl_json\fR ?\fB0.11.0\fR? 
 
 \fBjson get \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
@@ -37,6 +37,7 @@ json \- Parse and manipulate JSON documents
 \fBjson length \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson keys \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson decode \fIbytes\fR ?\fIencoding\fR?
+\fBjson valid ?\fB-extensions\fR \fIextensionlist\fR? ?\fB-details\fR \fIdetailsvar\fR? \fIjsonValue\fR
 .fi
 .BE
 .SH DESCRIPTION
@@ -263,6 +264,30 @@ This might look something like this in an application:
  	}
  }
 .CE
+.TP
+\fBjson valid\fR ?\fB-extensions\fR \fIextensionlist\fR? ?\fB-details\fR \fIdetails\fR? \fIjsonValue\fR
+.
+Validate \fBjsonValue\fR against the JSON grammar, returning true of it
+conforms and false otherwise.  A list of extensions to accept can be supplied
+with \fB-extensions\fR, with only one currently supported extension:
+\fBcomments\fR, which accepts JSON documents containing \fB// foo\fR and \fB/*
+foo */\fR style comments anywhere whitespace would be valid.  To reject
+documents containing comments, set \fIextensionlist\fR to {}.
+
+Validation using this subcommand is about 3 times faster than parsing and
+catching a parsing exception, and it allows strict validation against the RFC
+without comments.
+
+If validation fails and \fB-details\fR \fIdetailsvar\fR is supplied, the variable
+\fIdetailsvar\fR is set to a dictionary containing the keys:
+.RS 10
+.IP \fBerrmsg\fR 10
+A reason for the failure.
+.IP \fBdoc\fR 10
+The document that failed validation
+.IP \fBchar_ofs\fR 10
+The character offset into \fBdoc\fR that caused validation to fail.
+.RE
 .SH PATHS
 .PP
 Several of the commands (e.g., \fBjson get\fR, \fBjson exists\fR, \fBjson

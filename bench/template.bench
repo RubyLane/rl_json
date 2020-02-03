@@ -23,14 +23,14 @@ bench template-1.1 {Basic templated document creation} -setup { #<<<
 	}
 } -compare {
 	dict {
-		json template $tmpl {
+		json template_string $tmpl {
 			foo		Foo
 			a(bar)	Bar
 		}
 	}
 
 	dict_lit {
-		json template {
+		json template_string {
 			{
 				"foo": "~S:foo",
 				"bar": "~S:a(bar)",
@@ -43,18 +43,18 @@ bench template-1.1 {Basic templated document creation} -setup { #<<<
 	}
 
 	variables {
-		json template $tmpl
+		json template_string $tmpl
 	}
 
 	dict_direct {
-		json _template $tmpl {
+		json template $tmpl {
 			foo		Foo
 			a(bar)	Bar
 		}
 	}
 
 	dict_lit_direct {
-		json _template {
+		json template {
 			{
 				"foo": "~S:foo",
 				"bar": "~S:a(bar)",
@@ -67,7 +67,7 @@ bench template-1.1 {Basic templated document creation} -setup { #<<<
 	}
 
 	variables_direct {
-		json _template $tmpl
+		json template $tmpl
 	}
 } -cleanup {
 	unset -nocomplain tmpl a foo
@@ -96,6 +96,32 @@ bench template-2.1 {Test templated doc creation, including numbers} -setup { #<<
 		space	" 42"
 	}
 } -compare {
+	template_string {
+		json template_string {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		}
+	}
+
+	template_string_dict {
+		json template_string {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		} $d
+	}
+
 	template {
 		json template {
 			{
@@ -110,33 +136,7 @@ bench template-2.1 {Test templated doc creation, including numbers} -setup { #<<
 	}
 
 	template_dict {
-		json template {
-			{
-				"foo":		"~N:foo",
-				"bar":		"~N:bar",
-				//"baz":		"~N:baz",
-				"quux":		"~N:quux",
-				"octal":	"~N:octal",
-				"space":	"~N:space"
-			}
-		} $d
-	}
-
-	_template {
-		json _template {
-			{
-				"foo":		"~N:foo",
-				"bar":		"~N:bar",
-				//"baz":		"~N:baz",
-				"quux":		"~N:quux",
-				"octal":	"~N:octal",
-				"space":	"~N:space"
-			}
-		}
-	}
-
-	_template_dict {
-		json _template {
+		json template_string {
 			{
 				"foo":		"~N:foo",
 				"bar":		"~N:bar",
@@ -177,8 +177,36 @@ bench template-3.1 {Test templated doc creation, including numbers, json set on 
 		space	" 42"
 	}
 } -compare {
+	template_string {
+		set j	[json template_string {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		}]
+		json set j new null
+	}
+
+	template_string_dict {
+		set j	[json template_string {
+			{
+				"foo":		"~N:foo",
+				"bar":		"~N:bar",
+				//"baz":		"~N:baz",
+				"quux":		"~N:quux",
+				"octal":	"~N:octal",
+				"space":	"~N:space"
+			}
+		} $d]
+		json set j new null
+	}
+
 	template {
-		set j	[json template {
+		set j [json template {
 			{
 				"foo":		"~N:foo",
 				"bar":		"~N:bar",
@@ -192,35 +220,7 @@ bench template-3.1 {Test templated doc creation, including numbers, json set on 
 	}
 
 	template_dict {
-		set j	[json template {
-			{
-				"foo":		"~N:foo",
-				"bar":		"~N:bar",
-				//"baz":		"~N:baz",
-				"quux":		"~N:quux",
-				"octal":	"~N:octal",
-				"space":	"~N:space"
-			}
-		} $d]
-		json set j new null
-	}
-
-	_template {
-		set j [json _template {
-			{
-				"foo":		"~N:foo",
-				"bar":		"~N:bar",
-				//"baz":		"~N:baz",
-				"quux":		"~N:quux",
-				"octal":	"~N:octal",
-				"space":	"~N:space"
-			}
-		}]
-		json set j new null
-	}
-
-	_template_dict {
-		set j [json _template {
+		set j [json template {
 			{
 				"foo":		"~N:foo",
 				"bar":		"~N:bar",

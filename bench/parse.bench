@@ -65,6 +65,14 @@ bench parse-2.1 {Parse a few MB of json} -batch 3 -setup { #<<<
 		json normalize $json
 		list 83000 5434
 	}
+	valid {
+		json valid $json
+		list 83000 5434
+	}
+	valid_no_comments {
+		json valid -extensions {} $json
+		list 83000 5434
+	}
 	ours {
 		set c	0
 		set nrpics	0
@@ -103,14 +111,18 @@ bench parse-3.1 {Parse a large json doc with deep nesting and many UTF-8 chars} 
 	set json [readfile [file join [file dirname [file normalize [info script]]] sample.json]]
 } -compare {
 	ours {
-		json get [string trim $json] ?keys
+		json length [string trim $json]
 	}
 	yajltcl {
-		dict keys [yajl::json2dict [string trim $json]]
+		dict size [yajl::json2dict [string trim $json]]
+	}
+	valid {
+		json valid $json
+		return -level 0 3
 	}
 } -cleanup {
 	unset -nocomplain json
-} -result {a key z}
+} -result 3
 #>>>
 }
 }

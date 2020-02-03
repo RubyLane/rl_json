@@ -536,13 +536,13 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 					 */
 					{
 						Tcl_Obj*	new = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
-						REPLACE(val, new);
+						replace_tclobj(&val, new);
 						// Can do this because val's ref is on loan from new_stringobj_dedup
 						//val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
 					}
 					// Falls through
 				case JSON_STRING:
-					REPLACE(cx[0].last->hold_key, val);
+					replace_tclobj(&cx[0].last->hold_key, val);
 					break;
 
 				default:
@@ -697,7 +697,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		*out_type = cx[0].container;
 	}
 
-	RELEASE(val);
+	release_tclobj(&val);
 	return TCL_OK;
 
 whitespace_err:
@@ -707,7 +707,7 @@ err:
 	if (details.errmsg)
 		throw_parse_error(interp, &details);
 
-	RELEASE(val);
+	release_tclobj(&val);
 	free_cx(cx);
 	return TCL_ERROR;
 }

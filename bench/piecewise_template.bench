@@ -26,14 +26,14 @@ bench piecewise_template-1.1 {Templated document creation in multiple steps} -se
 	serialize {
 		unset -nocomplain last
 		for {set i 0} {$i < 6} {incr i} {
-			set last	[json template $tmpl]
+			set last	[json template_string $tmpl]
 		}
 		set last
 	}
 	direct {
 		unset -nocomplain last
 		for {set i 0} {$i < 6} {incr i} {
-			set last	[json _template $tmpl]
+			set last	[json template $tmpl]
 		}
 		set last
 	}
@@ -91,14 +91,14 @@ bench piecewise_template-1.2 {Templated document creation in a loop} -setup { #<
 	serialize {
 		set res {[]}
 		for {set i 0} {$i < 20} {incr i} {
-			json set res end+1 [json template $tmpl]
+			json set res end+1 [json template_string $tmpl]
 		}
 		set res
 	}
 	direct {
 		set res {[]}
 		for {set i 0} {$i < 20} {incr i} {
-			json set res end+1 [json _template $tmpl]
+			json set res end+1 [json template $tmpl]
 		}
 		set res
 	}

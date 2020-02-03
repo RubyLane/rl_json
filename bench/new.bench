@@ -62,8 +62,8 @@ bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 		]
 	}
 
-	template {
-		json template {
+	template_string {
+		json template_string {
 			{
 				"foo": "~S:bar",
 				"baz": [
@@ -81,8 +81,8 @@ bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 		}
 	}
 
-	template_direct {
-		json _template {
+	template {
+		json template {
 			{
 				"foo": "~S:bar",
 				"baz": [
@@ -133,8 +133,8 @@ bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
 		}
 	}
 
-	template_dict {
-		json template {
+	template_string_dict {
+		json template_string {
 			{
 				"foo": "~S:bar",
 				"baz": [

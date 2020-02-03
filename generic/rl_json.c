@@ -481,9 +481,9 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 					Tcl_Obj*	forced = NULL;
 
 					if ((res = force_json_number(interp, scx->l, subst_val, &forced)) == TCL_OK)
-						REPLACE(subst_val, forced);
+						replace_tclobj(&subst_val, forced);
 
-					RELEASE(forced);
+					release_tclobj(&forced);
 					if (res != TCL_OK) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error substituting value from \"%s\" into template, not a number: \"%s\"", Tcl_GetString(val), Tcl_GetString(subst_val)));
 						return TCL_ERROR;
@@ -946,7 +946,7 @@ static int _new_object(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], Tcl_
 
 	Tcl_IncrRefCount(*res = JSON_NewJvalObj(JSON_OBJECT, val));
 end:
-	RELEASE(val);
+	release_tclobj(&val);
 	return retval;
 }
 
@@ -1828,7 +1828,7 @@ static int template_actions(struct template_cx* cx, Tcl_Obj* template, enum acti
 								if (retval == TCL_OK)
 									retval = emit_action(cx, REPLACE_KEY, k, slot);
 
-								RELEASE(slot);
+								release_tclobj(&slot);
 								if (retval != TCL_OK) goto free_search;
 							}
 							break;
@@ -1859,12 +1859,12 @@ free_search:
 
 				TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
 				for (i=0; i<oc; i++) {
-					REPLACE(arr_elem, Tcl_NewIntObj(i));
+					replace_tclobj(&arr_elem, Tcl_NewIntObj(i));
 					if (TCL_OK != (retval = template_actions(cx, ov[i], REPLACE_ARR, arr_elem)))
 						break;
 				}
 
-				RELEASE(arr_elem);
+				release_tclobj(&arr_elem);
 				if (retval != TCL_OK) return retval;
 				if (prev_opcode(cx) == PUSH_TARGET) {
 					remove_action(interp, cx, -1);
@@ -2615,7 +2615,7 @@ static int jsonNew(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 
 	TEST_OK(new_json_value_from_list(interp, objc-1, objv+1, &res));
 	Tcl_SetObjResult(interp, res);
-	RELEASE(res);
+	release_tclobj(&res);
 
 	return TCL_OK;
 }
@@ -2662,7 +2662,7 @@ static int jsonNumber(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 	if (likely((res = force_json_number(interp, l, objv[1], &forced)) == TCL_OK)) {
 		Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_NUMBER, forced));
 	}
-	RELEASE(forced);
+	release_tclobj(&forced);
 
 	return res;
 }
@@ -2697,7 +2697,7 @@ static int jsonObject(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 		TEST_OK(_new_object(interp, objc-1, objv+1, &res));
 	}
 	Tcl_SetObjResult(interp, res);
-	RELEASE(res);
+	release_tclobj(&res);
 
 	return TCL_OK;
 }
@@ -2720,7 +2720,7 @@ static int jsonArray(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_ARRAY, val));
 
 end_new_array:
-	RELEASE(val);
+	release_tclobj(&val);
 
 	return retval;
 }
@@ -2781,7 +2781,7 @@ static int jsonIsNull(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 }
 
 //}}}
-static int jsonTemplate(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+static int jsonTemplateString(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int							res;
 	struct serialize_context	scx;
@@ -2805,7 +2805,7 @@ static int jsonTemplate(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 
 	res = serialize(interp, &scx, objv[1]);
 
-	RELEASE(scx.fromdict);
+	release_tclobj(&scx.fromdict);
 
 	if (res == TCL_OK)
 		Tcl_DStringResult(interp, scx.ds);
@@ -2816,7 +2816,7 @@ static int jsonTemplate(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj 
 }
 
 //}}}
-static int jsonTemplateNew(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+static int jsonTemplate(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	Tcl_Obj*	res = NULL;
 
@@ -2832,7 +2832,7 @@ static int jsonTemplateNew(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_O
 		return TCL_ERROR;
 	}
 	Tcl_SetObjResult(interp, res);
-	RELEASE(res);
+	release_tclobj(&res);
 
 	return TCL_OK;
 }
@@ -3069,8 +3069,8 @@ static int jsonDebug(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 	if ((retval = json_pretty_dbg(interp, objv[1], indent, pad, &ds)) == TCL_OK)
 		Tcl_DStringResult(interp, &ds);
 
-	RELEASE(pad);
-	RELEASE(indent);
+	release_tclobj(&pad);
+	release_tclobj(&indent);
 	Tcl_DStringFree(&ds);
 
 	return retval;
@@ -3263,7 +3263,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		"fmt",			// DEPRECATED
 		"isnull",
 		"template",
-		"_template",
+		"template_string",
 		"foreach",
 		"lmap",
 		"amap",
@@ -3305,7 +3305,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		M_FMT,
 		M_ISNULL,
 		M_TEMPLATE,
-		M_TEMPLATE_NEW,
+		M_TEMPLATE_STRING,
 		M_FOREACH,
 		M_LMAP,
 		M_AMAP,
@@ -3356,7 +3356,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_DECODE:		return jsonDecode(cdata, interp, objc-1, objv+1);
 		case M_ISNULL:		return jsonIsNull(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE:	return jsonTemplate(cdata, interp, objc-1, objv+1);
-		case M_TEMPLATE_NEW:return jsonTemplateNew(cdata, interp, objc-1, objv+1);
+		case M_TEMPLATE_STRING:	return jsonTemplateString(cdata, interp, objc-1, objv+1);
 		case M_FOREACH:		return jsonForeach(cdata, interp, objc-1, objv+1);
 		case M_LMAP:		return jsonLmap(cdata, interp, objc-1, objv+1);
 		case M_AMAP:		return jsonAmap(cdata, interp, objc-1, objv+1);
@@ -3408,39 +3408,39 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 
 	l->interp = NULL;
 
-	RELEASE(l->tcl_true);
-	RELEASE(l->tcl_false);
-	RELEASE(l->tcl_one);
-	RELEASE(l->tcl_zero);
+	release_tclobj(&l->tcl_true);
+	release_tclobj(&l->tcl_false);
+	release_tclobj(&l->tcl_one);
+	release_tclobj(&l->tcl_zero);
 
 	Tcl_DecrRefCount(l->tcl_empty);
-	RELEASE(l->tcl_empty);
+	release_tclobj(&l->tcl_empty);
 
-	RELEASE(l->json_true);
-	RELEASE(l->json_false);
-	RELEASE(l->json_null);
-	RELEASE(l->json_empty_string);
-	RELEASE(l->tcl_empty_dict);
-	RELEASE(l->tcl_empty_list);
+	release_tclobj(&l->json_true);
+	release_tclobj(&l->json_false);
+	release_tclobj(&l->json_null);
+	release_tclobj(&l->json_empty_string);
+	release_tclobj(&l->tcl_empty_dict);
+	release_tclobj(&l->tcl_empty_list);
 
 	for (i=0; i<2; i++)
-		RELEASE(l->force_num_cmd[i]);
+		release_tclobj(&l->force_num_cmd[i]);
 
 	for (i=0; i<JSON_TYPE_MAX; i++) {
-		RELEASE(l->type_int[i]);
-		RELEASE(l->type[i]);
+		release_tclobj(&l->type_int[i]);
+		release_tclobj(&l->type[i]);
 	}
 
 	for (i=0; i<TEMPLATE_ACTIONS_END; i++)
-		RELEASE(l->action[i]);
+		release_tclobj(&l->action[i]);
 
 #if DEDUP
 	free_cache(l);
 	Tcl_DeleteHashTable(&l->kc);
 #endif
 
-	RELEASE(l->apply);
-	RELEASE(l->decode_bytes);
+	release_tclobj(&l->apply);
+	release_tclobj(&l->decode_bytes);
 
 	free(l); l = NULL;
 }
@@ -3778,7 +3778,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, ENS "decode",     jsonDecode, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "isnull",     jsonIsNull, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "template",   jsonTemplate, l, NULL);
-		Tcl_CreateObjCommand(interp, ENS "_template",  jsonTemplateNew, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "template_string", jsonTemplateString, l, NULL);
 		Tcl_NRCreateCommand(interp,  ENS "foreach",    jsonForeach, jsonNRForeach, l, NULL);
 		Tcl_NRCreateCommand(interp,  ENS "lmap",       jsonLmap,    jsonNRLmap,    l, NULL);
 		Tcl_NRCreateCommand(interp,  ENS "amap",       jsonAmap,    jsonNRAmap,    l, NULL);

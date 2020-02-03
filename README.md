@@ -53,6 +53,7 @@ Quick Reference
 * [json keys *json_val* ?*key* ...?]  - Return the keys in the of the named JSON object, found by following the path of *key*s.
 * [json pretty *json_val*]  - Returns a pretty-printed string representation of *json_val*.  Useful for debugging or inspecting the structure of JSON data.
 * [json decode *bytes* ?*encoding*?]  - Decode the binary *bytes* into a character string according to the JSON standards.  The optional *encoding* arg can be one of *utf-8*, *utf-16le*, *utf-16be*, *utf-32le*, *utf-32be*.  The encoding is guessed from the BOM (byte order mark) if one is present and *encoding* isn't specified.
+* [json valid ?*-extensions* *extensionlist*? ?*-details* *detailsvar*?  *json_val*]  - Return true if *json_val* conforms to the JSON grammar with the extensions in *extensionlist*.  Currently only one extension is supported: *comments*, and is the default.  To reject comments, use *-extensions {}*.  If *-details detailsvar* is supplied and the validation fails, the variable *detailsvar* is set to a dictionary with the keys *errmsg*, *doc* and *char_ofs*.  *errmsg* contains the reason for the failure, *doc* contains the failing json value, and *char_ofs* is the character index into *doc* of the first invalid character.
 
 Paths
 -----
@@ -269,6 +270,16 @@ test which demonstrates the performance of the cached case.
            yajltcl |    8.800
 rl_json_get_native |    0.800
 ```
+
+### Validating
+
+If the requirement is to validate a JSON value, the [json valid] command is a
+light-weight version of the parsing engine that skips allocating values from
+the document and only returns whether the parsing succeeded or failed, and
+optionally a description of the failure.  It takes about a third of the time
+to validate a document as parsing it, so the performance win is substantial.
+On a relatively modern CPU validation takes about 11 cycles per byte, or around
+200MB of JSON per second on a 2.3 GHz Intel i7.
 
 ### Generating
 
