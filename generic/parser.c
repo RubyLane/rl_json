@@ -393,7 +393,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 			*type = JSON_BOOL;
 			if (val)
-				replace_tclobj(val, l->tcl_true);
+				replace_tclobj(val, l ? l->tcl_true : Tcl_NewBooleanObj(1));
 			p += 4;
 			break;
 
@@ -402,7 +402,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 			*type = JSON_BOOL;
 			if (val)
-				replace_tclobj(val, l->tcl_false);
+				replace_tclobj(val, l ? l->tcl_false : Tcl_NewBooleanObj(0));
 			p += 5;
 			break;
 
@@ -411,7 +411,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 			*type = JSON_NULL;
 			if (val)
-				replace_tclobj(val, l->tcl_empty);
+				replace_tclobj(val, l ? l->tcl_empty : Tcl_NewStringObj("", 0));
 			p += 4;
 			break;
 

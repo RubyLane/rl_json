@@ -96,13 +96,16 @@ Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length)
 	Tcl_Obj*			out;
 	Tcl_HashEntry*		entry = NULL;
 
+	if (l == NULL)
+		return Tcl_NewStringObj(bytes, length);
+
 	if (length == 0) {
 		return l->tcl_empty;
 	} else if (length < 0) {
 		length = strlen(bytes);
 	}
 
-	if (length > STRING_DEDUP_MAX || l == NULL)
+	if (length > STRING_DEDUP_MAX)
 		return Tcl_NewStringObj(bytes, length);
 
 	if (likely(bytes[length] == 0)) {
