@@ -203,6 +203,8 @@ libraries:
 #========================================================================
 
 doc:
+
+doc/json.html:
 	cd doc && man2html -r json.n > json.html
 
 install: all install-binaries install-libraries install-doc
