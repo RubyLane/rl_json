@@ -136,13 +136,20 @@ struct kc_entry {
  * TODO: possibly provide _BitScanForward implementation for Visual Studio >= 2005?
  */
 #if defined(HAVE___BUILTIN_FFSLL) || defined(HAVE_FFSLL)
+#	define FFS_TMP_STORAGE	/* nothing to declare */
 #	if defined(HAVE___BUILTIN_FFSLL)
 #		define FFS				__builtin_ffsll
 #	else
 #		define FFS				ffsll
 #	endif
 #	define FREEMAP_TYPE		long long
+#elif defined(_MSC_VER) && defined(_WIN64) && _MSC_VER >= 1400
+#	define FFS_TMP_STORAGE	unsigned long ix;
+/* _BitScanForward64 numbers bits starting with 0, ffsll starts with 1 */
+#	define FFS(x)			(_BitScanForward64(&ix, x) ? ix+1 : 0)
+#	define FREEMAP_TYPE		long long
 #else
+#	define FFS_TMP_STORAGE	/* nothing to declare */
 #	define FFS				ffs
 #	define FREEMAP_TYPE		int
 #endif

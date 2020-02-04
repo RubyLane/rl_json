@@ -9,9 +9,9 @@
 static int first_free(FREEMAP_TYPE* freemap) //{{{
 {
 	int	i=0, bit, res;
-	while ((bit = FFS(freemap[i])) == 0) {
-		i++;
-	}
+	FFS_TMP_STORAGE;
+
+	while ((bit = FFS(freemap[i])) == 0) i++;
 	res = i * (sizeof(FREEMAP_TYPE)*8) + (bit-1);
 	return res;
 }
