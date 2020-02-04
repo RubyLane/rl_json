@@ -6,20 +6,30 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
-proc my_rss {} { # Linux only!  Need alternatives for Mac, Win <<<
-	set h	[open /proc/self/statm r]
-	try {
-		read $h
-	} on ok statm {
-		expr {
-			[lindex $statm 1] * 4
-		}
-	} finally {
-		close $h
+if {$tcl_platform(platform) eq "windows" && ![catch {package require twapi}]} {
+	proc my_rss {} {
+		# Not clear what would correspond to VMRss on Linux.
+		# -workingset is too volatile. -pagefilebytes seems
+		# a little better but even that has variations
+		# (positive and negative)
+		lindex [twapi::get_process_info -pagefilebytes] 1
 	}
-}
+} else {
+	proc my_rss {} { # Linux only!  Need alternatives for Mac, Win <<<
+		set h	[open /proc/self/statm r]
+		try {
+			read $h
+		} on ok statm {
+			expr {
+				[lindex $statm 1] * 4
+			}
+		} finally {
+			close $h
+		}
+	}
 
-#>>>
+	#>>>
+}
 
 test memory-1.1 {memory leak with static object} -setup { #<<<
 	proc test_memory-1.1 it {

@@ -1,0 +1,35 @@
+#------------------------------------------------------------- -*- makefile -*-
+#
+# Makefile for building rl_json
+#
+# Basic build and install
+#   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl
+#   nmake /s /nologo /f makefile.vc INSTALLDIR=c:\path\to\tcl install
+#
+# For other build options (debug, static etc.)
+# See TIP 477 (https://core.tcl.tk/tips/doc/trunk/tip/477.md) for
+# detailed documentation.
+# 
+#------------------------------------------------------------------------------
+
+# The name of the package
+PROJECT = rl_json
+
+!include "rules-ext.vc"
+
+PRJ_OBJS = \
+	$(TMP_DIR)\rl_json.obj \
+	$(TMP_DIR)\rl_jsonStubInit.obj \
+	$(TMP_DIR)\json_types.obj \
+	$(TMP_DIR)\dedup.obj \
+	$(TMP_DIR)\api.obj \
+	$(TMP_DIR)\parser.obj
+
+PRJ_STUBOBJS = $(TMP_DIR)\rl_jsonStubLib.obj
+
+PRJ_DEFINES = -D_CRT_SECURE_NO_WARNINGS
+
+!include "$(_RULESDIR)\targets.vc"
+
+pkgindex: default-pkgindex-tea
+install: default-install-docs-html
