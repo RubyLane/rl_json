@@ -103,8 +103,9 @@ EXTERN int		JSON_Decode(Tcl_Interp*interp, Tcl_Obj*bytes,
 				Tcl_Obj*encoding, Tcl_Obj**decodedstring);
 /* 32 */
 EXTERN int		JSON_Foreach(Tcl_Interp*interp, Tcl_Obj*iterators,
-				int*body, enum collecting_mode collect,
-				Tcl_Obj**res, ClientData cdata);
+				JSON_ForeachBody*body,
+				enum collecting_mode collect, Tcl_Obj**res,
+				ClientData cdata);
 /* 33 */
 EXTERN int		JSON_Valid(Tcl_Interp*interp, Tcl_Obj*json,
 				int*valid, enum extensions extensions,
@@ -146,7 +147,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Length) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, int*length); /* 29 */
     int (*jSON_Keys) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, Tcl_Obj**keyslist); /* 30 */
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
-    int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, int*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
+    int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */
 } Rl_jsonStubs;
 

@@ -46,15 +46,18 @@ struct parse_error {
 	size_t			char_ofs;	// Offset in chars, not bytes
 };
 
-// Stubs exported API
-#include "rl_jsonDecls.h"
+typedef int (JSON_ForeachBody)(ClientData cdata, Tcl_Interp* interp, Tcl_Obj* loopvars);
 
+// Stubs exported API
+
+#ifdef USE_TCL_STUBS
 EXTERN CONST char* Rl_jsonInitStubs _ANSI_ARGS_((Tcl_Interp* interp, CONST char* version, int exact));
-#ifndef USE_TCL_STUBS
-#warning Using non-stubs
+#else
 #	define Rl_jsonInitStubs(interp, version, exact) Tcl_PkgRequire(interp, "rl_json", version, exact)
 #endif
+#include "rl_jsonDecls.h"
 
-EXTERN int Rl_jsonInit _ANSI_ARGS_((Tcl_Interp* interp));
+EXTERN int Rl_json_Init _ANSI_ARGS_((Tcl_Interp* interp));
+EXTERN int Rl_json_SafeInit _ANSI_ARGS_((Tcl_Interp* interp));
 
 #endif

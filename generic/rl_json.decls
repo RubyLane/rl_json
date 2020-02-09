@@ -110,7 +110,7 @@ declare 31 generic {
 }
 
 declare 32 generic {
-	int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, int* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata)
+	int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata)
 }
 declare 33 generic {
 	int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions extensions, struct parse_error* details)

@@ -116,6 +116,7 @@ TCL_BIN_DIR	= @TCL_BIN_DIR@
 TCL_SRC_DIR	= @TCL_SRC_DIR@
 #TK_BIN_DIR	= @TK_BIN_DIR@
 #TK_SRC_DIR	= @TK_SRC_DIR@
+TCL_LIB_SPEC = @TCL_LIB_SPEC@
 
 # Not used, but retained for reference of what libs Tcl required
 #TCL_LIBS	= @TCL_LIBS@
@@ -136,9 +137,11 @@ PKG_ENV		= @LD_LIBRARY_PATH_VAR@="$(EXTRA_PATH):$(@LD_LIBRARY_PATH_VAR@)" \
 		  TCLLIBPATH="$(TCLLIBPATH)"
 
 TCLSH_PROG	= @TCLSH_PROG@
+JSONSH_PROG	= ./jsonsh
 TCLSH		= $(PKG_ENV) $(TCLSH_ENV) $(TCLSH_PROG)
-TCLSH_VALGRIND	= $(PKG_ENV) $(TCLSH_ENV) valgrind $(TCLSH_PROG)
-TCLSH_VALGRIND_FULL	= $(PKG_ENV) $(TCLSH_ENV) valgrind --leak-check=full $(TCLSH_PROG)
+JSONSH		= $(PKG_ENV) $(TCLSH_ENV) $(JSONSH_PROG)
+TCLSH_VALGRIND	= $(PKG_ENV) $(TCLSH_ENV) valgrind --suppressions=suppressions $(TCLSH_PROG)
+TCLSH_VALGRIND_FULL	= $(PKG_ENV) $(TCLSH_ENV) valgrind --suppressions=suppressions --gen-suppressions=all --leak-check=full
 
 #WISH_ENV	= TK_LIBRARY=`@CYGPATH@ $(TK_SRC_DIR)/library`
 #WISH_PROG	= @WISH_PROG@
@@ -242,18 +245,21 @@ test: binaries libraries
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
+jsonsh: $(PKG_OBJECTS) $(TCL_SRC_DIR)/unix/tclAppInit.c $(srcdir)/generic/jsonsh.c
+	$(COMPILE) -DTCL_LOCAL_APPINIT=Json_AppInit $^ $(SHLIB_LD_LIBS) -L$(TCL_BIN_DIR)/parse_args0.3.1 -lparse_args0.3.1 $(TCL_LIB_SPEC) -lm -o $@
+
 test_valgrind: binaries libraries
 	$(TCLSH_VALGRIND) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
-test_valgrind_full: binaries libraries
-	$(TCLSH_VALGRIND_FULL) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
+test_valgrind_full: binaries libraries jsonsh
+	$(TCLSH_VALGRIND_FULL) $(JSONSH_PROG) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
 test_vgdb_full: binaries libraries
-	$(TCLSH_VALGRIND_FULL) --read-var-info=yes --track-origins=yes --vgdb-error=1 \
+	$(TCLSH_VALGRIND_FULL) --read-var-info=yes --track-origins=yes --vgdb-error=1 $(JSONSH_PROG) \
 		`@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
 		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
@@ -269,7 +275,7 @@ benchmark: binaries libraries
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)
 
-tags:
+tags: generic/*
 	ctags-exuberant generic/*
 
 vimgdb: tags

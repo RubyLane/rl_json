@@ -731,9 +731,8 @@ int type_is_dynamic(const enum json_types type) //{{{
 //}}}
 Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir) //{{{
 {
-	if (ir->twoPtrValue.ptr1 != NULL && Tcl_IsShared((Tcl_Obj*)ir->twoPtrValue.ptr1)) {
+	if (ir->twoPtrValue.ptr1 != NULL && Tcl_IsShared((Tcl_Obj*)ir->twoPtrValue.ptr1))
 		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1, Tcl_DuplicateObj(ir->twoPtrValue.ptr1));
-	}
 
 	if (ir->twoPtrValue.ptr2) {
 		// The caller wants val unshared, which implies that they intend to

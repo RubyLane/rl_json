@@ -14,9 +14,9 @@ test array-1.1 {Create an array from type-value pairs} -setup { #<<<
 		} else {
 			list string $v
 		}
-	}];
+	}]
 } -body {
-	json new array {*}$typevalues
+	json array {*}$typevalues
 } -cleanup {
 	unset -nocomplain typevalues
 } -result {["a",1,"c",2,"e",3,"g"]}
@@ -24,15 +24,15 @@ test array-1.1 {Create an array from type-value pairs} -setup { #<<<
 test array-1.2 {Create an array from JSON values} -setup { #<<<
 	set values [lmap v {a 1 c 2 e 3 g} {
 		if {[string is digit $v]} {
-			json new number $v
+			json number $v
 		} else {
-			json new string $v
+			json string $v
 		}
-	}];
+	}]
 } -body {
-	json new array {*}[lmap v $values {
+	json array {*}[lmap v $values {
 		list json $v
-	}];
+	}]
 } -cleanup {
 	unset -nocomplain values v
 } -result {["a",1,"c",2,"e",3,"g"]}

@@ -444,22 +444,14 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 	Tcl_Obj*		rep = NULL;
 	Tcl_Obj**		pathv = NULL;
 
-	src = Tcl_ObjGetVar2(interp, obj, NULL, 0);
-	if (src == NULL) {
-		src = Tcl_ObjSetVar2(interp, obj, NULL, JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj()), TCL_LEAVE_ERR_MSG);
-	}
-
-	if (Tcl_IsShared(src)) {
-		src = Tcl_ObjSetVar2(interp, obj, NULL, Tcl_DuplicateObj(src), TCL_LEAVE_ERR_MSG);
-		if (src == NULL)
-			return TCL_ERROR;
-	}
+	if (Tcl_IsShared(obj))
+		THROW_ERROR("JSON_Set called with shared object");
 
 	/*
 	fprintf(stderr, "JSON_Set, obj: \"%s\", src: \"%s\"\n",
 			Tcl_GetString(obj), Tcl_GetString(src));
 			*/
-	target = src;
+	target = src = obj;
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
 	val = get_unshared_val(ir);
@@ -620,10 +612,11 @@ followed_path:
 set_val:
 	//fprintf(stderr, "Reached end of path, calling JSON_SetIntRep for replacement value %s (%s), target is %s\n",
 	//		type_names_int[newtype], Tcl_GetString(replacement), type_names_int[type]);
-	rep = as_json(interp, replacement);
+	replace_tclobj(&rep, as_json(interp, replacement));
 
 	TEST_OK(JSON_GetJvalFromObj(interp, rep, &newtype, &newval));
 	TEST_OK(JSON_SetIntRep(target, newtype, newval));
+	release_tclobj(&rep);
 
 	Tcl_InvalidateStringRep(src);
 
@@ -638,39 +631,34 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 {
 	enum json_types	type;
 	int				i;
-	Tcl_Obj*		val;
-	Tcl_Obj*		step;
-	Tcl_Obj*		src;
-	Tcl_Obj*		target;
+	Tcl_Obj*		val = NULL;
+	Tcl_Obj*		step = NULL;
+	Tcl_Obj*		src = NULL;
+	Tcl_Obj*		target = NULL;
 	int				pathc;
 	Tcl_Obj**		pathv = NULL;
-
-	src = Tcl_ObjGetVar2(interp, obj, NULL, TCL_LEAVE_ERR_MSG);
-	if (src == NULL)
-		return TCL_ERROR;
+	int				retval = TCL_OK;
 
 	TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
+
+	target = src = obj;
 
 	if (pathc == 0) {
 		Tcl_SetObjResult(interp, src);
 		return TCL_OK;	// Do Nothing Gracefully
 	}
 
-	if (Tcl_IsShared(src)) {
-		src = Tcl_ObjSetVar2(interp, obj, NULL, Tcl_DuplicateObj(src), TCL_LEAVE_ERR_MSG);
-		if (src == NULL)
-			return TCL_ERROR;
-	}
+	if (Tcl_IsShared(src))
+		THROW_ERROR("JSON_Set called with shared Tcl_Obj");
 
 	/*
 	fprintf(stderr, "JSON_Set, obj: \"%s\", src: \"%s\"\n",
 			Tcl_GetString(obj), Tcl_GetString(src));
 			*/
-	target = src;
 
 	{
 		Tcl_ObjIntRep*	ir = NULL;
-		TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+		TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 		val = get_unshared_val(ir);
 	}
 
@@ -682,10 +670,10 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 
 		switch (type) {
 			case JSON_UNDEF: //{{{
-				THROW_ERROR("Found JSON_UNDEF type jval following path");
+				THROW_ERROR_LABEL(finally, retval, "Found JSON_UNDEF type jval following path");
 				//}}}
 			case JSON_OBJECT: //{{{
-				TEST_OK(Tcl_DictObjGet(interp, val, step, &target));
+				TEST_OK_LABEL(finally, retval, Tcl_DictObjGet(interp, val, step, &target));
 				if (target == NULL) {
 					goto bad_path;
 				}
@@ -693,7 +681,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 					//fprintf(stderr, "Path element %d: \"%s\" exists but the TclObj is shared (%d), replacing it with an unshared duplicate\n",
 					//		i, Tcl_GetString(step), target->refCount);
 					target = Tcl_DuplicateObj(target);
-					TEST_OK(Tcl_DictObjPut(interp, val, step, target));
+					TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, val, step, target));
 				}
 				break;
 				//}}}
@@ -705,7 +693,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 					char*		end;
 					Tcl_Obj**	av;
 
-					TEST_OK(Tcl_ListObjGetElements(interp, val, &ac, &av));
+					TEST_OK_LABEL(finally, retval, Tcl_ListObjGetElements(interp, val, &ac, &av));
 					//fprintf(stderr, "descending into array of length %d\n", ac);
 
 					if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
@@ -731,7 +719,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 						}
 
 						if (!ok)
-							THROW_ERROR("Expected an integer index or end(+/-integer)?, got ", Tcl_GetString(step));
+							THROW_ERROR_LABEL(finally, retval, "Expected an integer index or end(+/-integer)?, got ", Tcl_GetString(step));
 
 						//fprintf(stderr, "Resolved index of %ld from \"%s\"\n", index, index_str);
 					} else {
@@ -746,7 +734,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 						target = av[index];
 						if (Tcl_IsShared(target)) {
 							target = Tcl_DuplicateObj(target);
-							TEST_OK(Tcl_ListObjReplace(interp, val, index, 1, 1, &target));
+							TEST_OK_LABEL(finally, retval, Tcl_ListObjReplace(interp, val, index, 1, 1, &target));
 						}
 						//fprintf(stderr, "extracted index %ld: (%s)\n", index, Tcl_GetString(target));
 					}
@@ -763,18 +751,20 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 			case JSON_DYN_JSON:
 			case JSON_DYN_TEMPLATE:
 			case JSON_DYN_LITERAL:
-				THROW_ERROR("Attempt to index into atomic type ", get_type_name(type), " at path key \"", Tcl_GetString(step), "\"");
+				THROW_ERROR_LABEL(finally, retval, "Attempt to index into atomic type ", get_type_name(type), " at path key \"", Tcl_GetString(step), "\"");
 				/*
 				i++;
 				goto bad_path;
 				*/
 			default:
-				THROW_ERROR("Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
+				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Unhandled type: %d", type));
+				retval = TCL_ERROR;
+				goto finally;
 		}
 
 		{
 			Tcl_ObjIntRep*	ir = NULL;
-			TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+			TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 			val = get_unshared_val(ir);
 		}
 		//fprintf(stderr, "Walked on to new type %s\n", type_names[type]);
@@ -787,10 +777,10 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 	//fprintf(stderr, "To replace: path step %d: \"%s\"\n", i, Tcl_GetString(step));
 	switch (type) {
 		case JSON_UNDEF: //{{{
-			THROW_ERROR("Found JSON_UNDEF type jval following path");
+			THROW_ERROR_LABEL(finally, retval, "Found JSON_UNDEF type jval following path");
 			//}}}
 		case JSON_OBJECT: //{{{
-			TEST_OK(Tcl_DictObjRemove(interp, val, step));
+			TEST_OK_LABEL(finally, retval, Tcl_DictObjRemove(interp, val, step));
 			break;
 			//}}}
 		case JSON_ARRAY: //{{{
@@ -801,7 +791,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 				char*		end;
 				Tcl_Obj**	av;
 
-				TEST_OK(Tcl_ListObjGetElements(interp, val, &ac, &av));
+				TEST_OK_LABEL(finally, retval, Tcl_ListObjGetElements(interp, val, &ac, &av));
 				//fprintf(stderr, "descending into array of length %d\n", ac);
 
 				if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
@@ -827,7 +817,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 					}
 
 					if (!ok)
-						THROW_ERROR("Expected an integer index or end(+/-integer)?, got ", Tcl_GetString(step));
+						THROW_ERROR_LABEL(finally, retval, "Expected an integer index or end(+/-integer)?, got ", Tcl_GetString(step));
 
 					//fprintf(stderr, "Resolved index of %ld from \"%s\"\n", index, index_str);
 				} else {
@@ -840,7 +830,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 				} else if (index >= ac) {
 					break;
 				} else {
-					TEST_OK(Tcl_ListObjReplace(interp, val, index, 1, 0, NULL));
+					TEST_OK_LABEL(finally, retval, Tcl_ListObjReplace(interp, val, index, 1, 0, NULL));
 					//fprintf(stderr, "extracted index %ld: (%s)\n", index, Tcl_GetString(target));
 				}
 			}
@@ -859,22 +849,26 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 			{
 				Tcl_Obj* bad_path = NULL;
 
-				Tcl_IncrRefCount(bad_path = Tcl_NewListObj(i+1, pathv));
+				replace_tclobj(&bad_path, Tcl_NewListObj(i+1, pathv));
 				Tcl_SetErrorCode(interp, "RL", "JSON", "BAD_PATH", Tcl_GetString(bad_path), NULL);
 				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Attempt to index into atomic type %s at path \"%s\"", get_type_name(type), Tcl_GetString(bad_path)));
-				Tcl_DecrRefCount(bad_path); bad_path = NULL;
-				return TCL_ERROR;
+				release_tclobj(&bad_path);
+				retval = TCL_ERROR;
+				goto finally;
 			}
 		default:
-			THROW_ERROR("Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
+			Tcl_SetObjResult(interp, Tcl_ObjPrintf("Unhandled type: %d", type));
+			retval = TCL_ERROR;
+			goto finally;
 	}
 
 	Tcl_InvalidateStringRep(src);
 
-	if (interp)
+	if (interp && retval == TCL_OK)
 		Tcl_SetObjResult(interp, src);
 
-	return TCL_OK;
+finally:
+	return retval;
 
 bad_path:
 	{
@@ -884,7 +878,8 @@ bad_path:
 		Tcl_SetErrorCode(interp, "RL", "JSON", "BAD_PATH", Tcl_GetString(bad_path), NULL);
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Path element \"%s\" doesn't exist", Tcl_GetString(bad_path)));
 		Tcl_DecrRefCount(bad_path); bad_path = NULL;
-		return TCL_ERROR;
+		retval = TCL_ERROR;
+		goto finally;
 	}
 }
 
@@ -1097,11 +1092,268 @@ int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj**
 }
 
 //}}}
-int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, int* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata)
+int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata) //{{{
 {
-	THROW_ERROR("Not implemented yet");
+#if 0
+	unsigned int			i;
+	int						retcode=TCL_OK;
+	struct foreach_state*	state = NULL;
+	int						objc;
+	Tcl_Obj**				objv = NULL;
+	Tcl_Obj*				it_res = NULL;
+
+	TEST_OK(Tcl_ListObjGetElements(interp, iterators, &objc, &objv));
+
+	if (objc % 2 == 1) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("iterators must be a list with an even number of elements"));
+		return TCL_ERROR;
+	}
+
+	state = (struct foreach_state*)Tcl_Alloc(sizeof(*state));
+	state->iterators = objc/2;
+	state->it = (struct foreach_iterator*)Tcl_Alloc(sizeof(struct foreach_iterator) * state->iterators);
+	state->max_loops = 0;
+	state->loop_num = 0;
+	state->collecting = collect;
+	state->script = NULL;
+
+	switch (state->collecting) {
+		case COLLECT_NONE:
+			state->res = NULL;
+			break;
+		case COLLECT_LIST:
+			Tcl_IncrRefCount(state->res = Tcl_NewListObj(0, NULL));
+			break;
+		case COLLECT_ARRAY:
+			Tcl_IncrRefCount(state->res = JSON_NewJvalObj(JSON_ARRAY, Tcl_NewListObj(0, NULL)));
+			break;
+		case COLLECT_OBJECT:
+			Tcl_IncrRefCount(state->res = JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj()));
+			break;
+		default:
+			THROW_ERROR_LABEL(done, retcode, "Unhandled value for collecting");
+	}
+
+	for (i=0; i<state->iterators; i++) {
+		state->it[i].search.dictionaryPtr = NULL;
+		state->it[i].data_v = NULL;
+		state->it[i].is_array = 0;
+		state->it[i].var_v = NULL;
+		state->it[i].varlist = NULL;
+	}
+
+	for (i=0; i<state->iterators; i++) {
+		int				loops, j;
+		enum json_types	type;
+		Tcl_Obj*		val = NULL;
+		Tcl_Obj*		varlist = objv[i*2];
+
+		if (Tcl_IsShared(varlist))
+			varlist = Tcl_DuplicateObj(varlist);	// TODO: why do we care if this is shared?
+
+		replace_tclobj(&state->it[i].varlist, varlist);
+
+		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, state->it[i].varlist, &state->it[i].var_c, &state->it[i].var_v));
+		for (j=0; j < state->it[i].var_c; j++)
+			Tcl_IncrRefCount(state->it[i].var_v[j]);
+
+		if (state->it[i].var_c == 0)
+			THROW_ERROR_LABEL(done, retcode, "foreach varlist is empty");
+
+		TEST_OK_LABEL(done, retcode, JSON_GetJvalFromObj(interp, objv[i*2+1], &type, &val));
+		switch (type) {
+			case JSON_ARRAY:
+				TEST_OK_LABEL(done, retcode,
+						Tcl_ListObjGetElements(interp, val, &state->it[i].data_c, &state->it[i].data_v));
+				state->it[i].data_i = 0;
+				state->it[i].is_array = 1;
+				loops = (int)ceil(state->it[i].data_c / (double)state->it[i].var_c);
+
+				break;
+
+			case JSON_OBJECT:
+				if (state->it[i].var_c != 2)
+					THROW_ERROR_LABEL(done, retcode, "When iterating over a JSON object, varlist must be a pair of varnames (key value)");
+
+				TEST_OK_LABEL(done, retcode, Tcl_DictObjSize(interp, val, &loops));
+				TEST_OK_LABEL(done, retcode, Tcl_DictObjFirst(interp, val, &state->it[i].search, &state->it[i].k, &state->it[i].v, &state->it[i].done));
+				break;
+
+			case JSON_NULL:
+				state->it[i].data_c = 0;
+				state->it[i].data_v = NULL;
+				state->it[i].data_i = 0;
+				state->it[i].is_array = 1;
+				loops = 0;
+				break;
+
+			default:
+				THROW_ERROR_LABEL(done, retcode, "Cannot iterate over JSON type ", type_names[type]);
+		}
+
+		if (loops > state->max_loops)
+			state->max_loops = loops;
+	}
+
+	while (state->loop_num < state->max_loops) {
+		struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+		unsigned int		j, k;
+		Tcl_Obj*			loopvars = NULL;
+
+		replace_tclobj(&loopvars, Tcl_NewDictObj());
+
+		//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
+		// Set the iterator variables
+		for (j=0; j < state->iterators; j++) {
+			struct foreach_iterator* this_it = &state->it[j];
+
+			if (this_it->is_array) { // Iterating over a JSON array
+				//fprintf(stderr, "Array iteration, data_i: %d, length %d\n", this_it->data_i, this_it->data_c);
+				for (k=0; k<this_it->var_c; k++) {
+					Tcl_Obj* it_val = NULL;
+
+					if (this_it->data_i < this_it->data_c) {
+						//fprintf(stderr, "Pulling next element %d off the data list (length %d)\n", this_it->data_i, this_it->data_c);
+						replace_tclobj(&it_val, this_it->data_v[this_it->data_i++]);
+					} else {
+						//fprintf(stderr, "Ran out of elements in this data list, setting null\n");
+						replace_tclobj(&it_val, l->json_null);
+					}
+					//fprintf(stderr, "pre  Iteration %d, this_it: %p, setting var %p, varname ref: %d\n",
+					//		i, this_it, this_it->var_v[k]/*, Tcl_GetString(this_it->var_v[k])*/, this_it->var_v[k]->refCount);
+					//fprintf(stderr, "varname: \"%s\"\n", Tcl_GetString(it[j].var_v[k]));
+					//Tcl_ObjSetVar2(interp, this_it->var_v[k], NULL, it_val, 0);
+					retcode = Tcl_DictObjPut(interp, loopvars, this_it->var_v[k], it_val);
+					release_tclobj(&it_val);
+					if (retcode != TCL_OK) goto done;
+					//Tcl_ObjSetVar2(interp, Tcl_NewStringObj("elem", 4), NULL, it_val, 0);
+					//fprintf(stderr, "post Iteration %d, this_it: %p, setting var %p, varname ref: %d\n",
+					//		i, this_it, this_it->var_v[k]/*, Tcl_GetString(this_it->var_v[k])*/, this_it->var_v[k]->refCount);
+				}
+			} else { // Iterating over a JSON object
+				//fprintf(stderr, "Object iteration\n");
+				if (!this_it->done) {
+					// We check that this_it->var_c == 2 in the setup
+					TEST_OK_LABEL(done, retcode, Tcl_DictObjPut(interp, loopvars, this_it->var_v[0], this->k));
+					TEST_OK_LABEL(done, retcode, Tcl_DictObjPut(interp, loopvars, this_it->var_v[1], this->v));
+					Tcl_DictObjNext(&this_it->search, &this_it->k, &this_it->v, &this_it->done);
+				}
+			}
+		}
+
+		{
+			int						bodycode;
+
+			bodycode = body(cdata, interp, loopvars);
+
+			switch (bodycode) {
+				case TCL_OK:
+					switch (state->collecting) {
+						case COLLECT_NONE: break;
+						case COLLECT_LIST:
+							replace_tclobj(&it_res, Tcl_GetObjResult(interp));
+							Tcl_ResetResult(interp);
+							TEST_OK_LABEL(done, retcode, Tcl_ListObjAppendElement(interp, state->res, it_res));
+							Tcl_DecrRefCount(it_res); it_res = NULL;
+							break;
+
+						case COLLECT_ARRAY:
+						case COLLECT_OBJECT:
+							{
+								enum json_types	type;
+								Tcl_Obj*		val = NULL;		// Intrep of state->res
+
+								if (Tcl_IsShared(state->res)) {
+									Tcl_Obj*	new = NULL;
+									Tcl_IncrRefCount(new = Tcl_DuplicateObj(state->res));
+									Tcl_DecrRefCount(state->res);
+									state->res = new;	// Transfers ref from new to state->res
+								}
+								TEST_OK_LABEL(done, retcode, JSON_GetJvalFromObj(interp, state->res, &type, &val));
+
+								Tcl_IncrRefCount(it_res = Tcl_GetObjResult(interp));
+								Tcl_ResetResult(interp);
+
+								switch (state->collecting) {
+									case COLLECT_ARRAY:
+										TEST_OK_LABEL(done, retcode, Tcl_ListObjAppendElement(interp, val, as_json(interp, it_res)));
+										break;
+
+									case COLLECT_OBJECT:
+										if (it_res->typePtr == l->typeDict) { // Iterate over it_res as a dictionary {{{
+											Tcl_DictSearch	search;
+											Tcl_Obj*		k = NULL;
+											Tcl_Obj*		v = NULL;
+											int				done;
+
+											TEST_OK_LABEL(done, retcode, Tcl_DictObjFirst(interp, it_res, &search, &k, &v, &done));
+											for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+												TEST_OK_LABEL(cleanup_search, retcode, Tcl_DictObjPut(interp, val, k, as_json(interp, v)));
+											}
+
+cleanup_search:
+											Tcl_DictObjDone(&search);
+											if (retcode != TCL_OK) goto done;
+											break;
+											//}}}
+										} else { // Iterate over it_res as a list {{{
+											int			oc, i;
+											Tcl_Obj**	ov = NULL;
+
+											TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, it_res, &oc, &ov));
+
+											if (oc % 2 != 0)
+												THROW_ERROR_LABEL(done, retcode, "Iteration result must be a list with an even number of elements");
+
+											for (i=0; i<oc; i+=2)
+												TEST_OK_LABEL(done, retcode, Tcl_DictObjPut(interp, val, ov[i], as_json(interp, ov[i+1])));
+											//}}}
+										}
+										break;
+
+									default:
+										THROW_ERROR_LABEL(done, retcode, "Unexpect value for collecting");
+								}
+
+								if (it_res)
+									Tcl_DecrRefCount(it_res); it_res = NULL;
+							}
+							break;
+					}
+
+				case TCL_CONTINUE:
+					retcode = TCL_OK;
+					break;
+
+				case TCL_BREAK:
+					retcode = TCL_OK;
+					// falls through
+				default:
+					goto done;
+			}
+
+			state->loop_num++;
+		}
+	}
+
+done:
+	//fprintf(stderr, "done\n");
+	release_tclobj(&it_res);
+	if (retcode == TCL_OK && state->collecting != COLLECT_NONE)
+		replace_tclobj(res, state->res);
+
+	foreach_state_free(state);
+	Tcl_Free((char*)state);
+	state = NULL;
+
+	return retcode;
+#else
+	return TCL_OK;
+#endif
 }
-int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions extensions, struct parse_error* details)
+
+//}}}
+int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions extensions, struct parse_error* details) //{{{
 {
 	struct interp_cx*		l = NULL;
 	const unsigned char*	err_at = NULL;
@@ -1326,6 +1578,8 @@ err:
 	free_cx(cx);
 	return TCL_ERROR;
 }
+
+//}}}
 
 /* Local Variables: */
 /* tab-width: 4 */

@@ -1,12 +1,13 @@
 #include "rl_json.h"
 
+#ifdef USE_TCL_STUBS
 MODULE_SCOPE const Rl_jsonStubs *rl_jsonStubsPtr;
 
 const Rl_jsonStubs *Rl_jsonStubsPtr = NULL;
 
 #undef rl_jsonInitStubs
 
-EXTERN CONST const char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* version, int exact)
+EXTERN CONST char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* version, int exact)
 {
 	const char*		packageName = "rl_json";
 	const char* 	errMsg = NULL;
@@ -29,4 +30,4 @@ EXTERN CONST const char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* versio
 	Rl_jsonStubsPtr = stubsPtr;
 	return actualVersion;
 }
-
+#endif

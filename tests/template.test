@@ -6,6 +6,64 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
+test template-0.1 {Empty action list} -body { #<<<
+	string cat \n [join [lmap {k a b} [json template_actions {
+		{
+			"x":	"y"
+		}
+	}] {
+		format {%20s  %20s  %20s} $k $a $b
+	}] \n] \n
+} -cleanup {
+	unset -nocomplain k a b
+} -result "\n\n"
+#>>>
+test template-0.2 {Minimal action list} -body { #<<<
+	string cat \n [join [lmap {k a b} [json template_actions {"~S:foo"}] {
+		format {%20s  %20s  %20s} $k $a $b
+	}] \n] \n
+} -cleanup {
+	unset -nocomplain k a b
+} -result {
+            ALLOCATE                     0                     2
+         FETCH_VALUE                   foo                      
+        STORE_STRING                                           1
+        REPLACE_ATOM                                           1
+}
+#>>>
+test template-0.3 {No replacement} -body { #<<<
+	json template {"foo"}
+} -result {"foo"}
+#>>>
+test template-0.4 {Minimal replacement: null} -body { #<<<
+	json template {"~S:foo"}
+} -result null
+#>>>
+test template-0.5 {Minimal replacement: empty string} -body { #<<<
+	json template {"~S:foo"} {foo ""}
+} -result {""}
+#>>>
+test template-0.6 {Minimal replacement: string < STRING_DEDUP_MAX bytes} -body { #<<<
+	json template {"~S:foo"} {foo "small"}
+} -result {"small"}
+#>>>
+test template-0.7 {Minimal replacement: string > STRING_DEDUP_MAX bytes} -body { #<<<
+	json template {"~S:foo"} [list foo [string repeat a 256]]
+} -result "\"[string repeat a 256]\""
+#>>>
+test template-0.8 {Leak: Tcl_ListObjAppendList realloc} -body { #<<<
+	json template {["~S:foo"]} {}
+} -result {[null]}
+#>>>
+test template-0.9 {Leak: Non-string key subst: number} -body { #<<<
+	json template { {"~N:v":"bar"} } {v 1}
+} -returnCodes error -result {Only strings allowed as object keys}
+#>>>
+test template-0.10 {Leak: Test interpolated numeric validation} -body { #<<<
+	json template {["~S:foo"]} {}
+	list [json template {"~S:bar"} {}]
+} -result {null}
+#>>>
 test template-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<
 	set bar	"Bar"
 	unset -nocomplain a

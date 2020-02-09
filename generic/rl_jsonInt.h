@@ -205,6 +205,8 @@ extern const char* type_names_int[];
 #	undef JSON_NewJvalObj
 Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line);
 #	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
+#else
+Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val);
 #endif
 
 // Taken from tclInt.h:
@@ -227,7 +229,6 @@ Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file,
 #   endif
 #endif
 
-Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val);
 int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement);
 int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir);
 int JSON_GetJvalFromObj(Tcl_Interp *interp, Tcl_Obj *obj, enum json_types *type, Tcl_Obj **val);
