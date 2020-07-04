@@ -3012,7 +3012,7 @@ static int jsonValid(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 {
 	struct interp_cx*	l = (struct interp_cx*)cdata;
 	int					i, valid, retval=TCL_OK;
-	struct parse_error	details = {};
+	struct parse_error	details = {0};
 	Tcl_Obj*			detailsvar = NULL;
 	enum extensions	extensions = EXT_COMMENTS;		// By default, use the default set of extensions we accept
 	static const char *options[] = {
@@ -3511,6 +3511,7 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 }
 
 //}}}
+#ifndef _MSC_VER
 static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int					retcode = TCL_OK;
@@ -3601,6 +3602,7 @@ finally:
 }
 
 //}}}
+#endif // _MSC_VER
 
 #ifdef __cplusplus
 extern "C" {
@@ -3859,7 +3861,9 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObj, jsonNRObj, l, NULL);
 #endif
 
+#ifndef _MSC_VER
 		Tcl_CreateObjCommand(interp, NS "::checkmem", checkmem, l, NULL);
+#endif
 	}
 
 	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
