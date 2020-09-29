@@ -2155,9 +2155,12 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 				} else {
 					int is_true;
 
-					TEST_OK_LABEL(finally, retcode, Tcl_GetBooleanFromObj(interp, subst_val, &is_true));
-
-					fill_slot(slots, slot, is_true ? l->json_true : l->json_false);
+					if (likely((retcode = Tcl_GetBooleanFromObj(interp, subst_val, &is_true)) == TCL_OK)) {
+						fill_slot(slots, slot, is_true ? l->json_true : l->json_false);
+					} else {
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error substituting value from \"%s\" into template, not a boolean: \"%s\"", Tcl_GetString(key), Tcl_GetString(subst_val)));
+						goto finally;
+					}
 				}
 				break;
 				//}}}
