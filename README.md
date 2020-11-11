@@ -90,7 +90,6 @@ Rl_json operates on characters, not bytes, and so considerations of encoding
 are strictly out of scope.  However, interoperating with other systems
 properly in a way that conforms to the standards is a bit tricky, and requires
 support for encodings Tcl currently doesn't natively support, like utf-32be.
-encodings Tcl currently doesn't natively support, like utf-32be.
 To ease this burden and take care of things like replacing broken encoding
 sequences, the [json decode] subcommand is provided.  Using it in an application
 would look something like:
@@ -377,4 +376,4 @@ that value use the internal representation directly.
 License
 -------
 
-Copyright 2015-2019 Ruby Lane.  Licensed under the same terms as the Tcl core.
+Copyright 2015-2020 Ruby Lane.  Licensed under the same terms as the Tcl core.
