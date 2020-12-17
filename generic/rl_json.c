@@ -263,7 +263,7 @@ static void append_json_string(const struct serialize_context* scx, Tcl_Obj* obj
 	while (p < e) {
 		adv = Tcl_UtfToUniChar(p, &c);
 		if (unlikely(c <= 0x1f || c == '\\' || c == '"')) {
-			Tcl_DStringAppend(ds, chunk, p-chunk);
+			Tcl_DStringAppend(ds, chunk, (int) (p-chunk));
 			switch (c) {
 				case '"':	Tcl_DStringAppend(ds, "\\\"", 2); break;
 				case '\\':	Tcl_DStringAppend(ds, "\\\\", 2); break;
@@ -286,7 +286,7 @@ static void append_json_string(const struct serialize_context* scx, Tcl_Obj* obj
 	}
 
 	if (likely(p > chunk))
-		Tcl_DStringAppend(ds, chunk, p-chunk);
+		Tcl_DStringAppend(ds, chunk, (int) (p-chunk));
 
 	Tcl_DStringAppend(ds, "\"", 1);
 }
@@ -965,7 +965,8 @@ end:
 //}}}
 static void foreach_state_free(struct foreach_state* state) //{{{
 {
-	unsigned int i, j;
+	unsigned int i;
+    int j;
 
 	release_tclobj(&state->script);
 
@@ -992,7 +993,8 @@ static void foreach_state_free(struct foreach_state* state) //{{{
 static int NRforeach_next_loop_top(Tcl_Interp* interp, struct foreach_state* state) //{{{
 {
 	struct interp_cx* l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	unsigned int j, k;
+	unsigned int j;
+    int k;
 
 	//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
 	// Set the iterator variables
@@ -1246,7 +1248,7 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], enum col
 				THROW_ERROR_LABEL(done, retcode, "Cannot iterate over JSON type ", type_names[type]);
 		}
 
-		if (loops > state->max_loops)
+		if (loops > (int) state->max_loops)
 			state->max_loops = loops;
 	}
 
@@ -3099,7 +3101,7 @@ static int jsonValid(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, details_obj, k, v));
 
 		replace_tclobj(&k, get_string(l, "char_ofs", 8));
-		replace_tclobj(&v, Tcl_NewIntObj(details.char_ofs));
+		replace_tclobj(&v, Tcl_NewWideIntObj(details.char_ofs));
 		TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, details_obj, k, v));
 
 		if (NULL == Tcl_ObjSetVar2(interp, detailsvar, NULL, details_obj, TCL_LEAVE_ERR_MSG))
