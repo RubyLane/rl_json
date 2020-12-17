@@ -267,7 +267,7 @@ This might look something like this in an application:
 .TP
 \fBjson valid\fR ?\fB-extensions\fR \fIextensionlist\fR? ?\fB-details\fR \fIdetails\fR? \fIjsonValue\fR
 .
-Validate \fBjsonValue\fR against the JSON grammar, returning true of it
+Validate \fBjsonValue\fR against the JSON grammar, returning true if it
 conforms and false otherwise.  A list of extensions to accept can be supplied
 with \fB-extensions\fR, with only one currently supported extension:
 \fBcomments\fR, which accepts JSON documents containing \fB// foo\fR and \fB/*
