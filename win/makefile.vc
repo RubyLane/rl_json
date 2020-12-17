@@ -28,6 +28,9 @@ PRJ_OBJS = \
 PRJ_STUBOBJS = $(TMP_DIR)\rl_jsonStubLib.obj
 
 PRJ_DEFINES = -D_CRT_SECURE_NO_WARNINGS
+!if ($(TCL_MAJOR_VERSION) < 8) || ($(TCL_MAJOR_VERSION) == 8 && $(TCL_MINOR_VERSION) <= 6)
+PRJ_DEFINES = $(PRJ_DEFINES) -DTIP445_SHIM
+!endif
 
 !include "$(_RULESDIR)\targets.vc"
 

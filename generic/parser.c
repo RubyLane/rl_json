@@ -20,7 +20,7 @@ void throw_parse_error(Tcl_Interp* interp, struct parse_error* details) //{{{
 {
 	char		char_ofs_buf[20];		// 20 bytes allows for 19 bytes of decimal max 64 bit size_t, plus null terminator
 
-	snprintf(char_ofs_buf, 20, "%ld", details->char_ofs);
+	snprintf(char_ofs_buf, 20, "%zd", details->char_ofs);
 
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", details->errmsg, details->char_ofs));
 	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", details->errmsg, details->doc, char_ofs_buf, NULL);
@@ -283,12 +283,12 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 					len = p-chunk;
 
 					if (likely(out == NULL)) {
-						replace_tclobj(&out, get_string(l, (const char*)chunk, len));
+                                            replace_tclobj(&out, get_string(l, (const char*)chunk, (int) len));
 					} else if (len > 0) {
 						if (unlikely(Tcl_IsShared(out)))
 							replace_tclobj(&out, Tcl_DuplicateObj(out));
 
-						Tcl_AppendToObj(out, (const char*)chunk, len);
+						Tcl_AppendToObj(out, (const char*)chunk, (int) len);
 					}
 
 					if (likely(*p == '"')) {
@@ -458,7 +458,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 				*type = JSON_NUMBER;
 				if (val)
-					replace_tclobj(val, get_string(l, (const char*)start, p-start));
+                                    replace_tclobj(val, get_string(l, (const char*)start, (int)(p-start)));
 			}
 	}
 
