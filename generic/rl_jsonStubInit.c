@@ -11,7 +11,7 @@ const Rl_jsonStubs rl_jsonStubs = {
     JSON_NewJBooleanObj, /* 3 */
     JSON_NewJNullObj, /* 4 */
     JSON_NewJObjectObj, /* 5 */
-    0, /* 6 */
+    JSON_NewJArrayObj, /* 6 */
     JSON_NewTemplateObj, /* 7 */
     JSON_ForceJSON, /* 8 */
     JSON_GetJSONType, /* 9 */

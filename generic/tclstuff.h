@@ -43,22 +43,8 @@
 
 
 // A rather frivolous macro that just enhances readability for a common case
-#ifdef DEBUG
-#warning Using DEBUG version of TEST_OK
-#define TEST_OK( cmd )		\
-	if (cmd != TCL_OK) { \
-		fprintf( stderr, "TEST_OK() returned TCL_ERROR\n" ); \
-		return TCL_ERROR; \
-	}
-#define TEST_OK_LABEL( label, var, cmd )		\
-	if (cmd != TCL_OK) { \
-		var = TCL_ERROR; \
-		goto label; \
-	}
-#else
 #define TEST_OK( cmd )		\
 	if (cmd != TCL_OK) return TCL_ERROR;
-#endif
 
 #define TEST_OK_LABEL( label, var, cmd )		\
 	if (cmd != TCL_OK) { \
@@ -91,7 +77,35 @@ static inline void replace_tclobj(Tcl_Obj** target, Tcl_Obj* replacement)
 	if (*target) Tcl_IncrRefCount(*target);
 }
 
-#include <signal.h>
-#define DEBUGGER raise(SIGTRAP)
+#if DEBUG
+#	 include <signal.h>
+#	 include <unistd.h>
+#	 include <time.h>
+#	 include "names.h"
+#	 define DBG(...) fprintf(stdout, ##__VA_ARGS__)
+#	 define FDBG(...) fprintf(stdout, ##__VA_ARGS__)
+#	 define DEBUGGER raise(SIGTRAP)
+#	 define TIME(label, task) \
+	do { \
+		struct timespec first; \
+		struct timespec second; \
+		struct timespec after; \
+		double empty; \
+		double delta; \
+		clock_gettime(CLOCK_MONOTONIC, &first); /* Warm up the call */ \
+		clock_gettime(CLOCK_MONOTONIC, &first); \
+		clock_gettime(CLOCK_MONOTONIC, &second); \
+		task; \
+		clock_gettime(CLOCK_MONOTONIC, &after); \
+		empty = second.tv_sec - first.tv_sec + (second.tv_nsec - first.tv_nsec)/1e9; \
+		delta = after.tv_sec - second.tv_sec + (after.tv_nsec - second.tv_nsec)/1e9 - empty; \
+		DBG("Time for %s: %.1f microseconds\n", label, delta * 1e6); \
+	} while(0)
+#else
+#	define DBG(...) /* nop */
+#	define FDBG(...) /* nop */
+#	define DEBUGGER /* nop */
+#	define TIME(label, task) task
+#endif
 
 #endif

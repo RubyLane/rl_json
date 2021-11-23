@@ -460,7 +460,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	int						len;
 	struct parse_context	cx[CX_STACK_SIZE];
 	enum extensions			extensions = EXT_COMMENTS;
-	struct parse_error		details = {};
+	struct parse_error		details = {0};
 
 	if (interp)
 		l = Tcl_GetAssocData(interp, "rl_json", NULL);
@@ -475,7 +475,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 				(l->typeBignum && Tcl_FetchIntRep(obj, l->typeBignum) != NULL)
 			)
 		) {
-			Tcl_ObjIntRep			ir = {.twoPtrValue = {}};
+			Tcl_ObjIntRep			ir = {.twoPtrValue = {0}};
 
 			// Must dup because obj will soon be us, creating a circular ref
 			replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_DuplicateObj(obj));
@@ -682,7 +682,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 	{
 		Tcl_ObjType*	top_objtype = g_objtype_for_type[cx[0].container];
 		Tcl_ObjIntRep*	top_ir = Tcl_FetchIntRep(cx[0].val, top_objtype);
-		Tcl_ObjIntRep	ir = {.twoPtrValue = {}};
+		Tcl_ObjIntRep	ir = {.twoPtrValue = {0}};
 
 		if (unlikely(top_ir == NULL))
 			Tcl_Panic("Can't get intrep for the top container");

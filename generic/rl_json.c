@@ -8,12 +8,6 @@
 #define snprintf _snprintf
 #endif
 
-#ifdef WIN32
-#define _DLLEXPORT extern DLLEXPORT
-#else
-#define _DLLEXPORT
-#endif
-
 static const char* dyn_prefix[] = {
 	NULL,	// JSON_UNDEF
 	NULL,	// JSON_OBJECT
@@ -1826,7 +1820,7 @@ static int template_actions(struct template_cx* cx, Tcl_Obj* template, enum acti
 				Tcl_Obj*		k;
 				Tcl_Obj*		v;
 
-				TEST_OK(emit_action(cx, PUSH_TARGET, template, NULL));
+				TEST_OK(emit_action(cx, PUSH_TARGET, Tcl_DuplicateObj(template), NULL));
 				TEST_OK(Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
 				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
 					int				len;
@@ -1879,7 +1873,7 @@ free_search:
 				Tcl_Obj**	ov;
 				Tcl_Obj*	arr_elem = NULL;
 
-				TEST_OK(emit_action(cx, PUSH_TARGET, template, NULL));
+				TEST_OK(emit_action(cx, PUSH_TARGET, Tcl_DuplicateObj(template), NULL));
 
 				TEST_OK(Tcl_ListObjGetElements(interp, val, &oc, &ov));
 				for (i=0; i<oc; i++) {
@@ -3865,7 +3859,11 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, NS "::checkmem", checkmem, l, NULL);
 	}
 
+#ifdef USE_RL_JSON_STUBS
+	TEST_OK(Tcl_PkgProvideEx(interp, PACKAGE_NAME, PACKAGE_VERSION, rl_jsonStubs));
+#else
 	TEST_OK(Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION));
+#endif
 
 	return TCL_OK;
 }

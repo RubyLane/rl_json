@@ -24,7 +24,9 @@ EXTERN int		JSON_NewJBooleanObj(Tcl_Interp*interp,
 EXTERN int		JSON_NewJNullObj(Tcl_Interp*interp, Tcl_Obj**new);
 /* 5 */
 EXTERN int		JSON_NewJObjectObj(Tcl_Interp*interp, Tcl_Obj**new);
-/* Slot 6 is reserved */
+/* 6 */
+EXTERN int		JSON_NewJArrayObj(Tcl_Interp*interp, int objc,
+				Tcl_Obj*objv[], Tcl_Obj**new);
 /* 7 */
 EXTERN int		JSON_NewTemplateObj(Tcl_Interp*interp,
 				enum json_types type, Tcl_Obj*key,
@@ -121,7 +123,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_NewJBooleanObj) (Tcl_Interp*interp, Tcl_Obj*boolean, Tcl_Obj**new); /* 3 */
     int (*jSON_NewJNullObj) (Tcl_Interp*interp, Tcl_Obj**new); /* 4 */
     int (*jSON_NewJObjectObj) (Tcl_Interp*interp, Tcl_Obj**new); /* 5 */
-    void (*reserved6)(void);
+    int (*jSON_NewJArrayObj) (Tcl_Interp*interp, int objc, Tcl_Obj*objv[], Tcl_Obj**new); /* 6 */
     int (*jSON_NewTemplateObj) (Tcl_Interp*interp, enum json_types type, Tcl_Obj*key, Tcl_Obj**new); /* 7 */
     int (*jSON_ForceJSON) (Tcl_Interp*interp, Tcl_Obj*obj); /* 8 */
     enum json_types (*jSON_GetJSONType) (Tcl_Obj*obj); /* 9 */
@@ -175,7 +177,8 @@ extern const Rl_jsonStubs *rl_jsonStubsPtr;
 	(rl_jsonStubsPtr->jSON_NewJNullObj) /* 4 */
 #define JSON_NewJObjectObj \
 	(rl_jsonStubsPtr->jSON_NewJObjectObj) /* 5 */
-/* Slot 6 is reserved */
+#define JSON_NewJArrayObj \
+	(rl_jsonStubsPtr->jSON_NewJArrayObj) /* 6 */
 #define JSON_NewTemplateObj \
 	(rl_jsonStubsPtr->jSON_NewTemplateObj) /* 7 */
 #define JSON_ForceJSON \

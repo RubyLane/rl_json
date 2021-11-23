@@ -172,6 +172,11 @@ AR		= @AR@
 CFLAGS		= @CFLAGS@
 COMPILE		= $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 
+VALGRIND	= valgrind
+VALGRINDARGS	= --tool=memcheck --num-callers=8 --leak-resolution=high \
+		  --leak-check=yes -v --suppressions=suppressions --keep-debuginfo=yes \
+		  --trace-children=yes
+
 .SUFFIXES: .c .$(OBJEXT)
 
 #========================================================================
@@ -246,23 +251,7 @@ test: binaries libraries
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
 jsonsh: $(PKG_OBJECTS) $(TCL_SRC_DIR)/unix/tclAppInit.c $(srcdir)/generic/jsonsh.c
-	$(COMPILE) -DTCL_LOCAL_APPINIT=Json_AppInit $^ $(SHLIB_LD_LIBS) -L$(TCL_BIN_DIR)/parse_args0.3.1 -lparse_args0.3.1 $(TCL_LIB_SPEC) -lm -o $@
-
-test_valgrind: binaries libraries
-	$(TCLSH_VALGRIND) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
-
-test_valgrind_full: binaries libraries jsonsh
-	$(TCLSH_VALGRIND_FULL) $(JSONSH_PROG) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
-
-test_vgdb_full: binaries libraries
-	$(TCLSH_VALGRIND_FULL) --read-var-info=yes --track-origins=yes --vgdb-error=1 $(JSONSH_PROG) \
-		`@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+	$(COMPILE) -DTCL_LOCAL_APPINIT=Json_AppInit $^ $(SHLIB_LD_LIBS) -L$(TCL_BIN_DIR)/parse_args0.3.3 -lparse_args0.3.3 $(TCL_LIB_SPEC) -lm -o $@
 
 tests/JSONTestSuite/test_parsing: binaries libraries
 	$(TCLSH) `@CYGPATH@ $(srcdir)/fetch_test_cases.tcl` \
@@ -278,21 +267,22 @@ shell: binaries libraries
 tags: generic/*
 	ctags-exuberant generic/*
 
-vimgdb: tags
-	$(PKG_ENV) TCLSH="$(TCLSH_PROG)" vim
+vim-core:
+	$(TCLSH_ENV) $(PKG_ENV) vim -c 'packadd termdebug' -c "set mouse=a" -c "set number" -c "set foldlevel=100" -c "Termdebug $(TCLSH_PROG) core" -c Winbar generic/rl_json.c
+
+vim-gdb: binaries libraries
+	$(TCLSH_ENV) $(PKG_ENV) vim -c "set number" -c "set mouse=a" -c "set foldlevel=100" -c "Termdebug --args $(TCLSH_PROG) tests/all.tcl $(TESTFLAGS) -singleproc 1 -load package\ ifneeded\ $(PACKAGE_NAME)\ $(PACKAGE_VERSION)\ [list\ load\ `@CYGPATH@ $(PKG_LIB_FILE)`\ [string\ totitle\ $(PACKAGE_NAME)]]" generic/rl_json.c
 
 gdb:
 	$(PKG_ENV) gdb $(TCLSH_PROG) $(SCRIPT)
 
-VALGRINDARGS =	--tool=memcheck --num-callers=8 --leak-resolution=high \
-		--leak-check=yes --show-reachable=yes -v
-
 valgrind: binaries libraries
-	$(TCLSH_ENV) valgrind $(VALGRINDARGS) $(TCLSH_PROG) \
-		`@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS)
+	$(TCLSH_ENV) $(PKG_ENV) $(VALGRIND) $(VALGRINDARGS) $(TCLSH_PROG) \
+	    `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS)
 
 valgrindshell: binaries libraries
-	$(TCLSH_ENV) valgrind $(VALGRINDARGS) $(TCLSH_PROG) $(SCRIPT)
+	$(TCLSH_ENV) $(PKG_ENV) $(VALGRIND) $(VALGRINDARGS) $(TCLSH_PROG) $(SCRIPT)
+
 
 depend:
 
@@ -488,6 +478,7 @@ uninstall-binaries:
 	done
 
 .PHONY: all binaries clean depend distclean doc install libraries test
+.PHONY: valgrind valgrind-shell vim-gdb vim-core
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -1,9 +1,9 @@
 #include "rl_json.h"
 
-#ifdef USE_TCL_STUBS
-MODULE_SCOPE const Rl_jsonStubs *rl_jsonStubsPtr;
+#ifdef USE_RL_JSON_STUBS
+MODULE_SCOPE const Rl_jsonStubs* rl_jsonStubsPtr;
 
-const Rl_jsonStubs *Rl_jsonStubsPtr = NULL;
+const Rl_jsonStubs* Rl_jsonStubsPtr = NULL;
 
 #undef rl_jsonInitStubs
 

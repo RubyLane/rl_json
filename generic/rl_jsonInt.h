@@ -9,9 +9,12 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <tclTomMath.h>
 #include "tip445.h"
+#include "names.h"
 
 #define CX_STACK_SIZE	6
 

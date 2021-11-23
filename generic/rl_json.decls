@@ -20,7 +20,7 @@ declare 5 generic {
 	int JSON_NewJObjectObj(Tcl_Interp* interp, Tcl_Obj** new)
 }
 declare 6 generic {
-	int JSON_NewJArrayObj(Tcl_Interp*, int objc, Tcl_Obj* objv[], Tcl_Obj** new)
+	int JSON_NewJArrayObj(Tcl_Interp* interp, int objc, Tcl_Obj* objv[], Tcl_Obj** new)
 }
 # type is one of the DYN types, key is the variable name the template is replaced with
 declare 7 generic {

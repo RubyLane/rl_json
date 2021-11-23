@@ -173,6 +173,7 @@ int JSON_GetObjFromJBooleanObj(Tcl_Interp* interp, Tcl_Obj* jbooleanObj, Tcl_Obj
 //}}}
 int JSON_JArrayObjAppendElement(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* elem) //{{{
 {
+	int				code = TCL_OK;
 	enum json_types	type;
 	Tcl_ObjIntRep*	ir = NULL;
 	Tcl_Obj*		val = NULL;
@@ -183,19 +184,21 @@ int JSON_JArrayObjAppendElement(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* 
 		return TCL_ERROR;
 	}
 
-	TEST_OK(JSON_GetIntrepFromObj(interp, arrayObj, &type, &ir));
+	TEST_OK_LABEL(finally, code, JSON_GetIntrepFromObj(interp, arrayObj, &type, &ir));
 
 	if (type != JSON_ARRAY) // Turn it into one by creating a new array with a single element containing the old value
-		TEST_OK(JSON_SetIntRep(arrayObj, JSON_ARRAY, Tcl_NewListObj(1, &val)));
+		TEST_OK_LABEL(finally, code, JSON_SetIntRep(arrayObj, JSON_ARRAY, Tcl_NewListObj(1, &val)));
 
-	val = get_unshared_val(ir);
+	replace_tclobj(&val, get_unshared_val(ir));
 
-	TEST_OK(Tcl_ListObjAppendElement(interp, val, as_json(interp, elem)));
+	TEST_OK_LABEL(finally, code, Tcl_ListObjAppendElement(interp, val, as_json(interp, elem)));
 
 	release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
 	Tcl_InvalidateStringRep(arrayObj);
 
-	return TCL_OK;
+finally:
+	replace_tclobj(&val, NULL);
+	return code;
 }
 
 //}}}
@@ -213,17 +216,17 @@ int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* ele
 		return TCL_ERROR;
 	}
 
-	TEST_OK(JSON_GetIntrepFromObj(interp, arrayObj, &type, &ir));
+	TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, arrayObj, &type, &ir));
 
 	if (type != JSON_ARRAY) // Turn it into one by creating a new array with a single element containing the old value
-		TEST_OK(JSON_SetIntRep(arrayObj, JSON_ARRAY, Tcl_NewListObj(1, &val)));
+		TEST_OK_LABEL(finally, retval, JSON_SetIntRep(arrayObj, JSON_ARRAY, Tcl_NewListObj(1, &val)));
 
 	val = get_unshared_val(ir);
 
 	if (JSON_GetJvalFromObj(interp, elems, &elems_type, &elems_val) == TCL_OK) {
 		switch (elems_type) {
 			case JSON_ARRAY:	// Given a JSON array, append its elements
-				TEST_OK(Tcl_ListObjAppendList(interp, val, elems_val));
+				TEST_OK_LABEL(finally, retval, Tcl_ListObjAppendList(interp, val, elems_val));
 				break;
 
 			case JSON_OBJECT:	// Given a JSON object, append its keys as strings and values as whatever they were
@@ -234,7 +237,7 @@ int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* ele
 					Tcl_Obj*		v = NULL;
 					int				done;
 
-					TEST_OK(Tcl_DictObjFirst(interp, elems_val, &search, &k, &v, &done));
+					TEST_OK_LABEL(finally, retval, Tcl_DictObjFirst(interp, elems_val, &search, &k, &v, &done));
 					for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
 						TEST_OK_BREAK(retval, JSON_NewJStringObj(interp, k, &kjstring));
 						TEST_OK_BREAK(retval, Tcl_ListObjAppendElement(interp, val, kjstring));
@@ -250,9 +253,10 @@ int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* ele
 				return TCL_ERROR;
 		}
 	} else {
-		TEST_OK(Tcl_ListObjAppendList(interp, val, elems));
+		TEST_OK_LABEL(finally, retval, Tcl_ListObjAppendList(interp, val, elems));
 	}
 
+finally:
 	return retval;
 }
 
@@ -384,26 +388,26 @@ int JSON_Get(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res) //{
 //}}}
 int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res) //{{{
 {
+	int			code = TCL_OK;
 	Tcl_Obj*	target = NULL;
-	int			retval=TCL_OK;
 	Tcl_Obj**	pathv = NULL;
 	int			pathc;
 
-	TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
+	TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
 
 	if (pathc > 0) {
-		TEST_OK(resolve_path(interp, obj, pathv, pathc, &target, 0, 0));
+		TEST_OK_LABEL(finally, code, resolve_path(interp, obj, pathv, pathc, &target, 0, 0));
 	} else {
-		TEST_OK(JSON_ForceJSON(interp, obj));
+		TEST_OK_LABEL(finally, code, JSON_ForceJSON(interp, obj));
 		replace_tclobj(&target, obj);
 	}
 
-	if (retval == TCL_OK)
+	if (code == TCL_OK)
 		replace_tclobj(res, target);
 
+finally:
 	release_tclobj(&target);
-
-	return retval;
+	return code;
 }
 
 //}}}
@@ -433,6 +437,7 @@ int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //
 //}}}
 int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replacement) //{{{
 {
+	int				code = TCL_OK;
 	int				i, pathc;
 	enum json_types	type, newtype;
 	Tcl_ObjIntRep*	ir = NULL;
@@ -445,7 +450,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 	Tcl_Obj**		pathv = NULL;
 
 	if (Tcl_IsShared(obj))
-		THROW_ERROR("JSON_Set called with shared object");
+		THROW_ERROR_LABEL(finally, code, "JSON_Set called with shared object");
 
 	/*
 	fprintf(stderr, "JSON_Set, obj: \"%s\", src: \"%s\"\n",
@@ -453,10 +458,10 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 			*/
 	target = src = obj;
 
-	TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+	TEST_OK_LABEL(finally, code, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 	val = get_unshared_val(ir);
 
-	TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
+	TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
 
 	// Walk the path as far as it exists in src
 	//fprintf(stderr, "set, initial type %s\n", type_names[type]);
@@ -466,15 +471,15 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 
 		switch (type) {
 			case JSON_UNDEF: //{{{
-				THROW_ERROR("Found JSON_UNDEF type jval following path");
+				THROW_ERROR_LABEL(finally, code, "Found JSON_UNDEF type jval following path");
 				//}}}
 			case JSON_OBJECT: //{{{
-				TEST_OK(Tcl_DictObjGet(interp, val, step, &target));
+				TEST_OK_LABEL(finally, code, Tcl_DictObjGet(interp, val, step, &target));
 				if (target == NULL) {
 					//fprintf(stderr, "Path element %d: \"%s\" doesn't exist creating a new key for it and storing a null\n",
 					//		i, Tcl_GetString(step));
 					target = JSON_NewJvalObj(JSON_NULL, NULL);
-					TEST_OK(Tcl_DictObjPut(interp, val, step, target));
+					TEST_OK_LABEL(finally, code, Tcl_DictObjPut(interp, val, step, target));
 					i++;
 					goto followed_path;
 				}
@@ -482,7 +487,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 					//fprintf(stderr, "Path element %d: \"%s\" exists but the TclObj is shared (%d), replacing it with an unshared duplicate\n",
 					//		i, Tcl_GetString(step), target->refCount);
 					target = Tcl_DuplicateObj(target);
-					TEST_OK(Tcl_DictObjPut(interp, val, step, target));
+					TEST_OK_LABEL(finally, code, Tcl_DictObjPut(interp, val, step, target));
 				}
 				break;
 				//}}}
@@ -494,7 +499,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 					char*		end;
 					Tcl_Obj**	av;
 
-					TEST_OK(Tcl_ListObjGetElements(interp, val, &ac, &av));
+					TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, val, &ac, &av));
 					//fprintf(stderr, "descending into array of length %d\n", ac);
 
 					if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
@@ -520,7 +525,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 						}
 
 						if (!ok)
-							THROW_ERROR("Expected an integer index or end(+/-integer)?, got ", Tcl_GetString(step));
+							THROW_ERROR_LABEL(finally, code, "Expected an integer index or end(+/-integer)?, got ", Tcl_GetString(step));
 
 						//fprintf(stderr, "Resolved index of %ld from \"%s\"\n", index, index_str);
 					} else {
@@ -530,18 +535,18 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 					if (index < 0) {
 						// Prepend element to the array
 						target = JSON_NewJvalObj(JSON_NULL, NULL);
-						TEST_OK(Tcl_ListObjReplace(interp, val, -1, 0, 1, &target));
+						TEST_OK_LABEL(finally, code, Tcl_ListObjReplace(interp, val, -1, 0, 1, &target));
 
 						i++;
 						goto followed_path;
 					} else if (index >= ac) {
 						int			new_i;
 						for (new_i=ac; new_i<index; new_i++) {
-							TEST_OK(Tcl_ListObjAppendElement(interp, val,
+							TEST_OK_LABEL(finally, code, Tcl_ListObjAppendElement(interp, val,
 										JSON_NewJvalObj(JSON_NULL, NULL)));
 						}
 						target = JSON_NewJvalObj(JSON_NULL, NULL);
-						TEST_OK(Tcl_ListObjAppendElement(interp, val, target));
+						TEST_OK_LABEL(finally, code, Tcl_ListObjAppendElement(interp, val, target));
 
 						i++;
 						goto followed_path;
@@ -549,7 +554,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 						target = av[index];
 						if (Tcl_IsShared(target)) {
 							target = Tcl_DuplicateObj(target);
-							TEST_OK(Tcl_ListObjReplace(interp, val, index, 1, 1, &target));
+							TEST_OK_LABEL(finally, code, Tcl_ListObjReplace(interp, val, index, 1, 1, &target));
 						}
 						//fprintf(stderr, "extracted index %ld: (%s)\n", index, Tcl_GetString(target));
 					}
@@ -566,23 +571,23 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 			case JSON_DYN_JSON:
 			case JSON_DYN_TEMPLATE:
 			case JSON_DYN_LITERAL:
-				THROW_ERROR("Attempt to index into atomic type ", get_type_name(type), " at path key \"", Tcl_GetString(step), "\"");
+				THROW_ERROR_LABEL(finally, code, "Attempt to index into atomic type ", get_type_name(type), " at path key \"", Tcl_GetString(step), "\"");
 				/*
 				i++;
 				goto followed_path;
 				*/
 			default:
-				THROW_ERROR("Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
+				THROW_ERROR_LABEL(finally, code, "Unhandled type: ", Tcl_GetString(Tcl_NewIntObj(type)));
 		}
 
-		TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+		TEST_OK_LABEL(finally, code, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 		val = get_unshared_val(ir);
 	}
 
 	goto set_val;
 
 followed_path:
-	TEST_OK(JSON_GetIntrepFromObj(interp, target, &type, &ir));
+	TEST_OK_LABEL(finally, code, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 	val = get_unshared_val(ir);
 
 	// target points at the (first) object to replace.  It and its internalRep
@@ -598,13 +603,13 @@ followed_path:
 			if (val != NULL)
 				Tcl_DecrRefCount(val);
 			val = Tcl_NewDictObj();
-			TEST_OK(JSON_SetIntRep(target, JSON_OBJECT, val));
+			TEST_OK_LABEL(finally, code, JSON_SetIntRep(target, JSON_OBJECT, val));
 		}
 
 		target = JSON_NewJvalObj(JSON_OBJECT, Tcl_NewDictObj());
 		//fprintf(stderr, "Adding key \"%s\"\n", Tcl_GetString(pathv[i]));
-		TEST_OK(Tcl_DictObjPut(interp, val, pathv[i], target));
-		TEST_OK(JSON_GetJvalFromObj(interp, target, &type, &val));
+		TEST_OK_LABEL(finally, code, Tcl_DictObjPut(interp, val, pathv[i], target));
+		TEST_OK_LABEL(finally, code, JSON_GetJvalFromObj(interp, target, &type, &val));
 		//fprintf(stderr, "Newly added key \"%s\" is of type %s\n", Tcl_GetString(pathv[i]), type_names_int[type]);
 		// This was just created - it can't be shared
 	}
@@ -614,8 +619,8 @@ set_val:
 	//		type_names_int[newtype], Tcl_GetString(replacement), type_names_int[type]);
 	replace_tclobj(&rep, as_json(interp, replacement));
 
-	TEST_OK(JSON_GetJvalFromObj(interp, rep, &newtype, &newval));
-	TEST_OK(JSON_SetIntRep(target, newtype, newval));
+	TEST_OK_LABEL(finally, code, JSON_GetJvalFromObj(interp, rep, &newtype, &newval));
+	TEST_OK_LABEL(finally, code, JSON_SetIntRep(target, newtype, newval));
 	release_tclobj(&rep);
 
 	Tcl_InvalidateStringRep(src);
@@ -623,7 +628,8 @@ set_val:
 	if (interp)
 		Tcl_SetObjResult(interp, src);
 
-	return TCL_OK;
+finally:
+	return code;
 }
 
 //}}}
@@ -950,13 +956,17 @@ int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj*
 
 	replace_tclobj(&actions, ir->twoPtrValue.ptr2);
 	if (actions == NULL) {
-		TEST_OK(build_template_actions(interp, template, &actions));
+		//DBG("Building template actions and storing in intrep ptr2 for %s\n", name(template));
+		TEST_OK_LABEL(finally, retcode, build_template_actions(interp, template, &actions));
 		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2, actions);
 	}
 
+	//DBG("template %s refcount before: %d\n", name(template), template->refCount);
 	retcode = apply_template_actions(interp, template, actions, dict, res);
+	//DBG("template %s refcount after: %d\n", name(template), template->refCount);
 	release_tclobj(&actions);
 
+finally:
 	return retcode;
 }
 

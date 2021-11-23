@@ -48,6 +48,18 @@ AC_DEFUN([ENABLE_DEDUP], [
 	#trap '' DEBUG
 ])
 
+AC_DEFUN([CHECK_DEBUG], [
+	AC_MSG_CHECKING([whether to build in debug mode])
+	AC_ARG_ENABLE(debug,
+		[  --enable-debug          Build in debug mode (default: off)],
+		[enable_debug=$enableval],
+		[enable_debug="no"])
+	AC_MSG_RESULT($enable_debug)
+	if test "$enable_debug" = "yes"
+	then
+		AC_DEFINE(DEBUG)
+	fi
+])
 
 AC_DEFUN([TIP445], [
 	AC_MSG_CHECKING([whether we need to polyfill TIP 445])
