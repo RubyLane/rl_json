@@ -409,6 +409,21 @@ test set-7.1 {Be lenient about the value - if it can't be interpreted as a JSON 
 }]
 #>>>
 
+test set-8.1.1 {json set into a template} -body { #<<<
+	set foo	fooval
+	set bar	barval
+	set template {
+		{
+			"foo": "~S:foo"
+		}
+	}
+	json set template bar "~S:bar"
+	json template $template
+} -cleanup {
+	unset -nocomplain foo bar template
+} -result {{"foo":"fooval","bar":"barval"}}
+#>>>
+
 ::tcltest::cleanupTests
 return
 

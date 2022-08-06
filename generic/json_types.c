@@ -206,25 +206,42 @@ int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type,
 //}}}
 int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) //{{{
 {
-	Tcl_ObjIntRep		intrep;
+	Tcl_ObjIntRep		intrep = {0};
 	Tcl_ObjType*		objtype = NULL;
+	Tcl_Obj*			rep = NULL;
 
 	if (Tcl_IsShared(target))
 		Tcl_Panic("Called JSON_SetIntRep on a shared object");
+
+	replace_tclobj(&rep, replacement);
+
+	if (type == JSON_STRING && rep) { // Check for template values
+		int					len;
+		const char*			str = Tcl_GetStringFromObj(replacement, &len);
+		const char*const	strend = str + len;
+		enum json_types		template_type;
+
+		TEMPLATE_TYPE(str, len, template_type);
+
+		if (template_type != type) {
+			replace_tclobj(&rep, Tcl_NewStringObj(str, strend - str));	// TODO: dedup?
+			type = template_type;
+		}
+	}
 
 	objtype = g_objtype_for_type[type];
 
 	Tcl_FreeIntRep(target);
 
-	intrep.twoPtrValue.ptr1 = replacement;		// ptr1 is the Tcl_Obj holding the Tcl structure for this value
-	if (replacement) Tcl_IncrRefCount((Tcl_Obj*)intrep.twoPtrValue.ptr1);
-
-	intrep.twoPtrValue.ptr2 = NULL;				// ptr2 holds the template actions, if any have been generated for this value
+	// ptr1 is the Tcl_Obj holding the Tcl structure for this value               
+	// ptr2 holds the template actions, if any have been generated for this value 
+	replace_tclobj(&intrep.twoPtrValue.ptr1, rep);	
 
 	Tcl_StoreIntRep(target, objtype, &intrep);
 
 	Tcl_InvalidateStringRep(target);
 
+	replace_tclobj(&rep, NULL);
 	return TCL_OK;
 }
 

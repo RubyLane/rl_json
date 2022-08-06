@@ -1105,8 +1105,9 @@ cleanup_search:
 								THROW_ERROR_LABEL(done, retcode, "Unexpect value for collecting");
 						}
 
-						if (it_res)
+						if (it_res) {
 							Tcl_DecrRefCount(it_res); it_res = NULL;
+						}
 					}
 					break;
 			}
