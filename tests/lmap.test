@@ -240,6 +240,26 @@ test lmap-20.6 {too many args} -body { #<<<
 } -result {1 {wrong # args: should be "*lmap ?varlist datalist ...? script"} {TCL WRONGARGS}} -match glob
 #>>>
 
+unset -nocomplain done
+coroutine coro_tests apply {{} {
+	global done
+	try {
+		test lmap-30.1 {yield} -body { #<<<
+			json lmap e {["a","b","c"]} {
+				after 0 [list [info coroutine] x]
+				list [json get $e] [yield]
+			}
+		} -cleanup {
+			unset -nocomplain e
+		} -result {{a x} {b x} {c x}}
+		#>>>
+	} finally {
+		set done 1
+	}
+}}
+
+if {![info exists done]} {vwait done}
+
 ::tcltest::cleanupTests
 return
 

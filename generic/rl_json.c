@@ -3420,10 +3420,10 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_ISNULL:		return jsonIsNull(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE:	return jsonTemplate(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE_STRING:	return jsonTemplateString(cdata, interp, objc-1, objv+1);
-		case M_FOREACH:		return jsonForeach(cdata, interp, objc-1, objv+1);
-		case M_LMAP:		return jsonLmap(cdata, interp, objc-1, objv+1);
-		case M_AMAP:		return jsonAmap(cdata, interp, objc-1, objv+1);
-		case M_OMAP:		return jsonOmap(cdata, interp, objc-1, objv+1);
+		case M_FOREACH:		return jsonNRForeach(cdata, interp, objc-1, objv+1);
+		case M_LMAP:		return jsonNRLmap(cdata, interp, objc-1, objv+1);
+		case M_AMAP:		return jsonNRAmap(cdata, interp, objc-1, objv+1);
+		case M_OMAP:		return jsonNROmap(cdata, interp, objc-1, objv+1);
 		case M_FREE_CACHE:	return jsonFreeCache(cdata, interp, objc-1, objv+1);
 		case M_NOP:			return jsonNop(cdata, interp, objc-1, objv+1);
 		case M_PRETTY:		return jsonPretty(cdata, interp, objc-1, objv+1);

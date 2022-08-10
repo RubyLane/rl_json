@@ -13,7 +13,7 @@ AC_DEFUN([ENABLE_ENSEMBLE], [
 	#trap 'echo "val: (${enable_ensemble+set}), ensemble_ok: ($ensemble_ok), ensemble: ($ENSEMBLE)"' DEBUG
 	AC_MSG_CHECKING([whether to provide the json command as an ensemble])
 	AC_ARG_ENABLE(ensemble,
-		AC_HELP_STRING([--enable-ensemble], [Provide the json command using a proper ensemble, otherwise handle the subcommand dispatch internally (default: no)]),
+		AS_HELP_STRING([--enable-ensemble],[Provide the json command using a proper ensemble, otherwise handle the subcommand dispatch internally (default: no)]),
 		[ensemble_ok=$enableval], [ensemble_ok=no])
 
 	if test "$ensemble_ok" = "yes" -o "${ENSEMBLE}" = 1; then
@@ -33,7 +33,7 @@ AC_DEFUN([ENABLE_DEDUP], [
 	#trap 'echo "val: (${enable_dedup+set}), dedup_ok: ($dedup_ok), DEDUP: ($DEDUP)"' DEBUG
 	AC_MSG_CHECKING([whether to use a string deduplication mechanism for short strings])
 	AC_ARG_ENABLE(dedup,
-		AC_HELP_STRING([--enable-dedup], [Parsing JSON involves allocating a lot of small string Tcl_Objs, many of which are duplicates.  This mechanism helps reduce that duplication (default: yes)]),
+		AS_HELP_STRING([--enable-dedup],[Parsing JSON involves allocating a lot of small string Tcl_Objs, many of which are duplicates.  This mechanism helps reduce that duplication (default: yes)]),
 		[dedup_ok=$enableval], [dedup_ok=yes])
 
 	if test "$dedup_ok" = "yes" -o "${DEDUP}" = 1; then
@@ -65,8 +65,7 @@ AC_DEFUN([TIP445], [
 	AC_MSG_CHECKING([whether we need to polyfill TIP 445])
 	saved_CFLAGS="$CFLAGS"
 	CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
-	AC_TRY_COMPILE([#include <tcl.h>], [Tcl_ObjIntRep ir;],
-	    have_tcl_objintrep=yes, have_tcl_objintrep=no)
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <tcl.h>]], [[Tcl_ObjIntRep ir;]])],[have_tcl_objintrep=yes],[have_tcl_objintrep=no])
 	CFLAGS="$saved_CFLAGS"
 
 	if test "$have_tcl_objintrep" = yes; then
