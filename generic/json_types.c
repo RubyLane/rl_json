@@ -338,7 +338,17 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 		// Panic and go via the string rep
 		Tcl_IncrRefCount((Tcl_Obj*)(destir.twoPtrValue.ptr1 = Tcl_NewStringObj(str, len)));
 	} else {
-		destir.twoPtrValue.ptr1 = srcir->twoPtrValue.ptr1;
+		if (objtype == &json_array) {
+			Tcl_Obj**	ov = NULL;
+			int			oc;
+			// The list type's internal structure sharing on duplicates messes up our sharing,
+			// rather recreate a fresh list referencing the original element objects instead
+			if (TCL_OK != Tcl_ListObjGetElements(NULL, srcir->twoPtrValue.ptr1, &oc, &ov))
+				Tcl_Panic("Unable to retrieve the array elements from the shadow Tcl list while duplicating json array object");
+			destir.twoPtrValue.ptr1 = Tcl_NewListObj(oc, ov);
+		} else {
+			destir.twoPtrValue.ptr1 = srcir->twoPtrValue.ptr1;
+		}
 	}
 
 	destir.twoPtrValue.ptr2 = srcir->twoPtrValue.ptr2;

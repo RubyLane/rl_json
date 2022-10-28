@@ -423,6 +423,23 @@ test set-8.1.1 {json set into a template} -body { #<<<
 	unset -nocomplain foo bar template
 } -result {{"foo":"fooval","bar":"barval"}}
 #>>>
+test set-10.2 {JSON set on shared value} -setup { #<<<
+	set object {["a", "b"]}
+	proc t {object v} {
+		#puts stderr "-----------------------------------------"
+		#puts stderr "t, object rep: [tcl::unsupported::representation $object]"
+		#puts stderr "t before: [json debug $object]"
+		json set object 0 [json string $v]
+		#puts stderr "t after: [json debug $object]"
+		json get $object 0
+	}
+} -body {
+   list [t $object us-west-2] [t $object us-west-1] [json get $object 0]
+} -cleanup {
+   catch {rename t {}}
+   unset -nocomplain object
+} -result {us-west-2 us-west-1 a}
+#>>>
 
 ::tcltest::cleanupTests
 return

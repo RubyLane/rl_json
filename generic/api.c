@@ -552,7 +552,19 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 						goto followed_path;
 					} else {
 						target = av[index];
-						if (Tcl_IsShared(target)) {
+						// If we rely on the reference counts of the list
+						// element objects, the list intrep sharing on dup
+						// breaks things here - although the list is duplicated
+						// the element refcounts aren't incremented, so we
+						// still see the element as unshared here.  We could
+						// just always dup and replace it here but that is
+						// inefficient for the case of multiple sets down this
+						// path when the value truely is unshared, so we work
+						// around it in the array type dup by recreating a new
+						// list backing the array, with new references to each
+						// of the element objects.  That way the logic here
+						// about whether the path value is shared is correct.
+						if (/*1 ||*/ Tcl_IsShared(target)) {
 							target = Tcl_DuplicateObj(target);
 							TEST_OK_LABEL(finally, code, Tcl_ListObjReplace(interp, val, index, 1, 1, &target));
 						}
