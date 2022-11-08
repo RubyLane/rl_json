@@ -157,7 +157,7 @@ Tcl_ObjType* g_objtype_for_type[JSON_TYPE_MAX];
 
 int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
 {
-	enum json_types		t;
+	int		t;
 	Tcl_ObjIntRep*		_ir = NULL;
 
 	for (t=JSON_OBJECT; t<JSON_TYPE_MAX && _ir==NULL; t++)
@@ -168,7 +168,7 @@ int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
 		return 0;
 
 	*ir = _ir;
-	*type = t;
+	*type = (enum json_types)t;
 	return 1;
 }
 
@@ -198,7 +198,7 @@ int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type,
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, obj, type, &ir));
 
-	*val = ir->twoPtrValue.ptr1;
+	*val =(Tcl_Obj *)(ir->twoPtrValue.ptr1);
 
 	return TCL_OK;
 }
@@ -224,7 +224,7 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 		TEMPLATE_TYPE(str, len, template_type);
 
 		if (template_type != type) {
-			replace_tclobj(&rep, Tcl_NewStringObj(str, strend - str));	// TODO: dedup?
+			replace_tclobj(&rep, Tcl_NewStringObj(str,(int)(strend - str)));	// TODO: dedup?
 			type = template_type;
 		}
 	}
@@ -343,7 +343,7 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 			int			oc;
 			// The list type's internal structure sharing on duplicates messes up our sharing,
 			// rather recreate a fresh list referencing the original element objects instead
-			if (TCL_OK != Tcl_ListObjGetElements(NULL, srcir->twoPtrValue.ptr1, &oc, &ov))
+			if (TCL_OK != Tcl_ListObjGetElements(NULL,(Tcl_Obj *) srcir->twoPtrValue.ptr1, &oc, &ov))
 				Tcl_Panic("Unable to retrieve the array elements from the shadow Tcl list while duplicating json array object");
 			destir.twoPtrValue.ptr1 = Tcl_NewListObj(oc, ov);
 		} else {
@@ -379,7 +379,7 @@ static void update_string_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 	serialize(NULL, &scx, obj);
 
 	obj->length = Tcl_DStringLength(&ds);
-	obj->bytes = ckalloc(obj->length + 1);
+	obj->bytes = (char* )ckalloc(obj->length + 1);
 	memcpy(obj->bytes, Tcl_DStringValue(&ds), obj->length);
 	obj->bytes[obj->length] = 0;
 
@@ -416,7 +416,7 @@ static void update_string_rep_number(Tcl_Obj* obj) //{{{
 		Tcl_Panic("Turtles all the way down!");
 
 	str = Tcl_GetStringFromObj((Tcl_Obj*)ir->twoPtrValue.ptr1, &len);
-	obj->bytes = ckalloc(len+1);
+	obj->bytes =(char*) ckalloc(len+1);
 	memcpy(obj->bytes, str, len+1);
 	obj->length = len;
 }
@@ -431,11 +431,11 @@ static void update_string_rep_bool(Tcl_Obj* obj) //{{{
 		Tcl_Panic("json_bool's intrep tclobj is not a boolean");
 
 	if (boolval) {
-		obj->bytes = ckalloc(5);
+		obj->bytes =(char*)ckalloc(5);
 		memcpy(obj->bytes, "true", 5);
 		obj->length = 4;
 	} else {
-		obj->bytes = ckalloc(6);
+		obj->bytes =(char*)ckalloc(6);
 		memcpy(obj->bytes, "false", 6);
 		obj->length = 5;
 	}
@@ -444,7 +444,7 @@ static void update_string_rep_bool(Tcl_Obj* obj) //{{{
 //}}}
 static void update_string_rep_null(Tcl_Obj* obj) //{{{
 {
-	obj->bytes = ckalloc(5);
+	obj->bytes =(char*)ckalloc(5);
 	memcpy(obj->bytes, "null", 5);
 	obj->length = 4;
 }
@@ -490,7 +490,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	struct parse_error		details = {0};
 
 	if (interp)
-		l = Tcl_GetAssocData(interp, "rl_json", NULL);
+		l = (struct interp_cx *)Tcl_GetAssocData(interp, "rl_json", NULL);
 
 #if 1
 	// Snoop on the intrep for clues on optimized conversions {{{
@@ -562,8 +562,8 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 					 * in the dict key.  The template generation code reparses it later.
 					 */
 					{
-						Tcl_Obj*	new = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
-						replace_tclobj(&val, new);
+						Tcl_Obj*	new_obj = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
+						replace_tclobj(&val, new_obj);
 						// Can do this because val's ref is on loan from new_stringobj_dedup
 						//val = Tcl_ObjPrintf("~%c:%s", key_start[2], Tcl_GetString(val));
 					}
@@ -715,7 +715,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 			Tcl_Panic("Can't get intrep for the top container");
 
 		// We're transferring the ref from cx[0].val to our intrep
-		replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, top_ir->twoPtrValue.ptr1);
+		replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, (Tcl_Obj* )top_ir->twoPtrValue.ptr1);
 		release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
 		release_tclobj(&cx[0].val);
 
@@ -759,7 +759,7 @@ int type_is_dynamic(const enum json_types type) //{{{
 Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir) //{{{
 {
 	if (ir->twoPtrValue.ptr1 != NULL && Tcl_IsShared((Tcl_Obj*)ir->twoPtrValue.ptr1))
-		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1, Tcl_DuplicateObj(ir->twoPtrValue.ptr1));
+		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1, Tcl_DuplicateObj((Tcl_Obj *)ir->twoPtrValue.ptr1));
 
 	if (ir->twoPtrValue.ptr2) {
 		// The caller wants val unshared, which implies that they intend to
@@ -768,7 +768,7 @@ Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir) //{{{
 		release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
 	}
 
-	return ir->twoPtrValue.ptr1;
+	return (Tcl_Obj *)ir->twoPtrValue.ptr1;
 }
 
 //}}}

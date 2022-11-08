@@ -1,97 +1,97 @@
 #include "rl_jsonInt.h"
 #include "parser.h"
 
-Tcl_Obj* JSON_NewJSONObj(Tcl_Interp* interp, Tcl_Obj* from) //{{{
+DLLEXPORT Tcl_Obj* JSON_NewJSONObj(Tcl_Interp* interp, Tcl_Obj* from) //{{{
 {
 	return as_json(interp, from);
 }
 
 //}}}
-int JSON_NewJStringObj(Tcl_Interp* interp, Tcl_Obj* string, Tcl_Obj** new) //{{{
+DLLEXPORT int JSON_NewJStringObj(Tcl_Interp* interp, Tcl_Obj* string, Tcl_Obj**new_obj) //{{{
 {
-	replace_tclobj(new, JSON_NewJvalObj(JSON_STRING, string));
+	replace_tclobj(new_obj, JSON_NewJvalObj(JSON_STRING, string));
 
 	return TCL_OK;
 }
 
 //}}}
-int JSON_NewJNumberObj(Tcl_Interp* interp, Tcl_Obj* number, Tcl_Obj** new) //{{{
+DLLEXPORT int JSON_NewJNumberObj(Tcl_Interp* interp, Tcl_Obj* number, Tcl_Obj**new_obj) //{{{
 {
 	Tcl_Obj*			forced = NULL;
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json",NULL);
 
 	TEST_OK(force_json_number(interp, l, number, &forced));
-	replace_tclobj(new, JSON_NewJvalObj(JSON_NUMBER, forced));
+	replace_tclobj(new_obj, JSON_NewJvalObj(JSON_NUMBER, forced));
 	release_tclobj(&forced);
 
 	return TCL_OK;
 }
 
 //}}}
-int JSON_NewJBooleanObj(Tcl_Interp* interp, Tcl_Obj* boolean, Tcl_Obj** new) //{{{
+DLLEXPORT int JSON_NewJBooleanObj(Tcl_Interp* interp, Tcl_Obj* boolean, Tcl_Obj**new_obj) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	int					bool;
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
+	int					bool_value;
 
-	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &bool));
-	replace_tclobj(new, bool ? l->json_true : l->json_false);
+	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &bool_value));
+	replace_tclobj(new_obj,bool_value? l->json_true : l->json_false);
 
 	return TCL_OK;
 }
 
 //}}}
-int JSON_NewJNullObj(Tcl_Interp* interp, Tcl_Obj* *new) //{{{
+DLLEXPORT int JSON_NewJNullObj(Tcl_Interp* interp, Tcl_Obj* *new_obj) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 
-	replace_tclobj(new, l->json_null);
+	replace_tclobj(new_obj, l->json_null);
 
     return TCL_OK;
 }
 
 //}}}
-int JSON_NewJObjectObj(Tcl_Interp* interp, Tcl_Obj** new) //{{{
+DLLEXPORT int JSON_NewJObjectObj(Tcl_Interp* interp, Tcl_Obj**new_obj) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 
-	replace_tclobj(new, JSON_NewJvalObj(JSON_OBJECT, l->tcl_empty_dict));
+	replace_tclobj(new_obj, JSON_NewJvalObj(JSON_OBJECT, l->tcl_empty_dict));
 
 	return TCL_OK;
 }
 
 //}}}
-int JSON_NewJArrayObj(Tcl_Interp* interp, int objc, Tcl_Obj* objv[], Tcl_Obj** new) //{{{
+DLLEXPORT int JSON_NewJArrayObj(Tcl_Interp* interp, int objc, Tcl_Obj* objv[], Tcl_Obj**new_obj) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 
 	if (objc == 0) {
-		replace_tclobj(new, JSON_NewJvalObj(JSON_OBJECT, l->tcl_empty_list));
+		replace_tclobj(new_obj, JSON_NewJvalObj(JSON_OBJECT, l->tcl_empty_list));
 	} else {
 		int		i;
 
 		for (i=0; i<objc; i++) TEST_OK(JSON_ForceJSON(interp, objv[i]));
 
-		replace_tclobj(new, JSON_NewJvalObj(JSON_OBJECT, Tcl_NewListObj(objc, objv)));
+		replace_tclobj(new_obj, JSON_NewJvalObj(JSON_OBJECT, Tcl_NewListObj(objc, objv)));
 	}
 
 	return TCL_OK;
 }
 
 //}}}
-int JSON_NewTemplateObj(Tcl_Interp* interp, enum json_types type, Tcl_Obj* key, Tcl_Obj** new) //{{{
+DLLEXPORT int JSON_NewTemplateObj(Tcl_Interp* interp, enum json_types type, Tcl_Obj* key, Tcl_Obj**new_obj) //{{{
 {
 	if (!type_is_dynamic(type)) {
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Requested type is not a valid template type: %s", type_names_int[type]));
 		return TCL_ERROR;
 	}
 
-	replace_tclobj(new, JSON_NewJvalObj(type, key));
+	replace_tclobj(new_obj, JSON_NewJvalObj(type, key));
 
 	return TCL_OK;	
 }
 
 //}}}
-int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a JSON objtype, or throw an exception {{{
+DLLEXPORT int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a JSON objtype, or throw an exception {{{
 {
 	Tcl_ObjIntRep*	ir;
 	enum json_types	type;
@@ -106,12 +106,12 @@ int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a 
 enum json_types JSON_GetJSONType(Tcl_Obj* obj) //{{{
 {
 	Tcl_ObjIntRep*	ir = NULL;
-	enum json_types	t;
+	int	t;
 
 	for (t=JSON_OBJECT; t<JSON_TYPE_MAX && ir==NULL; t++)
 		ir = Tcl_FetchIntRep(obj, g_objtype_for_type[t]);
 
-	return (ir == NULL) ? JSON_UNDEF : t-1;
+	return (ir == NULL) ? JSON_UNDEF : (enum json_types)(t-1);
 }
 
 //}}}
@@ -276,7 +276,7 @@ int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, const int objc, Tcl_Obj*
 		return TCL_ERROR;
 	}
 
-	jov = ckalloc(sizeof(Tcl_Obj*) * objc);
+	jov = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj*) * objc);
 	for (i=0; i<objc; i++)
 		Tcl_IncrRefCount(jov[i] = as_json(interp, objv[i]));
 
@@ -347,7 +347,7 @@ int JSON_JArrayObjReplace(Tcl_Interp* interp, Tcl_Obj* arrayObj, int first, int 
 		return TCL_ERROR;
 	}
 
-	jov = ckalloc(sizeof(Tcl_Obj*) * objc);
+	jov =(Tcl_Obj **)ckalloc(sizeof(Tcl_Obj*) * objc);
 	for (i=0; i<objc; i++)
 		Tcl_IncrRefCount(jov[i] = as_json(interp, objv[i]));
 
@@ -413,7 +413,7 @@ finally:
 //}}}
 int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 	Tcl_Obj*			target = NULL;
 	Tcl_Obj**			pathv = NULL;
 	int					pathc;
@@ -936,7 +936,7 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 	int					retval = TCL_OK;
 	Tcl_DString			ds;
 	Tcl_Obj*			pad = NULL;
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 
 	if (indent == NULL)
 		replace_tclobj(&indent, get_string(l, "    ", 4));
@@ -956,26 +956,26 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 }
 
 //}}}
-int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj** res) //{{{
+int JSON_Template(Tcl_Interp* interp, Tcl_Obj*template_obj, Tcl_Obj* dict, Tcl_Obj** res) //{{{
 {
-	//struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	//struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 	Tcl_Obj*			actions = NULL;
 	int					retcode = TCL_OK;
 	Tcl_ObjIntRep*		ir;
 	enum json_types		type;
 
-	TEST_OK(JSON_GetIntrepFromObj(interp, template, &type, &ir));
+	TEST_OK(JSON_GetIntrepFromObj(interp, template_obj, &type, &ir));
 
-	replace_tclobj(&actions, ir->twoPtrValue.ptr2);
+	replace_tclobj(&actions,(Tcl_Obj *) ir->twoPtrValue.ptr2);
 	if (actions == NULL) {
-		//DBG("Building template actions and storing in intrep ptr2 for %s\n", name(template));
-		TEST_OK_LABEL(finally, retcode, build_template_actions(interp, template, &actions));
+		//DBG("Building template actions and storing in intrep ptr2 for %s\n", name(template_obj));
+		TEST_OK_LABEL(finally, retcode, build_template_actions(interp, template_obj, &actions));
 		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2, actions);
 	}
 
-	//DBG("template %s refcount before: %d\n", name(template), template->refCount);
-	retcode = apply_template_actions(interp, template, actions, dict, res);
-	//DBG("template %s refcount after: %d\n", name(template), template->refCount);
+	//DBG("template %s refcount before: %d\n", name(template_obj), template->refCount);
+	retcode = apply_template_actions(interp, template_obj, actions, dict, res);
+	//DBG("template %s refcount after: %d\n", name(template_obj), template->refCount);
 	release_tclobj(&actions);
 
 finally:
@@ -1092,7 +1092,7 @@ finally:
 //}}}
 int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj** decodedstring) //{{{
 {
-	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+	struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 	Tcl_Obj*			ov[4];
 	int					i, retval;
 
@@ -1218,7 +1218,7 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 	}
 
 	while (state->loop_num < state->max_loops) {
-		struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+		struct interp_cx*	l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 		unsigned int		j, k;
 		Tcl_Obj*			loopvars = NULL;
 
@@ -1390,7 +1390,7 @@ int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions ex
 	struct parse_context	cx[CX_STACK_SIZE];
 
 	if (interp)
-		l = Tcl_GetAssocData(interp, "rl_json", NULL);
+		l = (struct interp_cx *) Tcl_GetAssocData(interp, "rl_json", NULL);
 
 #if 1
 	// Snoop on the intrep for clues on optimized conversions {{{
