@@ -76,7 +76,7 @@ json get {
             { "name": "first" },
             { "name": "second" },
             { "name": "third" }
-        }
+        ]
     }
 } foo end-1 name
 ~~~
