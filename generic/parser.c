@@ -20,7 +20,7 @@ void throw_parse_error(Tcl_Interp* interp, struct parse_error* details) //{{{
 {
 	char		char_ofs_buf[20];		// 20 bytes allows for 19 bytes of decimal max 64 bit size_t, plus null terminator
 
-	snprintf(char_ofs_buf, 20, "%ld", details->char_ofs);
+	snprintf(char_ofs_buf, 20, "%ld", (long)(details->char_ofs));
 
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", details->errmsg, details->char_ofs));
 	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", details->errmsg, details->doc, char_ofs_buf, NULL);
@@ -30,39 +30,39 @@ void throw_parse_error(Tcl_Interp* interp, struct parse_error* details) //{{{
 struct parse_context* push_parse_context(struct parse_context* cx, const enum json_types container, const size_t char_ofs) //{{{
 {
 	struct parse_context*	last = cx->last;
-	struct parse_context*	new;
+	struct parse_context*	new_obj;
 
 	if (last->container == JSON_UNDEF) {
-		new = last;
+		new_obj = last;
 	} else if (likely((ptrdiff_t)last >= (ptrdiff_t)cx && (ptrdiff_t)last < (ptrdiff_t)(cx + CX_STACK_SIZE - 1))) {
 		// Space remains on the cx array stack
-		new = cx->last+1;
+		new_obj= cx->last+1;
 	} else {
-		new = (struct parse_context*)malloc(sizeof(*new));
+		new_obj= (struct parse_context*)malloc(sizeof(*new_obj));
 	}
 
 
-	new->prev = last;
+	new_obj->prev = last;
 	if (last->mode == VALIDATE) {
-		new->val = NULL;
+		new_obj->val = NULL;
 	} else {
 		Tcl_IncrRefCount(
-			new->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?
+			new_obj->val = JSON_NewJvalObj(container, container == JSON_OBJECT  ?
 				(cx->l ? cx->l->tcl_empty_dict : Tcl_NewDictObj())  :
 				(cx->l ? cx->l->tcl_empty_list : Tcl_NewListObj(0, NULL))
 		));
 	}
-	new->hold_key = NULL;
-	new->char_ofs = char_ofs;
-	new->container = container;
-	new->closed = 0;
-	new->objtype = g_objtype_for_type[container];
-	new->l = last->l;
-	new->mode = last->mode;
+	new_obj->hold_key = NULL;
+	new_obj->char_ofs = char_ofs;
+	new_obj->container = container;
+	new_obj->closed = 0;
+	new_obj->objtype = g_objtype_for_type[container];
+	new_obj->l = last->l;
+	new_obj->mode = last->mode;
 
-	cx->last = new;
+	cx->last = new_obj;
 
-	return new;
+	return new_obj;
 }
 
 //}}}
@@ -283,12 +283,12 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 					len = p-chunk;
 
 					if (likely(out == NULL)) {
-						replace_tclobj(&out, get_string(l, (const char*)chunk, len));
+						replace_tclobj(&out, get_string(l, (const char*)chunk, (int)len));
 					} else if (len > 0) {
 						if (unlikely(Tcl_IsShared(out)))
 							replace_tclobj(&out, Tcl_DuplicateObj(out));
 
-						Tcl_AppendToObj(out, (const char*)chunk, len);
+						Tcl_AppendToObj(out, (const char*)chunk, (int)len);
 					}
 
 					if (likely(*p == '"')) {
@@ -458,7 +458,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 				*type = JSON_NUMBER;
 				if (val)
-					replace_tclobj(val, get_string(l, (const char*)start, p-start));
+					replace_tclobj(val, get_string(l, (const char*)start,(int)(p-start)));
 			}
 	}
 

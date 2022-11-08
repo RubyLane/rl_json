@@ -50,14 +50,15 @@ typedef int (JSON_ForeachBody)(ClientData cdata, Tcl_Interp* interp, Tcl_Obj* lo
 
 // Stubs exported API
 
+#include "rl_jsonDecls.h"
 #ifdef USE_RL_JSON_STUBS
-EXTERN CONST char* Rl_jsonInitStubs _ANSI_ARGS_((Tcl_Interp* interp, CONST char* version, int exact));
+RL_JSON_EXTERN CONST char* Rl_jsonInitStubs _ANSI_ARGS_((Tcl_Interp* interp, CONST char* version, int exact));
 #else
 #	define Rl_jsonInitStubs(interp, version, exact) Tcl_PkgRequire(interp, "rl_json", version, exact)
 #endif
-#include "rl_jsonDecls.h"
 
-EXTERN int Rl_json_Init _ANSI_ARGS_((Tcl_Interp* interp));
-EXTERN int Rl_json_SafeInit _ANSI_ARGS_((Tcl_Interp* interp));
+
+RL_JSON_EXTERN int Rl_json_Init _ANSI_ARGS_((Tcl_Interp* interp));
+RL_JSON_EXTERN int Rl_json_SafeInit _ANSI_ARGS_((Tcl_Interp* interp));
 
 #endif
