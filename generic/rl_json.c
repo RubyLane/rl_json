@@ -123,8 +123,8 @@ const char* get_type_name(enum json_types type) //{{{
 //}}}
 Tcl_Obj* as_json(Tcl_Interp* interp, Tcl_Obj* from) //{{{
 {
-	Tcl_ObjIntRep*	ir = NULL;
-	enum json_types	type;
+	Tcl_ObjInternalRep*	ir = NULL;
+	enum json_types		type;
 
 	if (JSON_GetIntrepFromObj(interp, from, &type, &ir) == TCL_OK) {
 		// Already a JSON value, use it directly
@@ -150,9 +150,9 @@ display *obj
 		// Attempt to snoop on the intrep to verify that it is one of the numeric types
 		if (
 			obj->typePtr && (
-				(l->typeInt    && Tcl_FetchIntRep(obj, l->typeInt) != NULL) ||
-				(l->typeDouble && Tcl_FetchIntRep(obj, l->typeDouble) != NULL) ||
-				(l->typeBignum && Tcl_FetchIntRep(obj, l->typeBignum) != NULL)
+				(l->typeInt    && Tcl_FetchInternalRep(obj, l->typeInt) != NULL) ||
+				(l->typeDouble && Tcl_FetchInternalRep(obj, l->typeDouble) != NULL) ||
+				(l->typeBignum && Tcl_FetchInternalRep(obj, l->typeBignum) != NULL)
 		   )
 		) {
 			// It's a known number type, we can safely use it directly
@@ -510,8 +510,8 @@ done:
 
 void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 {
-	Tcl_ObjIntRep*	ir = NULL;
-	Tcl_Obj*		ir_val = NULL;
+	Tcl_ObjInternalRep*	ir = NULL;
+	Tcl_Obj*			ir_val = NULL;
 
 	/*
 	fprintf(stderr, "append_to_cx, storing %s: \"%s\"\n",
@@ -524,7 +524,7 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 	switch (cx->container) {
 		case JSON_OBJECT:
 			//fprintf(stderr, "append_to_cx, cx->hold_key->refCount: %d (%s)\n", cx->hold_key->refCount, Tcl_GetString(cx->hold_key));
-			ir = Tcl_FetchIntRep(cx->val, cx->objtype);
+			ir = Tcl_FetchInternalRep(cx->val, cx->objtype);
 			if (ir == NULL) Tcl_Panic("Can't get intrep for container");
 			ir_val = get_unshared_val(ir);
 			Tcl_DictObjPut(NULL, ir_val, cx->hold_key, val);
@@ -534,7 +534,7 @@ void append_to_cx(struct parse_context* cx, Tcl_Obj* val) //{{{
 			break;
 
 		case JSON_ARRAY:
-			ir = Tcl_FetchIntRep(cx->val, cx->objtype);
+			ir = Tcl_FetchInternalRep(cx->val, cx->objtype);
 			if (ir == NULL) Tcl_Panic("Can't get intrep for container");
 			ir_val = get_unshared_val(ir);
 			//fprintf(stderr, "append_to_cx, appending to list: (%s)\n", Tcl_GetString(val));
@@ -2221,9 +2221,9 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 
 			case REPLACE_ARR:
 				{
-					int				slot, idx;
-					Tcl_ObjIntRep*	ir = NULL;
-					Tcl_Obj*		ir_obj = NULL;
+					int					slot, idx;
+					Tcl_ObjInternalRep*	ir = NULL;
+					Tcl_Obj*			ir_obj = NULL;
 
 					// a is idx, b is slot
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slot));
@@ -2231,7 +2231,7 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					if (Tcl_IsShared(target)) {
 						THROW_ERROR_LABEL(finally, retcode, "target is shared for REPLACE_ARR");
 					}
-					ir = Tcl_FetchIntRep(target, g_objtype_for_type[JSON_ARRAY]);
+					ir = Tcl_FetchInternalRep(target, g_objtype_for_type[JSON_ARRAY]);
 					if (ir == NULL) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Could not fetch array intrep for target array %s", Tcl_GetString(target)));
 						retcode = TCL_ERROR;
@@ -2246,13 +2246,13 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 
 			case REPLACE_VAL:
 				{
-					int				slot;
-					Tcl_ObjIntRep*	ir = NULL;
-					Tcl_Obj*		ir_obj = NULL;
+					int					slot;
+					Tcl_ObjInternalRep*	ir = NULL;
+					Tcl_Obj*			ir_obj = NULL;
 
 					// a is key, b is slot
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slot));
-					ir = Tcl_FetchIntRep(target, g_objtype_for_type[JSON_OBJECT]);
+					ir = Tcl_FetchInternalRep(target, g_objtype_for_type[JSON_OBJECT]);
 					if (ir == NULL) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Could not fetch array intrep for target object %s", Tcl_GetString(target)));
 						retcode = TCL_ERROR;
@@ -2277,14 +2277,14 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 
 			case REPLACE_KEY:
 				{
-					int				slot;
-					Tcl_ObjIntRep*	ir = NULL;
-					Tcl_Obj*		ir_obj = NULL;
-					Tcl_Obj*		hold = NULL;
+					int					slot;
+					Tcl_ObjInternalRep*	ir = NULL;
+					Tcl_Obj*			ir_obj = NULL;
+					Tcl_Obj*			hold = NULL;
 
 					// a is key, b is slot (which holds the new key name)
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slot));
-					ir = Tcl_FetchIntRep(target, g_objtype_for_type[JSON_OBJECT]);
+					ir = Tcl_FetchInternalRep(target, g_objtype_for_type[JSON_OBJECT]);
 					if (ir == NULL) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Could not fetch array intrep for target object %s", Tcl_GetString(target)));
 						retcode = TCL_ERROR;
@@ -2548,8 +2548,8 @@ static int jsonGet(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 			convert = 0;
 		}
 	} else {
-		enum json_types	type;
-		Tcl_ObjIntRep*	ir;
+		enum json_types		type;
+		Tcl_ObjInternalRep*	ir;
 		replace_tclobj(&target, objv[1]);
 		TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, target, &type, &ir));	// Force parsing objv[2] as JSON
 	}
@@ -3142,9 +3142,9 @@ static int jsonDebug(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 //}}}
 static int jsonTemplateActions(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	Tcl_Obj*		actions = NULL;
-	Tcl_ObjIntRep*	ir;
-	enum json_types	type;
+	Tcl_Obj*			actions = NULL;
+	Tcl_ObjInternalRep*	ir;
+	enum json_types		type;
 
 	if (objc != 2) {
 		Tcl_WrongNumArgs(interp, 1, objv, "json_template");

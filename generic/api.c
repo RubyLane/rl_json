@@ -93,8 +93,8 @@ int JSON_NewTemplateObj(Tcl_Interp* interp, enum json_types type, Tcl_Obj* key, 
 //}}}
 int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a JSON objtype, or throw an exception {{{
 {
-	Tcl_ObjIntRep*	ir;
-	enum json_types	type;
+	Tcl_ObjInternalRep*	ir;
+	enum json_types		type;
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, obj, &type, &ir));
 
@@ -105,11 +105,11 @@ int JSON_ForceJSON(Tcl_Interp* interp, Tcl_Obj* obj) // Force a conversion to a 
 
 enum json_types JSON_GetJSONType(Tcl_Obj* obj) //{{{
 {
-	Tcl_ObjIntRep*	ir = NULL;
-	enum json_types	t;
+	Tcl_ObjInternalRep*	ir = NULL;
+	enum json_types		t;
 
 	for (t=JSON_OBJECT; t<JSON_TYPE_MAX && ir==NULL; t++)
-		ir = Tcl_FetchIntRep(obj, g_objtype_for_type[t]);
+		ir = Tcl_FetchInternalRep(obj, g_objtype_for_type[t]);
 
 	return (ir == NULL) ? JSON_UNDEF : t-1;
 }
@@ -173,10 +173,10 @@ int JSON_GetObjFromJBooleanObj(Tcl_Interp* interp, Tcl_Obj* jbooleanObj, Tcl_Obj
 //}}}
 int JSON_JArrayObjAppendElement(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* elem) //{{{
 {
-	int				code = TCL_OK;
-	enum json_types	type;
-	Tcl_ObjIntRep*	ir = NULL;
-	Tcl_Obj*		val = NULL;
+	int					code = TCL_OK;
+	enum json_types		type;
+	Tcl_ObjInternalRep*	ir = NULL;
+	Tcl_Obj*			val = NULL;
 
 	if (Tcl_IsShared(arrayObj)) {
 		// Tcl_Panic?
@@ -204,11 +204,11 @@ finally:
 //}}}
 int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* elems /* a JArrayObj or ListObj */ ) //{{{
 {
-	enum json_types	type, elems_type;
-	Tcl_ObjIntRep*	ir = NULL;
-	Tcl_Obj*		val = NULL;
-	Tcl_Obj*		elems_val = NULL;
-	int				retval = TCL_OK;
+	enum json_types		type, elems_type;
+	Tcl_ObjInternalRep*	ir = NULL;
+	Tcl_Obj*			val = NULL;
+	Tcl_Obj*			elems_val = NULL;
+	int					retval = TCL_OK;
 
 	if (Tcl_IsShared(arrayObj)) {
 		// Tcl_Panic?
@@ -263,12 +263,12 @@ finally:
 //}}}
 int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, const int objc, Tcl_Obj* objv[]) //{{{
 {
-	enum json_types	type;
-	Tcl_ObjIntRep*	ir = NULL;
-	Tcl_Obj*		val = NULL;
-	int				i, retval = TCL_OK;
-	Tcl_Obj**		jov = NULL;
-	Tcl_Obj*		newlist = NULL;
+	enum json_types		type;
+	Tcl_ObjInternalRep*	ir = NULL;
+	Tcl_Obj*			val = NULL;
+	int					i, retval = TCL_OK;
+	Tcl_Obj**			jov = NULL;
+	Tcl_Obj*			newlist = NULL;
 
 	if (Tcl_IsShared(obj)) {
 		// Tcl_Panic?
@@ -437,17 +437,17 @@ int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //
 //}}}
 int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replacement) //{{{
 {
-	int				code = TCL_OK;
-	int				i, pathc;
-	enum json_types	type, newtype;
-	Tcl_ObjIntRep*	ir = NULL;
-	Tcl_Obj*		val = NULL;
-	Tcl_Obj*		step;
-	Tcl_Obj*		src;
-	Tcl_Obj*		target;
-	Tcl_Obj*		newval;
-	Tcl_Obj*		rep = NULL;
-	Tcl_Obj**		pathv = NULL;
+	int					code = TCL_OK;
+	int					i, pathc;
+	enum json_types		type, newtype;
+	Tcl_ObjInternalRep*	ir = NULL;
+	Tcl_Obj*			val = NULL;
+	Tcl_Obj*			step;
+	Tcl_Obj*			src;
+	Tcl_Obj*			target;
+	Tcl_Obj*			newval;
+	Tcl_Obj*			rep = NULL;
+	Tcl_Obj**			pathv = NULL;
 
 	if (Tcl_IsShared(obj))
 		THROW_ERROR_LABEL(finally, code, "JSON_Set called with shared object");
@@ -675,7 +675,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 			*/
 
 	{
-		Tcl_ObjIntRep*	ir = NULL;
+		Tcl_ObjInternalRep*	ir = NULL;
 		TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 		val = get_unshared_val(ir);
 	}
@@ -781,7 +781,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 		}
 
 		{
-			Tcl_ObjIntRep*	ir = NULL;
+			Tcl_ObjInternalRep*	ir = NULL;
 			TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, target, &type, &ir));
 			val = get_unshared_val(ir);
 		}
@@ -961,7 +961,7 @@ int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj*
 	//struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 	Tcl_Obj*			actions = NULL;
 	int					retcode = TCL_OK;
-	Tcl_ObjIntRep*		ir;
+	Tcl_ObjInternalRep*	ir;
 	enum json_types		type;
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, template, &type, &ir));
@@ -1397,9 +1397,9 @@ int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions ex
 	{
 		if (
 			l && (
-				(l->typeInt    && Tcl_FetchIntRep(json, l->typeInt)    != NULL) ||
-				(l->typeDouble && Tcl_FetchIntRep(json, l->typeDouble) != NULL) ||
-				(l->typeBignum && Tcl_FetchIntRep(json, l->typeBignum) != NULL)
+				(l->typeInt    && Tcl_FetchInternalRep(json, l->typeInt)    != NULL) ||
+				(l->typeDouble && Tcl_FetchInternalRep(json, l->typeDouble) != NULL) ||
+				(l->typeBignum && Tcl_FetchInternalRep(json, l->typeBignum) != NULL)
 			)
 		) {
 			*valid = 1;

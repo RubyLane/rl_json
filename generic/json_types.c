@@ -155,13 +155,13 @@ Tcl_ObjType json_dyn_literal = {
 Tcl_ObjType* g_objtype_for_type[JSON_TYPE_MAX];
 
 
-int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
+int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjInternalRep** ir) //{{{
 {
-	enum json_types		t;
-	Tcl_ObjIntRep*		_ir = NULL;
+	enum json_types			t;
+	Tcl_ObjInternalRep*		_ir = NULL;
 
 	for (t=JSON_OBJECT; t<JSON_TYPE_MAX && _ir==NULL; t++)
-		_ir = Tcl_FetchIntRep(obj, g_objtype_for_type[t]);
+		_ir = Tcl_FetchInternalRep(obj, g_objtype_for_type[t]);
 	t--;
 
 	if (_ir == NULL)
@@ -173,15 +173,15 @@ int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
 }
 
 //}}}
-int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_ObjIntRep** ir) //{{{
+int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_ObjInternalRep** ir) //{{{
 {
-	enum json_types		t;
-	Tcl_ObjIntRep*		_ir = NULL;
-	Tcl_ObjType*		objtype = NULL;
+	enum json_types			t;
+	Tcl_ObjInternalRep*		_ir = NULL;
+	Tcl_ObjType*			objtype = NULL;
 
 	if (!JSON_IsJSON(obj, &t, &_ir)) {
 		TEST_OK(set_from_any(interp, obj, &objtype, &t));
-		_ir = Tcl_FetchIntRep(obj, objtype);
+		_ir = Tcl_FetchInternalRep(obj, objtype);
 		if (_ir == NULL) Tcl_Panic("Could not retrieve the intrep we just created");
 	}
 
@@ -194,7 +194,7 @@ int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* typ
 //}}}
 int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type, Tcl_Obj** val) //{{{
 {
-	Tcl_ObjIntRep*		ir = NULL;
+	Tcl_ObjInternalRep*		ir = NULL;
 
 	TEST_OK(JSON_GetIntrepFromObj(interp, obj, type, &ir));
 
@@ -206,7 +206,7 @@ int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type,
 //}}}
 int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) //{{{
 {
-	Tcl_ObjIntRep		intrep = {0};
+	Tcl_ObjInternalRep	intrep = {0};
 	Tcl_ObjType*		objtype = NULL;
 	Tcl_Obj*			rep = NULL;
 
@@ -231,13 +231,13 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 
 	objtype = g_objtype_for_type[type];
 
-	Tcl_FreeIntRep(target);
+	Tcl_FreeInternalRep(target);
 
 	// ptr1 is the Tcl_Obj holding the Tcl structure for this value               
 	// ptr2 holds the template actions, if any have been generated for this value 
 	replace_tclobj((Tcl_Obj**)&intrep.twoPtrValue.ptr1, rep);
 
-	Tcl_StoreIntRep(target, objtype, &intrep);
+	Tcl_StoreInternalRep(target, objtype, &intrep);
 
 	Tcl_InvalidateStringRep(target);
 
@@ -290,9 +290,9 @@ Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val)
 
 static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 {
-	Tcl_ObjIntRep*		ir = NULL;
+	Tcl_ObjInternalRep*		ir = NULL;
 
-	ir = Tcl_FetchIntRep(obj, objtype);
+	ir = Tcl_FetchInternalRep(obj, objtype);
 	if (ir != NULL) {
 		release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1);
 		release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
@@ -323,10 +323,10 @@ static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 //}}}
 static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) //{{{
 {
-	Tcl_ObjIntRep*		srcir = NULL;
-	Tcl_ObjIntRep		destir;
+	Tcl_ObjInternalRep*		srcir = NULL;
+	Tcl_ObjInternalRep		destir;
 
-	srcir = Tcl_FetchIntRep(src, objtype);
+	srcir = Tcl_FetchInternalRep(src, objtype);
 	if (srcir == NULL)
 		Tcl_Panic("dup_internal_rep asked to duplicate for type, but that type wasn't available on the src object");
 
@@ -355,13 +355,13 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 	if (destir.twoPtrValue.ptr1) Tcl_IncrRefCount((Tcl_Obj*)destir.twoPtrValue.ptr1);
 	if (destir.twoPtrValue.ptr2) Tcl_IncrRefCount((Tcl_Obj*)destir.twoPtrValue.ptr2);
 
-	Tcl_StoreIntRep(dest, objtype, &destir);
+	Tcl_StoreInternalRep(dest, objtype, &destir);
 }
 
 //}}}
 static void update_string_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 {
-	Tcl_ObjIntRep*				ir = Tcl_FetchIntRep(obj, objtype);
+	Tcl_ObjInternalRep*			ir = Tcl_FetchInternalRep(obj, objtype);
 	struct serialize_context	scx;
 	Tcl_DString					ds;
 
@@ -391,9 +391,9 @@ static void update_string_rep_string(Tcl_Obj* obj) //{{{
 {
 	update_string_rep(obj, &json_string);
 	/*
-	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_string);
-	const char*		str;
-	int				len;
+	Tcl_ObjInternalRep*	ir = Tcl_FetchInternalRep(obj, &json_string);
+	const char*			str;
+	int					len;
 
 	str = Tcl_GetStringFromObj((Tcl_Obj*)ir->twoPtrValue.ptr1, &len);
 	obj->bytes = ckalloc(len+3);
@@ -408,9 +408,9 @@ static void update_string_rep_string(Tcl_Obj* obj) //{{{
 //}}}
 static void update_string_rep_number(Tcl_Obj* obj) //{{{
 {
-	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_number);
-	const char*		str;
-	int				len;
+	Tcl_ObjInternalRep*	ir = Tcl_FetchInternalRep(obj, &json_number);
+	const char*			str;
+	int					len;
 
 	if (ir->twoPtrValue.ptr1 == obj)
 		Tcl_Panic("Turtles all the way down!");
@@ -424,8 +424,8 @@ static void update_string_rep_number(Tcl_Obj* obj) //{{{
 //}}}
 static void update_string_rep_bool(Tcl_Obj* obj) //{{{
 {
-	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_bool);
-	int				boolval;
+	Tcl_ObjInternalRep*	ir = Tcl_FetchInternalRep(obj, &json_bool);
+	int					boolval;
 
 	if (Tcl_GetBooleanFromObj(NULL, (Tcl_Obj*)ir->twoPtrValue.ptr1, &boolval) != TCL_OK)
 		Tcl_Panic("json_bool's intrep tclobj is not a boolean");
@@ -454,9 +454,9 @@ static void update_string_rep_dyn_literal(Tcl_Obj* obj) //{{{
 {
 	update_string_rep(obj, &json_dyn_literal);
 	/*
-	Tcl_ObjIntRep*	ir = Tcl_FetchIntRep(obj, &json_dyn_literal);
-	const char*		str;
-	int				len;
+	Tcl_ObjInternalRep*	ir = Tcl_FetchInternalRep(obj, &json_dyn_literal);
+	const char*			str;
+	int					len;
 
 	str = Tcl_GetStringFromObj((Tcl_Obj*)ir->twoPtrValue.ptr1, &len);
 	obj->bytes = ckalloc(len+6);
@@ -497,12 +497,12 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	{
 		if (
 			l && (
-				(l->typeInt    && Tcl_FetchIntRep(obj, l->typeInt)    != NULL) ||
-				(l->typeDouble && Tcl_FetchIntRep(obj, l->typeDouble) != NULL) ||
-				(l->typeBignum && Tcl_FetchIntRep(obj, l->typeBignum) != NULL)
+				(l->typeInt    && Tcl_FetchInternalRep(obj, l->typeInt)    != NULL) ||
+				(l->typeDouble && Tcl_FetchInternalRep(obj, l->typeDouble) != NULL) ||
+				(l->typeBignum && Tcl_FetchInternalRep(obj, l->typeBignum) != NULL)
 			)
 		) {
-			Tcl_ObjIntRep			ir = {.twoPtrValue = {0}};
+			Tcl_ObjInternalRep		ir = {.twoPtrValue = {0}};
 
 			// Must dup because obj will soon be us, creating a circular ref
 			replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_DuplicateObj(obj));
@@ -511,7 +511,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 			*out_type = JSON_NUMBER;
 			*objtype = g_objtype_for_type[JSON_NUMBER];
 
-			Tcl_StoreIntRep(obj, *objtype, &ir);
+			Tcl_StoreInternalRep(obj, *objtype, &ir);
 			return TCL_OK;
 		}
 	}
@@ -704,12 +704,12 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		goto whitespace_err;
 	}
 
-	//Tcl_FreeIntRep(obj);
+	//Tcl_FreeInternalRep(obj);
 
 	{
-		Tcl_ObjType*	top_objtype = g_objtype_for_type[cx[0].container];
-		Tcl_ObjIntRep*	top_ir = Tcl_FetchIntRep(cx[0].val, top_objtype);
-		Tcl_ObjIntRep	ir = {.twoPtrValue = {0}};
+		Tcl_ObjType*		top_objtype = g_objtype_for_type[cx[0].container];
+		Tcl_ObjInternalRep*	top_ir = Tcl_FetchInternalRep(cx[0].val, top_objtype);
+		Tcl_ObjInternalRep	ir = {.twoPtrValue = {0}};
 
 		if (unlikely(top_ir == NULL))
 			Tcl_Panic("Can't get intrep for the top container");
@@ -719,7 +719,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
 		release_tclobj(&cx[0].val);
 
-		Tcl_StoreIntRep(obj, top_objtype, &ir);
+		Tcl_StoreInternalRep(obj, top_objtype, &ir);
 		*objtype = top_objtype;
 		*out_type = cx[0].container;
 	}
@@ -756,7 +756,7 @@ int type_is_dynamic(const enum json_types type) //{{{
 }
 
 //}}}
-Tcl_Obj* get_unshared_val(Tcl_ObjIntRep* ir) //{{{
+Tcl_Obj* get_unshared_val(Tcl_ObjInternalRep* ir) //{{{
 {
 	if (ir->twoPtrValue.ptr1 != NULL && Tcl_IsShared((Tcl_Obj*)ir->twoPtrValue.ptr1))
 		replace_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr1, Tcl_DuplicateObj(ir->twoPtrValue.ptr1));
