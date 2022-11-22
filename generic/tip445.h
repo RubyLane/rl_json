@@ -9,6 +9,9 @@
 /* Just enough of TIP445 to build rl_json on Tcl 8.6 */
 
 #ifndef Tcl_ObjInternalRep
+#ifdef Tcl_ObjIntRep
+#define Tcl_ObjInternalRep Tcl_ObjIntRep
+#else
 typedef union Tcl_ObjInternalRep {
 	struct {
 		void*	ptr1;
@@ -19,6 +22,7 @@ typedef union Tcl_ObjInternalRep {
 		unsigned long	value;
 	} ptrAndLongRep;
 } Tcl_ObjInternalRep;
+#endif
 #endif
 
 #ifndef Tcl_FetchInternalRep
