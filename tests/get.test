@@ -15,6 +15,15 @@ test get-1.1 {Get a value from an object} -body { #<<<
 	} foo
 } -result bar
 #>>>
+test get-1.2 {Get a value from an object, with an unused default} -body { #<<<
+	json get -default xx {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} foo
+} -result bar
+#>>>
 test get-2.1 {Get a value from an object} -body { #<<<
 	json get {
 		{
@@ -912,6 +921,311 @@ test get-60.25 {Get a template point} -body { #<<<
 	} foo
 } -result {~S:bar}
 #>>>
+test get-61.1 {invalid path: missing key} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} blah
+} -result def
+#>>>
+test get-61.2 {invalid path: subscribed atomic: string} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.3 {invalid path: subscribed atomic: number} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 1 blah
+} -result def
+#>>>
+test get-61.4 {invalid path: subscribed atomic: boolean} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 3 blah
+} -result def
+#>>>
+test get-61.5 {invalid path: subscribed atomic: null} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 5 blah
+} -result def
+#>>>
+test get-61.6 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz blah
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got blah}
+#>>>
+test get-61.7 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-12
+} -result def
+#>>>
+test get-61.8 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 100
+} -result def
+#>>>
+test get-61.9 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz -2
+} -result def
+#>>>
+test get-61.10 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-2foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-2foo}
+#>>>
+test get-61.11 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-foo}
+#>>>
+test get-61.12 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end2
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end2}
+#>>>
+test get-61.13 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end+2
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end+2}
+#>>>
+test get-61.14 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz "end- 2"
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end- 2}
+#>>>
+test get-61.15 {invalid path: invalid array index} -body { #<<<
+	json get -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-}
+#>>>
+test get-61.16 {invalid path: subscribed atomic: template string} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~S:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.17 {invalid path: subscribed atomic: template number} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~N:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.18 {invalid path: subscribed atomic: template boolean} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~B:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.19 {invalid path: subscribed atomic: template json doc} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~J:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.20 {invalid path: subscribed atomic: template json template} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~T:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.21 {invalid path: subscribed atomic: template literal} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~L:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result def
+#>>>
+test get-61.23 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz en
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got en}
+#>>>
+test get-61.24 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got foo}
+#>>>
+test get-61.25 {Get a template point} -body { #<<<
+	json get -default def {
+		{
+			"foo": "~S:bar"
+		}
+	} foo
+} -result {~S:bar}
+#>>>
+
+# Coverage golf
+test get-jsonGet-1.1 {check args} -body {json get} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "get ?-default defaultValue? json_val ?path ...?"}
+test get-jsonGet-2.1 {check args} -body {json get -default def} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "get ?-default defaultValue? json_val ?path ...?"}
+test get-jsonGet-3.1 {check args} -body {json get -foo def} -returnCodes error -errorCode {TCL LOOKUP INDEX option -foo} -result {bad option "-foo": must be *} -match glob
+test get-jsonGet-4.1 {check args} -body {json get -default} -returnCodes error -errorCode {TCL ARGUMENT MISSING} -result {missing argument to "-default"}
+test get-jsonGet-5.1 {check args} -body {json get -- true} -result 1
+test get-jsonGet-5.2 {check args} -body {json get true} -result 1
+test get-jsonGet-6.1 {default on null} -body {json get -default def null} -result def
 
 ::tcltest::cleanupTests
 return

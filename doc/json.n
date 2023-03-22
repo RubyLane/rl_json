@@ -1,10 +1,10 @@
 '\"
-'\" Copyright (c) 2015 Ruby Lane
+'\" Copyright (c) 2015-2023 Ruby Lane
 '\"
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.11.0 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.12.0 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
@@ -12,32 +12,32 @@
 json \- Parse, manipulate and produce JSON documents 
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.11.0\fR? 
+\fBpackage require rl_json\fR ?\fB0.12.0\fR? 
 
-\fBjson get \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson exists \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson set \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
-\fBjson unset \fIjsonVariableName\fR ?\fIkey ...\fR?
-\fBjson foreach \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
-\fBjson lmap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
-\fBjson amap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
-\fBjson omap \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
-\fBjson string \fIvalue\fR
-\fBjson number \fIvalue\fR
-\fBjson boolean \fIvalue\fR
-\fBjson object \fI?key value ?key value ...??\fR
-\fBjson array \fIelem ...\fR
-\fBjson bool \fIvalue\fR
-\fBjson normalize \fIjsonValue\fR
-\fBjson pretty \fIjsonValue\fR
-\fBjson template \fIjsonValue\fR ?\fIdictionary\fR?
-\fBjson isnull \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson type \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson length \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson keys \fIjsonValue\fR ?\fIkey ...\fR?
-\fBjson decode \fIbytes\fR ?\fIencoding\fR?
-\fBjson valid ?\fB-extensions\fR \fIextensionlist\fR? ?\fB-details\fR \fIdetailsvar\fR? \fIjsonValue\fR
+\fBjson get\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson extract\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson exists\fR \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson set\fR \fIjsonVariableName\fR ?\fIkey ...\fR? \fIvalue\fR
+\fBjson unset\fR \fIjsonVariableName\fR ?\fIkey ...\fR?
+\fBjson foreach\fR \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson lmap\fR \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson amap\fR \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson omap\fR \fIvarlist1 jsonValue1\fR ?\fIvarlist2 jsonValue2 ...\fR? \fIscript\fR
+\fBjson string\fR \fIvalue\fR
+\fBjson number\fR \fIvalue\fR
+\fBjson boolean\fR \fIvalue\fR
+\fBjson object\fR \fI?key value ?key value ...??\fR
+\fBjson array\fR \fIelem ...\fR
+\fBjson bool\fR \fIvalue\fR
+\fBjson normalize\fR \fIjsonValue\fR
+\fBjson pretty\fR ?\fB-intent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson template\fR \fIjsonValue\fR ?\fIdictionary\fR?
+\fBjson isnull\fR \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson type\fR \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson length\fR \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson keys\fR \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson decode\fR \fIbytes\fR ?\fIencoding\fR?
+\fBjson valid\fR ?\fB-extensions\fR \fIextensionlist\fR? ?\fB-details\fR \fIdetailsvar\fR? \fIjsonValue\fR
 .fi
 .BE
 .SH DESCRIPTION
@@ -49,18 +49,21 @@ similar way to how the \fBdict\fR command directly manipulates values whose
 string representation is a valid dictionary.  It is similar to \fBdict\fR in
 performance.
 .TP
-\fBjson get \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson get ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Extract the value of a portion of the \fIjsonValue\fR, returns the closest
 native Tcl type (other than JSON) for the extracted portion. The \fIkey ...\fR
-arguments are a path, as described in \fBPATHS\fR below.
+arguments are a path, as described in \fBPATHS\fR below.  If the fragment
+named by the path doesn't exist, return \fIdefaultValue\fR in its place.
 '\" TODO: describe what happens with a null
 .TP
-\fBjson extract \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson extract ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Extract the value of a portion of the \fIjsonValue\fR, returns the JSON
 fragment. The \fIkey ...\fR arguments are a path, as described in \fBPATHS\fR
-below.
+below.  If the fragment named by the path doesn't exist, return
+\fIdefaultValue\fR in its place.
+
 .TP
 \fBjson exists \fIjsonValue\fR ?\fIkey ...\fR?
 .
@@ -229,10 +232,12 @@ Return a
 version of the input \fIjsonValue\fR, i.e., with all optional whitespace
 trimmed.
 .TP
-\fBjson pretty \fIjsonValue\fR
+\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 .
-Returns a pretty-printed string representation of \fIjsonValue\fR.  Useful for
-debugging or inspecting the structure of JSON data.
+Returns a pretty-printed string representation of \fIjsonValue\fR, found by
+following the path of \fIkey\fRs.  Useful for debugging or inspecting the
+structure of JSON data.  If \fB-indent\fR is supplied, use \fIindent\fR for
+each level of indent, otherwise default to four spaces.
 .TP
 \fBjson decode \fIbytes\fR ?\fIencoding\fR?
 .

@@ -391,12 +391,13 @@ int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
 	int			code = TCL_OK;
 	Tcl_Obj*	target = NULL;
 	Tcl_Obj**	pathv = NULL;
+	Tcl_Obj*	def = NULL;
 	int			pathc;
 
 	TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
 
 	if (pathc > 0) {
-		TEST_OK_LABEL(finally, code, resolve_path(interp, obj, pathv, pathc, &target, 0, 0));
+		TEST_OK_LABEL(finally, code, resolve_path(interp, obj, pathv, pathc, &target, 0, 0, def));
 	} else {
 		TEST_OK_LABEL(finally, code, JSON_ForceJSON(interp, obj));
 		replace_tclobj(&target, obj);
@@ -407,6 +408,7 @@ int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
 
 finally:
 	release_tclobj(&target);
+	release_tclobj(&def);
 	return code;
 }
 
@@ -421,7 +423,7 @@ int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //
 	TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
 
 	if (pathc > 0) {
-		TEST_OK(resolve_path(interp, obj, pathv, pathc, &target, 1, 0));
+		TEST_OK(resolve_path(interp, obj, pathv, pathc, &target, 1, 0, NULL));
 		release_tclobj(&target);
 		// resolve_path sets the interp result in exists mode
 		*exists = (Tcl_GetObjResult(interp) == l->json_true);
@@ -935,11 +937,14 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 {
 	int					retval = TCL_OK;
 	Tcl_DString			ds;
+	Tcl_Obj*			lindent = NULL;
 	Tcl_Obj*			pad = NULL;
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
-	if (indent == NULL)
-		replace_tclobj(&indent, get_string(l, "    ", 4));
+	if (indent == NULL) {
+		replace_tclobj(&lindent, get_string(l, "    ", 4));
+		indent = lindent;
+	}
 
 	replace_tclobj(&pad, l->tcl_empty);
 	Tcl_DStringInit(&ds);
@@ -950,7 +955,7 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 
 	Tcl_DStringFree(&ds);
 	release_tclobj(&pad);
-	release_tclobj(&indent);
+	release_tclobj(&lindent);
 
 	return retval;
 }

@@ -587,7 +587,7 @@ static int get_modifier(Tcl_Interp* interp, Tcl_Obj* modobj, enum modifiers* mod
 }
 
 //}}}
-int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers) //{{{
+int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def) //{{{
 {
 	int					i, modstrlen;
 	enum json_types		type;
@@ -602,6 +602,9 @@ int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int p
 #define EXISTS(bool) \
 	if (exists) { \
 		Tcl_SetObjResult(interp, (bool) ? l->tcl_true : l->tcl_false); \
+		goto done; \
+	} else if (!(bool) && def) { \
+		replace_tclobj(&t, def); \
 		goto done; \
 	}
 
@@ -847,9 +850,9 @@ int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out) //{{{
 
 	TEST_OK(JSON_GetJvalFromObj(interp, obj, &type, &val));
 	/*
-	fprintf(stderr, "Retrieved internal rep of jval: type: %s, intrep Tcl_Obj type: %s, object: %p\n",
+	fprintf(stderr, "Retrieved internal rep of jval: type: %s, intrep Tcl_Obj type: %s, object: %p: \"%s\"\n",
 			type_names[type], val && val->typePtr ? val->typePtr->name : "<no type>",
-			val);
+			val, val ? Tcl_GetString(val) : "<none>");
 	*/
 
 	switch (type) {
@@ -2299,7 +2302,7 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 						enum json_types	key_type;
 
 						// The value in the slot is a JSON value (JSON_STRING or JSON_DYN_LITERAL), so we need to
-						// fetch it's Tcl string (from its intrep)
+						// fetch its Tcl string (from its intrep)
 						TEST_OK_LABEL(finally, retcode, JSON_GetJvalFromObj(interp, slots[slot], &key_type, &key_ir_obj));
 
 						switch (key_type) {
@@ -2424,7 +2427,7 @@ static int jsonType(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	}
 
 	if (objc >= 3) {
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0, NULL));
 	} else {
 		replace_tclobj(&target, objv[1]);
 	}
@@ -2510,7 +2513,7 @@ static int jsonExists(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 	}
 
 	if (objc >= 3) {
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 1, 1));
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 1, 1, NULL));
 		release_tclobj(&target);
 		// resolve_path sets the interp result in exists mode
 	} else {
@@ -2526,20 +2529,70 @@ static int jsonExists(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 //}}}
 static int jsonGet(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	int			code = TCL_OK;
 	Tcl_Obj*	target = NULL;
 	Tcl_Obj*	res = NULL;
-	int			convert=1, retval=TCL_OK;
+	Tcl_Obj*	def = NULL;
+	int			convert = 1;
+	int			argbase = 1;
+	static const char* opts[] = {
+		"-default",
+		"--",			// Unnecessary for this case, but supported for convention
+		NULL
+	};
+	enum {
+		OPT_DEFAULT,
+		OPT_END_OPTIONS
+	};
 
 	if (objc < 2) {
-		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
-		return TCL_ERROR;
+		Tcl_WrongNumArgs(interp, 1, objv, "?-default defaultValue? json_val ?path ...?");
+		code = TCL_ERROR;
+		goto finally;
 	}
 
-	if (objc >= 3) {
+	// Consume any leading options {{{
+	while (argbase < objc) {
+		int	optidx;
+
+		enum json_types	type = JSON_GetJSONType(objv[argbase]);
+		if (type != JSON_UNDEF) break;		// Arg is already a JSON value, stop consuming options
+		const char*	str = Tcl_GetString(objv[argbase]);		// If it's not a native json value we will need this string rep to parse for the next step, so potientially regenerating the stringrep here isn't a concern
+		if (str[0] != '-') break;			// Not an option
+		TEST_OK_LABEL(finally, code, Tcl_GetIndexFromObj(interp, objv[argbase], opts, "option", TCL_EXACT, &optidx));
+
+		switch (optidx) {
+			case OPT_DEFAULT:
+				if (objc - argbase < 2) {
+					Tcl_SetErrorCode(interp, "TCL", "ARGUMENT", "MISSING", NULL);
+					THROW_ERROR_LABEL(finally, code, "missing argument to \"", Tcl_GetString(objv[argbase]), "\"");
+				}
+				replace_tclobj(&def, objv[argbase+1]);
+				argbase += 2;
+				break;
+
+			case OPT_END_OPTIONS:
+				argbase++;
+				goto endoptions;
+
+			default:
+				THROW_ERROR_LABEL(finally, code, "Unhandled get option idx");
+		}
+	}
+endoptions:
+
+	if (objc == argbase) {
+		Tcl_WrongNumArgs(interp, 1, objv, "?-default defaultValue? json_val ?path ...?");
+		code = TCL_ERROR;
+		goto finally;
+	}
+	//}}}
+
+	if (objc >= argbase+2) {
 		const char*		s = NULL;
 		int				l;
 
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 1));
+		TEST_OK_LABEL(finally, code, resolve_path(interp, objv[argbase], objv+argbase+1, objc-(argbase+1), &target, 0, 1, def));
 		s = Tcl_GetStringFromObj(objv[objc-1], &l);
 		if (s[0] == '?' && s[1] != '?') {
 			// If the last element of the path is an unquoted
@@ -2550,49 +2603,110 @@ static int jsonGet(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 	} else {
 		enum json_types		type;
 		Tcl_ObjInternalRep*	ir;
-		replace_tclobj(&target, objv[1]);
-		TEST_OK_LABEL(finally, retval, JSON_GetIntrepFromObj(interp, target, &type, &ir));	// Force parsing objv[2] as JSON
+		replace_tclobj(&target, objv[argbase]);
+		TEST_OK_LABEL(finally, code, JSON_GetIntrepFromObj(interp, target, &type, &ir));	// Force parsing objv[argbase] as JSON
+		if (type == JSON_NULL && def)
+			replace_tclobj(&target, def);
 	}
 
-	if (convert) {
-		TEST_OK_LABEL(finally, retval, convert_to_tcl(interp, target, &res));
+	if (convert && target != def) {
+		TEST_OK_LABEL(finally, code, convert_to_tcl(interp, target, &res));
 	} else {
 		replace_tclobj(&res, target);
 	}
 
-	if (retval == TCL_OK)
-		Tcl_SetObjResult(interp, res);
+	Tcl_SetObjResult(interp, res);
 
 finally:
+	release_tclobj(&def);
 	release_tclobj(&target);
 	release_tclobj(&res);
 
-	return retval;
+	return code;
 }
 
 //}}}
 static int jsonExtract(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	int				code = TCL_OK;
 	Tcl_Obj*		target = NULL;
+	Tcl_Obj*		def = NULL;
+	int				argbase = 1;
+	static const char* opts[] = {
+		"-default",
+		"--",			// Unnecessary for this case, but supported for convention
+		NULL
+	};
+	enum {
+		OPT_DEFAULT,
+		OPT_END_OPTIONS
+	};
 
 	if (objc < 2) {
-		Tcl_WrongNumArgs(interp, 1, objv, "json_val ?path ...?");
+		Tcl_WrongNumArgs(interp, 1, objv, "?-default defaultValue? json_val ?path ...?");
 		return TCL_ERROR;
 	}
 
-	if (objc >= 3) {
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+	// Consume any leading options {{{
+	while (argbase < objc) {
+		int	optidx;
+
+		enum json_types	type = JSON_GetJSONType(objv[argbase]);
+		if (type != JSON_UNDEF) break;		// Arg is already a JSON value, stop consuming options
+		const char*	str = Tcl_GetString(objv[argbase]);		// If it's not a native json value we will need this string rep to parse for the next step, so potientially regenerating the stringrep here isn't a concern
+		if (str[0] != '-') break;			// Not an option
+		TEST_OK_LABEL(finally, code, Tcl_GetIndexFromObj(interp, objv[argbase], opts, "option", TCL_EXACT, &optidx));
+
+		switch (optidx) {
+			case OPT_DEFAULT:
+				if (objc - argbase < 2) {
+					Tcl_SetErrorCode(interp, "TCL", "ARGUMENT", "MISSING", NULL);
+					THROW_ERROR_LABEL(finally, code, "missing argument to \"", Tcl_GetString(objv[argbase]), "\"");
+				}
+				{
+					enum json_types	type;
+					Tcl_Obj*		val;
+					// Ensure the default is valid, even if we don't use it (fail early)
+					TEST_OK_LABEL(finally, code, JSON_GetJvalFromObj(interp, objv[argbase+1], &type, &val));
+				}
+				replace_tclobj(&def, objv[argbase+1]);
+				argbase += 2;
+				break;
+
+			case OPT_END_OPTIONS:
+				argbase++;
+				goto endoptions;
+
+			default:
+				THROW_ERROR_LABEL(finally, code, "Unhandled get option idx");
+		}
+	}
+endoptions:
+
+	if (objc == argbase) {
+		Tcl_WrongNumArgs(interp, 1, objv, "?-default defaultValue? json_val ?path ...?");
+		code = TCL_ERROR;
+		goto finally;
+	}
+	//}}}
+
+	if (objc >= argbase+2) {
+		TEST_OK_LABEL(finally, code, resolve_path(interp, objv[argbase], objv+argbase+1, objc-(argbase+1), &target, 0, 0, def));
 	} else {
 		enum json_types	type;
 		Tcl_Obj*		val;
-		TEST_OK(JSON_GetJvalFromObj(interp, objv[1], &type, &val));	// Just a validation, keeps the contract that we return JSON
-		replace_tclobj(&target, objv[1]);
+		TEST_OK_LABEL(finally, code, JSON_GetJvalFromObj(interp, objv[argbase], &type, &val));	// Just a validation, keeps the contract that we return JSON
+		replace_tclobj(&target, objv[argbase]);
+		if (type == JSON_NULL && def)
+			replace_tclobj(&target, def);
 	}
 
 	Tcl_SetObjResult(interp, target);
-	release_tclobj(&target);
 
-	return TCL_OK;
+finally:
+	release_tclobj(&target);
+	release_tclobj(&def);
+	return code;
 }
 
 //}}}
@@ -2832,7 +2946,7 @@ static int jsonIsNull(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 	}
 
 	if (objc >= 3) {
-		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0));
+		TEST_OK(resolve_path(interp, objv[1], objv+2, objc-2, &target, 0, 0, NULL));
 	} else {
 		replace_tclobj(&target, objv[1]);
 	}
@@ -2918,48 +3032,60 @@ static int jsonNRForeach(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj
 }
 
 //}}}
+_Pragma("GCC diagnostic push");
+_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
 static int jsonForeach(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRForeach, cdata, objc, objv);
 }
 
 //}}}
+_Pragma("GCC diagnostic pop");
 static int jsonNRLmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return _foreach(cdata, interp, objc, objv, COLLECT_LIST);
 }
 
 //}}}
+_Pragma("GCC diagnostic push");
+_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
 static int jsonLmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRLmap, cdata, objc, objv);
 }
 
 //}}}
+_Pragma("GCC diagnostic pop");
 static int jsonNRAmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return _foreach(cdata, interp, objc, objv, COLLECT_ARRAY);
 }
 
 //}}}
+_Pragma("GCC diagnostic push");
+_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
 static int jsonAmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRAmap, cdata, objc, objv);
 }
 
 //}}}
+_Pragma("GCC diagnostic pop");
 static int jsonNROmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return _foreach(cdata, interp, objc, objv, COLLECT_OBJECT);
 }
 
 //}}}
+_Pragma("GCC diagnostic push");
+_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
 static int jsonOmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNROmap, cdata, objc, objv);
 }
 
 //}}}
+_Pragma("GCC diagnostic pop");
 static int jsonFreeCache(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 #if DEDUP
@@ -2985,24 +3111,76 @@ static int jsonNop(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 //}}}
 static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	int			code = TCL_OK;
 	Tcl_Obj*	pretty = NULL;
-	int			retval = TCL_OK;
 	Tcl_Obj*	indent = NULL;
+	Tcl_Obj*	target = NULL;
+	int			argbase = 1;
+	static const char* opts[] = {
+		"-indent",
+		"--",			// Unnecessary for this case, but supported for convention
+		NULL
+	};
+	enum {
+		OPT_INDENT,
+		OPT_END_OPTIONS
+	};
 
-	if (objc < 2 || objc > 3)
-		CHECK_ARGS(2, "pretty json_val ?indent?");
+	enum {A_cmd=0, A_VAL, A_args};
+	CHECK_MIN_ARGS_LABEL(finally, code, "pretty ?-indent indent? json_val ?key ...?");
 
-	if (objc >= 3)
-		replace_tclobj(&indent, objv[2]);
+	// Consume any leading options {{{
+	while (argbase < objc) {
+		int	optidx;
 
-	retval = JSON_Pretty(interp, objv[1], indent, &pretty);
+		enum json_types	type = JSON_GetJSONType(objv[argbase]);
+		if (type != JSON_UNDEF) break;		// Arg is already a JSON value, stop consuming options
+		const char*	str = Tcl_GetString(objv[argbase]);		// If it's not a native json value we will need this string rep to parse for the next step, so potientially regenerating the stringrep here isn't a concern
+		if (str[0] != '-') break;			// Not an option
+		TEST_OK_LABEL(finally, code, Tcl_GetIndexFromObj(interp, objv[argbase], opts, "option", TCL_EXACT, &optidx));
 
-	if (retval == TCL_OK)
-		Tcl_SetObjResult(interp, pretty);
+		switch (optidx) {
+			case OPT_INDENT:
+				if (objc - argbase < 2) {
+					Tcl_SetErrorCode(interp, "TCL", "ARGUMENT", "MISSING", NULL);
+					THROW_ERROR_LABEL(finally, code, "missing argument to \"", Tcl_GetString(objv[argbase]), "\"");
+				}
+				replace_tclobj(&indent, objv[argbase+1]);
+				argbase += 2;
+				break;
 
-	release_tclobj(&pretty);
+			case OPT_END_OPTIONS:
+				argbase++;
+				goto endoptions;
 
-	return retval;
+			default:
+				THROW_ERROR_LABEL(finally, code, "Unhandled get option idx");
+		}
+	}
+endoptions:
+
+	if (objc == argbase) {
+		Tcl_WrongNumArgs(interp, 1, objv, "?-default defaultValue? json_val ?key ...?");
+		code = TCL_ERROR;
+		goto finally;
+	}
+	//}}}
+
+	if (objc > argbase+1) {
+		TEST_OK_LABEL(finally, code, resolve_path(interp, objv[argbase], objv+argbase+1, objc-(argbase+1), &target, 0, 0, NULL));
+	} else {
+		replace_tclobj(&target, objv[argbase]);
+	}
+
+	TEST_OK_LABEL(finally, code, JSON_Pretty(interp, target, indent, &pretty));
+
+	Tcl_SetObjResult(interp, pretty);
+
+finally:
+	replace_tclobj(&pretty, NULL);
+	replace_tclobj(&indent, NULL);
+
+	return code;
 }
 
 //}}}
@@ -3877,6 +4055,7 @@ DLLEXPORT int Rl_json_SafeInit(Tcl_Interp* interp) //{{{
 }
 
 //}}}
+#if UNLOAD
 DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 {
 	Tcl_Namespace*		ns;
@@ -3915,6 +4094,7 @@ DLLEXPORT int Rl_json_SafeUnload(Tcl_Interp* interp, int flags) //{{{
 }
 
 //}}}
+#endif
 
 #ifdef __cplusplus
 }

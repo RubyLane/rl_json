@@ -231,8 +231,6 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 
 	objtype = g_objtype_for_type[type];
 
-	Tcl_FreeInternalRep(target);
-
 	// ptr1 is the Tcl_Obj holding the Tcl structure for this value               
 	// ptr2 holds the template actions, if any have been generated for this value 
 	replace_tclobj((Tcl_Obj**)&intrep.twoPtrValue.ptr1, rep);

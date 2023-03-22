@@ -642,6 +642,12 @@ test template-7.1 {Action list: optimize fetches} -body { #<<<
 }
 #>>>
 
+# Coverage golf
+test template-apply_template_actions-1.1 {bad boolean subst} -body {json template {"~B:x"} {x bad}} -returnCodes error -result {Error substituting value from "x" into template, not a boolean: "bad"} -errorCode {TCL VALUE NUMBER}
+test template-apply_template_actions-2.1 {bad json subst} -body {json template {"~J:x"} {x bad}} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
+test template-apply_template_actions-3.1 {bad template subst} -body {json template {"~T:x"} {x bad}} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
+test template-apply_template_actions-4.1 {static stack overflow} -body {json template {[[[[[[[[[["~S:x"]]]]]]]]]]} {x foo}} -result {[[[[[[[[[["foo"]]]]]]]]]]}
+
 
 ::tcltest::cleanupTests
 return

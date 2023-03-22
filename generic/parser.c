@@ -254,7 +254,7 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 	Tcl_Obj*				out = NULL;
 
 	if (val)
-		release_tclobj(val);
+		replace_tclobj(val, NULL);
 
 	if (unlikely(p >= e)) goto err;
 

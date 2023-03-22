@@ -15,6 +15,24 @@ test extract-1.1 {extract a value from an object} -body { #<<<
 	} foo
 } -result {"bar"}
 #>>>
+test extract-1.2 {extract a value from an object, unused valid default} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} foo
+} -result {"bar"}
+#>>>
+test extract-1.3 {extract a value from an object, unused invalid default} -body { #<<<
+	json extract -default def {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+		}
+	} foo
+} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} def 0}
+#>>>
 test extract-2.1 {extract a value from an object} -body { #<<<
 	json extract {
 		{
@@ -75,6 +93,13 @@ test extract-6.1 {extract of a toplevel value} -body { #<<<
 		}
 	}
 #>>>
+test extract-6.2 {extract toplevel array}	{json extract {[1, 2, 3]}}		{[1, 2, 3]}
+test extract-6.3 {extract toplevel string}	{json extract {"foo"}}			{"foo"}
+test extract-6.4 {extract toplevel number}	{json extract 1e6}				1e6
+test extract-6.5 {extract toplevel true}	{json extract true}				true
+test extract-6.6 {extract toplevel false}	{json extract false}			false
+test extract-6.7 {extract toplevel null}	{json extract null}				null
+test extract-6.8 {extract toplevel null}	{json extract -default 42 null}	42
 test extract-7.1 {extract for invalid value - empty string} -body { #<<<
 	json extract {} foo
 } -returnCodes error -result {Error parsing JSON value: No JSON value found at offset 0}
@@ -886,6 +911,334 @@ test extract-60.22 {invalid path: subscribed atomic: template invalid} -body { #
 	} foo blah
 } -returnCodes error -result {Cannot descend into atomic type "string" with path element 2: "blah"}
 #>>>
+test extract-60.23 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json extract {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz en
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got en}
+#>>>
+test extract-60.24 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json extract {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got foo}
+#>>>
+test extract-60.25 {Get a template point} -body { #<<<
+	json extract {
+		{
+			"foo": "~S:bar"
+		}
+	} foo
+} -result {"~S:bar"}
+#>>>
+test extract-61.1 {invalid path: missing key} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} blah
+} -result {"def"}
+#>>>
+test extract-61.2 {invalid path: subscribed atomic: string} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.3 {invalid path: subscribed atomic: number} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 1 blah
+} -result {"def"}
+#>>>
+test extract-61.4 {invalid path: subscribed atomic: boolean} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 3 blah
+} -result {"def"}
+#>>>
+test extract-61.5 {invalid path: subscribed atomic: null} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 5 blah
+} -result {"def"}
+#>>>
+test extract-61.6 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz blah
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got blah}
+#>>>
+test extract-61.7 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-12
+} -result {"def"}
+#>>>
+test extract-61.8 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz 100
+} -result {"def"}
+#>>>
+test extract-61.9 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz -2
+} -result {"def"}
+#>>>
+test extract-61.10 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-2foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-2foo}
+#>>>
+test extract-61.11 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-foo}
+#>>>
+test extract-61.12 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end2
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end2}
+#>>>
+test extract-61.13 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end+2
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end+2}
+#>>>
+test extract-61.14 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz "end- 2"
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end- 2}
+#>>>
+test extract-61.15 {invalid path: invalid array index} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz end-
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got end-}
+#>>>
+test extract-61.16 {invalid path: subscribed atomic: template string} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~S:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.17 {invalid path: subscribed atomic: template number} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~N:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.18 {invalid path: subscribed atomic: template boolean} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~B:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.19 {invalid path: subscribed atomic: template json doc} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~J:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.20 {invalid path: subscribed atomic: template json template} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~T:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.21 {invalid path: subscribed atomic: template literal} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~L:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.22 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} foo blah
+} -result {"def"}
+#>>>
+test extract-61.23 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz en
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got en}
+#>>>
+test extract-61.24 {invalid path: subscribed atomic: template invalid} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~X:bar",
+			"baz":  ["str", 123, 123.4, true, false, null, {"inner": "obj"}],
+			"something": {
+				"?type": "fromdoc"
+			}
+		}
+	} baz foo
+} -returnCodes error -result {Expected an integer index or end(-integer)?, got foo}
+#>>>
+test extract-61.25 {Get a template point} -body { #<<<
+	json extract -default {"def"} {
+		{
+			"foo": "~S:bar"
+		}
+	} foo
+} -result {"~S:bar"}
+#>>>
 
 test extract-70.1 {Path tail element isn't interpreted as a modifier - no need to escape} -body { #<<<
 	json extract {
@@ -899,6 +1252,16 @@ test extract-70.1 {Path tail element isn't interpreted as a modifier - no need t
 	} something ?type
 } -result {"fromdoc"}
 #>>>
+
+# Coverage golf
+test extract-jsonExtract-1.1 {check args} -body {json extract} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "extract ?-default defaultValue? json_val ?path ...?"}
+test extract-jsonExtract-2.1 {check args} -body {json extract -default {"def"}} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "extract ?-default defaultValue? json_val ?path ...?"}
+test extract-jsonExtract-3.1 {check args} -body {json extract -foo def} -returnCodes error -errorCode {TCL LOOKUP INDEX option -foo} -result {bad option "-foo": must be *} -match glob
+test extract-jsonExtract-4.1 {check args} -body {json extract -default} -returnCodes error -errorCode {TCL ARGUMENT MISSING} -result {missing argument to "-default"}
+test extract-jsonExtract-4.2 {check args} -body {json extract -default bad} -returnCodes error -errorCode {RL JSON PARSE {Illegal character} bad 0} -result {Error parsing JSON value: Illegal character at offset 0}
+test extract-jsonExtract-5.1 {check args} -body {json extract -- true} -result true
+#test extract-jsonExtract-5.2 {check args} -body {json extract true} -result true
+test extract-jsonExtract-6.1 {default on null} -body {json extract -default {"def"} null} -result {"def"}
 
 ::tcltest::cleanupTests
 return

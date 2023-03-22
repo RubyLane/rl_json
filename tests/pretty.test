@@ -27,8 +27,8 @@ test pretty-1.1 {Basic pretty-print} -body { #<<<
     ]
 }}
 #>>>
-test pretty-1.1 {Basic pretty-print, different indent} -body { #<<<
-	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} "  "
+test pretty-1.2 {Basic pretty-print, different indent} -body { #<<<
+	json pretty -indent "  " {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
 } -result {{
   "foo":          null,
   "empty":        {},
@@ -49,11 +49,25 @@ test pretty-1.1 {Basic pretty-print, different indent} -body { #<<<
 #>>>
 test pretty-2.1 {too few args} -body { #<<<
 	json pretty
-} -returnCodes error -result {Wrong # of arguments.  Must be "pretty json_val ?indent?"}
+} -returnCodes error -result {wrong # args: should be "pretty pretty ?-indent indent? json_val ?key ...?"}
 #>>>
-test pretty-2.2 {too many args} -body { #<<<
-	json pretty {"foo"} 8 bar
-} -returnCodes error -result {Wrong # of arguments.  Must be "pretty json_val ?indent?"}
+test pretty-3.1 {path} -body { #<<<
+	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} {This is a much longer key}
+} -result {[
+    "str",
+    123,
+    123.4,
+    true,
+    false,
+    null,
+    {
+        "inner": "obj"
+    }
+]}
+#>>>
+test pretty-3.2 {bad path} -body { #<<<
+	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} bad
+} -returnCodes error -result {Path element 2: "bad" not found} -errorCode NONE
 #>>>
 
 test debug-1.1 {Basic debug pretty-print} -body { #<<<
@@ -76,6 +90,13 @@ test debug-1.1 {Basic debug pretty-print} -body { #<<<
     \]
 }$}
 #>>>
+
+# Coverage golf
+test pretty-jsonPretty-1.1 {} -body {json pretty -indent} -returnCodes error -result {missing argument to "-indent"} -errorCode {TCL ARGUMENT MISSING}
+test pretty-jsonPretty-2.1 {} -body {json pretty -- 1} -result 1
+test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -result {wrong # args: should be "pretty ?-default defaultValue? json_val ?key ...?"} -errorCode {TCL WRONGARGS}
+test pretty-jsonPretty-4.1 {} -body {json pretty bad} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
+test pretty-jsonPretty-5.1 {} -body {json pretty -bad} -returnCodes error -result {bad option "-bad": must be *} -errorCode {TCL LOOKUP INDEX option -bad} -match glob
 
 ::tcltest::cleanupTests
 return

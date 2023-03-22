@@ -3,7 +3,7 @@
 #ifndef _TCLSTUFF_H
 #define _TCLSTUFF_H
 
-#include "tcl.h"
+#include <tcl.h>
 
 #define NEW_CMD( tcl_cmd, c_cmd ) \
 	Tcl_CreateObjCommand( interp, tcl_cmd, \
@@ -29,6 +29,20 @@
 		goto label;											\
 	}
 
+#define THROW_PRINTF_LABEL( label, var, fmtstr, ... )						\
+	{																		\
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf((fmtstr), ##__VA_ARGS__));	\
+		var = TCL_ERROR;													\
+		goto label;															\
+	}
+
+#define THROW_POSIX_LABEL(label, code, msg) do {							\
+	int err = Tcl_GetErrno();											\
+	const char* errstr = Tcl_ErrnoId();									\
+	Tcl_SetErrorCode(interp, "POSIX", errstr, Tcl_ErrnoMsg(err), NULL);	\
+	THROW_PRINTF_LABEL(label, code, "%s: %s %s", msg, errstr, Tcl_ErrnoMsg(err));	\
+} while(0);
+
 // convenience macro to check the number of arguments passed to a function
 // implementing a tcl command against the number expected, and to throw
 // a tcl error if they don't match.  Note that the value of expected does
@@ -40,6 +54,24 @@
 						  msg, "\"", NULL );							\
 		return TCL_ERROR;												\
 	}
+
+#define CHECK_ARGS_LABEL(label, rc, msg) \
+	do { \
+		if (objc != A_objc) { \
+			Tcl_WrongNumArgs(interp, A_cmd+1, objv, msg); \
+			rc = TCL_ERROR; \
+			goto label; \
+		} \
+	} while(0);
+
+#define CHECK_MIN_ARGS_LABEL(label, rc, msg) \
+	do { \
+		if (objc < A_args) { \
+			Tcl_WrongNumArgs(interp, A_cmd+1, objv, msg); \
+			rc = TCL_ERROR; \
+			goto label; \
+		} \
+	} while(0);
 
 
 // A rather frivolous macro that just enhances readability for a common case
@@ -69,12 +101,17 @@ static inline void release_tclobj(Tcl_Obj** obj)
 }
 static inline void replace_tclobj(Tcl_Obj** target, Tcl_Obj* replacement)
 {
-	if (*target) {
-		Tcl_DecrRefCount(*target);
-		*target = NULL;
-	}
+	Tcl_Obj*	old = *target;
+
+#if DEBUG
+	if (*target && (*target)->refCount <= 0) Tcl_Panic("replace_tclobj target exists but has refcount <= 0: %d", (*target)->refCount);
+#endif
 	*target = replacement;
 	if (*target) Tcl_IncrRefCount(*target);
+	if (old) {
+		Tcl_DecrRefCount(old);
+		old = NULL;
+	}
 }
 
 #if DEBUG

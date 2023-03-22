@@ -30,8 +30,8 @@ exist, a JSON null is interpolated in its place.
 
 Quick Reference
 ---------------
-* [json get *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the closest native Tcl type (other than JSON) for the extracted portion.
-* [json extract *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the JSON fragment.
+* [json get ?-default *defaultValue*? *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the closest native Tcl type (other than JSON) for the extracted portion.
+* [json extract ?-default *defaultValue*? *json_val* ?*key* ...?]  - Extract the value of a portion of the *json_val*, returns the JSON fragment.
 * [json exists *json_val* ?*key* ...?]  - Tests whether the supplied key path resolve to something that exists in *json_val*
 * [json set *json_variable_name* ?*key* ...? *value*]  - Updates the JSON value stored in the variable *json_variable_name*, replacing the value referenced by *key* ... with the JSON value *value*.
 * [json unset *json_variable_name* ?*key* ...?]  - Updates the JSON value stored in the variable *json_variable_name*, removing the value referenced by *key* ...
@@ -51,7 +51,7 @@ Quick Reference
 * [json type *json_val* ?*key* ...?]  - Return the type of the named JSON value, one of "object", "array", "string", "number", "boolean" or "null".
 * [json length *json_val* ?*key* ...?]  - Return the length of the of the named JSON array, number of entries in the named JSON object, or number of characters in the named JSON string.  Other JSON value types are not supported.
 * [json keys *json_val* ?*key* ...?]  - Return the keys in the of the named JSON object, found by following the path of *key*s.
-* [json pretty *json_val*]  - Returns a pretty-printed string representation of *json_val*.  Useful for debugging or inspecting the structure of JSON data.
+* [json pretty ?-indent *indent*? *json_val* ?*key* ...?]  - Returns a pretty-printed string representation of *json_val*.  Useful for debugging or inspecting the structure of JSON data.
 * [json decode *bytes* ?*encoding*?]  - Decode the binary *bytes* into a character string according to the JSON standards.  The optional *encoding* arg can be one of *utf-8*, *utf-16le*, *utf-16be*, *utf-32le*, *utf-32be*.  The encoding is guessed from the BOM (byte order mark) if one is present and *encoding* isn't specified.
 * [json valid ?*-extensions* *extensionlist*? ?*-details* *detailsvar*?  *json_val*]  - Return true if *json_val* conforms to the JSON grammar with the extensions in *extensionlist*.  Currently only one extension is supported: *comments*, and is the default.  To reject comments, use *-extensions {}*.  If *-details detailsvar* is supplied and the validation fails, the variable *detailsvar* is set to a dictionary with the keys *errmsg*, *doc* and *char_ofs*.  *errmsg* contains the reason for the failure, *doc* contains the failing json value, and *char_ofs* is the character index into *doc* of the first invalid character.
 
@@ -376,4 +376,4 @@ that value use the internal representation directly.
 License
 -------
 
-Copyright 2015-2020 Ruby Lane.  Licensed under the same terms as the Tcl core.
+Copyright 2015-2023 Ruby Lane.  Licensed under the same terms as the Tcl core.
