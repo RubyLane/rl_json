@@ -238,14 +238,14 @@ test number-2.3 {json number, not a number} -body { #<<<
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {can't use non-numeric string as operand of "+"} {ARITH DOMAIN {non-numeric string}}]
+} -result [list 1 {can't use non-numeric string "foo" as operand of "+"} {ARITH DOMAIN {non-numeric string}}]
 #>>>
 test number-2.4 {json number, not a number: empty string} -body { #<<<
 	set code [catch {json number ""} r o]
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {can't use empty string as operand of "+"} {ARITH DOMAIN {empty string}}]
+} -result [list 1 {can't use empty string "" as operand of "+"} {ARITH DOMAIN {empty string}}]
 #>>>
 
 ::tcltest::cleanupTests
