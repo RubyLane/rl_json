@@ -3,11 +3,14 @@
 #
 
 builtin(include,tclconfig/tcl.m4)
-builtin(include,ax_gcc_builtin.m4)
 
 #
 # Add here whatever m4 macros you want to define for your package
 #
+
+builtin(include,ax_gcc_builtin.m4)
+builtin(include,ax_cc_for_build.m4)
+builtin(include,ax_check_compile_flag.m4)
 
 AC_DEFUN([ENABLE_ENSEMBLE], [
 	#trap 'echo "val: (${enable_ensemble+set}), ensemble_ok: ($ensemble_ok), ensemble: ($ENSEMBLE)"' DEBUG

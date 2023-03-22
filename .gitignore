@@ -1,11 +1,16 @@
 *.swp
 *.swo
 *.o
-*.so
 *.a
+*.so
+*.gcda
+*.gcno
+*.gcov
+*~
 core
 vgcore.*
 autom4te.cache
+configure
 config.log
 config.status
 Makefile
@@ -14,9 +19,6 @@ rl_jsonConfig.sh
 cachegrind.out*
 perf.data
 perf.data.old
-*.gcda
-*.gcno
-*.gcov
 .cproject
 .project
 .settings

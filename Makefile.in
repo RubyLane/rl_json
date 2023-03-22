@@ -176,6 +176,11 @@ VALGRIND	= valgrind
 VALGRINDARGS	= --tool=memcheck --num-callers=8 --leak-resolution=high \
 		  --leak-check=yes -v --suppressions=suppressions --keep-debuginfo=yes \
 		  --trace-children=yes
+PGOGEN_BUILD = -fprofile-generate=prof
+PGO_BUILD = @PGO_BUILD@
+PGO=
+
+CFLAGS		= @CFLAGS@ $(PGO)
 
 .SUFFIXES: .c .$(OBJEXT)
 
@@ -271,7 +276,7 @@ vim-core:
 	$(TCLSH_ENV) $(PKG_ENV) vim -c 'packadd termdebug' -c "set mouse=a" -c "set number" -c "set foldlevel=100" -c "Termdebug $(TCLSH_PROG) core" -c Winbar generic/rl_json.c
 
 vim-gdb: binaries libraries
-	$(TCLSH_ENV) $(PKG_ENV) vim -c "set number" -c "set mouse=a" -c "set foldlevel=100" -c "Termdebug -ex set\ print\ pretty\ on --args $(TCLSH_PROG) tests/all.tcl $(TESTFLAGS) -singleproc 1 -load package\ ifneeded\ $(PACKAGE_NAME)\ $(PACKAGE_VERSION)\ [list\ load\ `@CYGPATH@ $(PKG_LIB_FILE)`\ [string\ totitle\ $(PACKAGE_NAME)]]" -c "1windo set nonumber" -c "2windo set nonumber" generic/rl_json.c
+	$(TCLSH_ENV) $(PKG_ENV) vim -c "set number" -c "set mouse=a" -c "set foldlevel=100" -c "Termdebug -ex set\ print\ pretty\ on --args $(TCLSH_PROG) tests/all.tcl $(TESTFLAGS) -singleproc 1 -load package\ ifneeded\ $(PACKAGE_NAME)\ $(PACKAGE_VERSION)\ [list\ load\ `@CYGPATH@ $(PKG_LIB_FILE)`\ [string\ totitle\ $(PACKAGE_NAME)]]" -c "2windo set nonumber" -c "1windo set nonumber" generic/rl_json.c
 
 gdb:
 	$(PKG_ENV) gdb $(TCLSH_PROG) $(SCRIPT)
@@ -390,6 +395,7 @@ clean:
 	-test -z "$(BINARIES)" || rm -f $(BINARIES)
 	-rm -f *.$(OBJEXT) core *.core
 	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
+	-rm -f *.gcda *.gcno *.gcov
 
 distclean: clean
 	-rm -f *.tab.c
@@ -477,8 +483,16 @@ uninstall-binaries:
 	  rm -f $(DESTDIR)$(bindir)/$$p; \
 	done
 
+pgo:
+	rm -rf prof
+	make -C . PGO="$(PGOGEN_BUILD)" clean binaries libraries benchmark
+	make -C . PGO="$(PGO_BUILD)" clean binaries libraries
+
+coverage:
+	make -C . PGO="--coverage" clean binaries libraries test
+
 .PHONY: all binaries clean depend distclean doc install libraries test
-.PHONY: valgrind valgrind-shell vim-gdb vim-core
+.PHONY: valgrind valgrind-shell vim-gdb vim-core pgo coverage benchmark
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
