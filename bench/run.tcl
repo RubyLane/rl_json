@@ -1,23 +1,7 @@
-#!/usr/bin/env cfkit8.6
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
 
 set big	[string repeat a [expr {int(1e8)}]]	;# Allocate 100MB to pre-expand the zippy pool
 unset big
-
-if {[file system [info script]] eq "native"} {
-	package require platform
-
-	foreach platform [platform::patterns [platform::identify]] {
-		set tm_path		[file join $env(HOME) .tbuild repo tm $platform]
-		set pkg_path	[file join $env(HOME) .tbuild repo pkg $platform]
-		if {[file exists $tm_path]} {
-			tcl::tm::path add $tm_path
-		}
-		if {[file exists $pkg_path]} {
-			lappend auto_path $pkg_path
-		}
-	}
-}
 
 set here	[file dirname [file normalize [info script]]]
 set parent	[file dirname $here]
@@ -25,7 +9,9 @@ tcl::tm::path add $here
 lappend auto_path $parent
 
 package require platform
-package require bench
+
+source [file join $here bench-0.1.tm]
+package provide bench 0.1
 
 proc with_chan {var create use} {
 	upvar 1 $var h
@@ -196,12 +182,21 @@ proc benchmark_mode script {
 proc main {} {
 	try {
 		set here	[file dirname [file normalize [info script]]]
-		benchmark_mode {
-			puts "[string repeat - 80]\nStarting benchmarks\n"
-			bench::run_benchmarks $here {*}$::argv
-		}
+		#benchmark_mode {
+		#	puts "[string repeat - 80]\nStarting benchmarks\n"
+		#	bench::run_benchmarks $here {*}$::argv
+		#}
+
+		puts "[string repeat - 80]\nStarting benchmarks\n"
+		bench::run_benchmarks $here {*}$::argv
 	} on ok {} {
 		exit 0
+	} trap {BENCH BAD_RESULT} {errmsg options} {
+		puts stderr $errmsg
+		exit 1
+	} trap {BENCH BAD_CODE} {errmsg options} {
+		puts stderr $errmsg
+		exit 1
 	} trap {BENCH INVALID_ARG} {errmsg options} {
 		puts stderr $errmsg
 		exit 1

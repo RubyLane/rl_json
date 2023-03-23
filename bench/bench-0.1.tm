@@ -1,3 +1,4 @@
+puts stderr "Loading bench"
 package require math::statistics
 
 namespace eval bench {
@@ -70,15 +71,40 @@ proc _writefile {fn dat} { #<<<
 #>>>
 proc _run_if_set script { #<<<
 	if {$script eq ""} return
-	uplevel 2 [list if 1 $script]
+	uplevel 2 $script
+}
+
+#>>>
+proc _pick {mode variant patterns} { #<<<
+	set chain	0
+	set found	0
+	set res [lmap {pat e} $patterns {
+		if {!$chain && ![string match $pat $variant]} continue
+		if {$e eq "-"} {
+			set chain	1
+			continue
+		}
+		set chain	0
+		switch -exact -- $mode {
+			first - first!	{return $e}
+			all - all!		{set found 1; set e}
+			default	{error "Invalid _pick mode: ($mode)"}
+		}
+	}]
+	if {!$found && [string match *! $mode]} {
+		error "No pattern matches for \"$variant\""
+	}
+	set res
 }
 
 #>>>
 proc _verify_res {variant retcodes expected match_mode got options} { #<<<
+	variable current_bench
+
 	if {[dict get $options -code] ni $retcodes} {
-		bench::output error "Error: $got"
-		throw [list BENCH BAD_CODE $variant $retcodes [dict get $options -code]] \
-			"$variant: Expected codes [list $retcodes], got [dict get $options -code]"
+		bench::output error "Error: $got\n[dict get $options -errorinfo]"
+		throw [list BENCH BAD_CODE $current_bench $variant $retcodes [dict get $options -code]] \
+			"$current_bench/$variant: Expected codes [list $retcodes], got [dict get $options -code]"
 	}
 
 	switch -- $match_mode {
@@ -91,8 +117,8 @@ proc _verify_res {variant retcodes expected match_mode got options} { #<<<
 		}
 	}
 
-	throw [list BENCH BAD_RESULT $variant $match_mode $expected $got] \
-		"$variant: Expected ($match_mode): -----------\n$expected\nGot: ----------\n$got"
+	throw [list BENCH BAD_RESULT $current_bench $variant $match_mode $expected $got] \
+		"$current_bench/$variant: Expected ($match_mode): -----------\n$expected\nGot: ----------\n$got"
 }
 
 #>>>
@@ -119,6 +145,7 @@ proc bench {name desc args} { #<<<
 	variable run
 	variable skipped
 	variable output
+	variable current_bench
 
 	# -target_cv		- Run until the coefficient of variation is below this, up to -max_time
 	# -max_time 		- Maximum number of seconds to keep running while the cv is converging
@@ -137,10 +164,11 @@ proc bench {name desc args} { #<<<
 		-max_time		4.0
 		-min_it			30
 		-window			30
+		-overhead		{}
 	}
 	array set opts $args
 	set badargs [lindex [_intersect3 [array names opts] {
-		-setup -compare -cleanup -batch -match -result -returnCodes -target_cv -min_time -max_time -min_it -window
+		-setup -compare -cleanup -batch -match -result -results -returnCodes -target_cv -min_time -max_time -min_it -window -overhead
 	}] 0]
 
 	if {[llength $badargs] > 0} {
@@ -172,22 +200,25 @@ proc bench {name desc args} { #<<<
 
 	set variant_stats {}
 
+	set current_bench $name
 	_run_if_set $opts(-setup)
 	try {
 		dict for {variant script} $opts(-compare) {
 			set hint	[lindex [time {
 				catch {uplevel 1 $script} r o
 			}] 0]
-			if {[info exists opts(-result)]} {
-				_verify_res $variant $normalized_codes $opts(-result) $opts(-match) $r $o
+			unset -nocomplain expected
+			if {[info exists opts(-results)]} {
+				set expected	[_pick first! $variant $opts(-results)]
+			} elseif {[info exists opts(-result)]} {
+				set expected	$opts(-result)
+			}
+			if {[info exists expected]} {
+				_verify_res $variant $normalized_codes $expected $opts(-match) $r $o
 			}
 
-			set single_empty {
-				uplevel 1 [list if 1 {}]
-			}
-			set single_ex_s	{
-				uplevel 1 [list if 1 $script]
-			}
+			set single_empty [list uplevel 1 {}]
+			set single_ex_s	[list uplevel 1 $script]
 			if 1 $single_empty	;# throw the first away
 			if 1 $single_ex_s	;# throw the first away
 
@@ -205,7 +236,12 @@ proc bench {name desc args} { #<<<
 			set extime_comp	[expr {$extime - $single_overhead}]
 			#puts stderr "extime: $extime, extime comp: $extime_comp"
 			if {$opts(-batch) eq "auto"} {
-				set batch	[expr {int(round(max(1, 1000.0/$extime_comp)))}]
+				if {$extime_comp <= 0} {
+					# Can happen for very low overhead
+					set batch	10000
+				} else {
+					set batch	[expr {int(round(max(1, 1000.0/$extime_comp)))}]
+				}
 				#puts stderr "Guessed batch size of $batch based on sample execution time $extime_comp usec"
 			} else {
 				set batch	$opts(-batch)
@@ -215,15 +251,16 @@ proc bench {name desc args} { #<<<
 			# Measure the instrumentation overhead to compensate for it <<<
 			set times	{}
 			set start	[clock microseconds]	;# Prime [clock microseconds], start var
-			set bscript	[apply $make_script $batch {}]
-			uplevel 1 [list if 1 $script]
+			set overhead_script	[join [_pick all $variant $opts(-overhead)] \n]
+			set bscript	[apply $make_script $batch $overhead_script]
+			uplevel 1 $script
 			for {set i 0} {$i < int(100000 / ($batch*0.15))} {incr i} {
 				set start [clock microseconds]
-				uplevel 1 [list if 1 $bscript]
+				uplevel 1 $bscript
 				lappend times [- [clock microseconds] $start]
 			}
 			set overhead	[::tcl::mathfunc::min {*}[lmap e $times {expr {$e / double($batch)}}]]
-			#apply $output debug [format {Overhead: %.3f usec, mean: %.3f for batch %d} $overhead [expr {double([+ {*}$times]) / ([llength $times]*$batch)}] $batch]
+			#apply $output debug [format {%s Overhead: %.3f usec, mean: %.3f for batch %d: %s} $variant $overhead [expr {double([+ {*}$times]) / ([llength $times]*$batch)}] $batch [list $overhead_script]]
 			# Measure the instrumentation overhead to compensate for it >>>
 
 			set cv {data { # Calculate the coefficient of variation of $data <<<
@@ -255,7 +292,7 @@ proc bench {name desc args} { #<<<
 				($elapsed < $opts(-max_time) && $cvmeans > $opts(-target_cv))
 			} {
 				set start [clock microseconds]
-				uplevel 1 [list if 1 $bscript]
+				uplevel 1 $bscript
 				set batchtime	[- [clock microseconds] $start]
 				lappend times [expr {
 					$batchtime / double($batch) - $overhead
@@ -278,6 +315,7 @@ proc bench {name desc args} { #<<<
 		lappend run $name $desc $variant_stats
 	} finally {
 		_run_if_set $opts(-cleanup)
+		unset current_bench
 	}
 }; namespace export bench
 
@@ -403,6 +441,11 @@ proc run_benchmarks {dir args} { #<<<
 		lassign [apply $consume_args 1] next
 
 		switch -- $next {
+			-load {
+				lassign [apply $consume_args 1] load_script
+				namespace eval :: $load_script
+			}
+
 			-match {
 				lassign [apply $consume_args 1] match
 			}
@@ -435,7 +478,7 @@ proc run_benchmarks {dir args} { #<<<
 
 	set stats	{}
 	foreach f [glob -nocomplain -type f -dir $dir -tails *.bench] {
-		uplevel 1 [list if 1 [list source [file join $dir $f]]]
+		uplevel 1 [list source [file join $dir $f]]
 	}
 
 	set save {{save_fn run} {
@@ -474,8 +517,10 @@ proc run_benchmarks {dir args} { #<<<
 		} trap {TCL LOOKUP SUBCOMMAND} {errmsg options} {
 			puts $options
 			apply $output error "Invalid display mode: \"$display_mode\""
+			exit 1
 		} trap {TCL WRONGARGS} {errmsg options} {
 			apply $output error "Invalid display mode params: $errmsg"
+			exit 1
 		}
 	}
 }

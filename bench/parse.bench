@@ -4,7 +4,6 @@ if {"bench" ni [info commands bench]} {
 }
 
 package require rl_json
-package require yajltcl
 package require json_old
 
 namespace import ::rl_json::json
@@ -21,110 +20,121 @@ proc readfile fn { #<<<
 #>>>
 
 proc main {} {
-bench parse-1.1 {Parse a small JSON doc and extract a field} -setup { #<<<
-	set json {
-		{
-			"foo": "bar",
-			"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+	# parse-1.1 <<<
+	set variants	{
+		old_json_parse {
+			dict get [lindex [dict get [json_old parse [string trim $json]] baz] end] inner
+		}
+
+		ours {
+			dict get [lindex [dict get [json parse [string trim $json]] baz] end] inner
+		}
+
+		ours_get {
+			json get [string trim $json] baz end inner
+		}
+
+		ours_pre {
+			dict get [lindex [dict get $pre baz] end] inner
+		}
+
+		ours_get_native {
+			json get $json baz end inner
 		}
 	}
-	set pre	[json get [string trim $json]]
-} -compare {
-	old_json_parse {
-		dict get [lindex [dict get [json_old parse [string trim $json]] baz] end] inner
+	try {package require yajl} on error {} {} on ok {} {
+		lappend variants yajltcl {
+			dict get [lindex [dict get [yajl::json2dict [string trim $json]] baz] end] inner
+		}
 	}
-
-	ours {
-		dict get [lindex [dict get [json parse [string trim $json]] baz] end] inner
-	}
-
-	ours_get {
-		json get [string trim $json] baz end inner
-	}
-
-	ours_pre {
-		dict get [lindex [dict get $pre baz] end] inner
-	}
-
-	ours_get_native {
-		json get $json baz end inner
-	}
-
-	yajltcl {
-		dict get [lindex [dict get [yajl::json2dict [string trim $json]] baz] end] inner
-	}
-} -cleanup {
-	unset -nocomplain json pre
-} -result obj
-#>>>
-if {[file readable [file join [file dirname [file normalize [info script]]] items1.json]]} {
-bench parse-2.1 {Parse a few MB of json} -batch 3 -setup { #<<<
-	set json [readfile [file join [file dirname [file normalize [info script]]] items1.json]]
-} -compare {
-	just_parse {
-		json normalize $json
-		list 83000 5434
-	}
-	valid {
-		json valid $json
-		list 83000 5434
-	}
-	valid_no_comments {
-		json valid -extensions {} $json
-		list 83000 5434
-	}
-	ours {
-		set c	0
-		set nrpics	0
-		set p	[string trim $json]
-		json foreach hit [json extract $p hits hits] {
-			if {[json exists $hit _source shopstatus]} {
-				json get $hit _source shopstatus
+	bench parse-1.1 {Parse a small JSON doc and extract a field} -setup {
+		set json {
+			{
+				"foo": "bar",
+				"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
 			}
-			incr c [json get $hit _source ?size]
-			incr nrpics [json get $hit _source itemnrpics]
 		}
-		json get $p hits hits end _source shopstatus
-		list $c $nrpics
-	}
-	yajltcl_access {
-		set c	0
-		set nrpics	0
-		foreach hit [dict get [yajl::json2dict $json] hits hits] {
-			if {[dict exists $hit _source shopstatus]} {
-				dict get $hit _source shopstatus
+		set pre	[json get [string trim $json]]
+	} -compare $variants -cleanup {
+		unset -nocomplain json pre
+	} -result obj
+	#>>>
+	# parse-2.1 <<<
+	if {[file readable [file join [file dirname [file normalize [info script]]] items1.json]]} {
+		set variants	{
+			just_parse {
+				json normalize $json
+				list 83000 5434
 			}
-			incr c [dict size [dict get $hit _source]]
-			incr nrpics [dict get $hit _source itemnrpics]
+			valid {
+				json valid $json
+				list 83000 5434
+			}
+			valid_no_comments {
+				json valid -extensions {} $json
+				list 83000 5434
+			}
+			ours {
+				set c	0
+				set nrpics	0
+				set p	[string trim $json]
+				json foreach hit [json extract $p hits hits] {
+					if {[json exists $hit _source shopstatus]} {
+						json get $hit _source shopstatus
+					}
+					incr c [json get $hit _source ?size]
+					incr nrpics [json get $hit _source itemnrpics]
+				}
+				json get $p hits hits end _source shopstatus
+				list $c $nrpics
+			}
 		}
-		dict get [lindex [dict get [yajl::json2dict $json] hits hits] end] _source shopstatus
-		list $c $nrpics
+		try {package require yajl} on error {} {} on ok {} {
+			lappend variants	yajltcl_access {
+				set c	0
+				set nrpics	0
+				foreach hit [dict get [yajl::json2dict $json] hits hits] {
+					if {[dict exists $hit _source shopstatus]} {
+						dict get $hit _source shopstatus
+					}
+					incr c [dict size [dict get $hit _source]]
+					incr nrpics [dict get $hit _source itemnrpics]
+				}
+				dict get [lindex [dict get [yajl::json2dict $json] hits hits] end] _source shopstatus
+				list $c $nrpics
+			}
+		}
+		bench parse-2.1 {Parse a few MB of json} -batch 3 -setup {
+			set json [readfile [file join [file dirname [file normalize [info script]]] items1.json]]
+		} -compare $variants -cleanup {
+			unset -nocomplain json
+		} -result {83000 5434}
 	}
-} -cleanup {
-	unset -nocomplain json
-} -result {83000 5434}
-#>>>
-}
-if {[file readable [file join [file dirname [file normalize [info script]]] sample.json]]} {
-bench parse-3.1 {Parse a large json doc with deep nesting and many UTF-8 chars} -batch 3 -setup { #<<<
-	# Sample from the json-test-suite project: https://code.google.com/p/json-test-suite/downloads/detail?name=sample.zip
-	set json [readfile [file join [file dirname [file normalize [info script]]] sample.json]]
-} -compare {
-	ours {
-		json length [string trim $json]
+	#>>>
+	# parse-3.1 <<<
+	if {[file readable [file join [file dirname [file normalize [info script]]] sample.json]]} {
+		set variants	{
+			ours {
+				json length [string trim $json]
+			}
+			valid {
+				json valid $json
+				return -level 0 3
+			}
+		}
+		try {package require yajl} on error {} {} on ok {} {
+			lappend variants	yajltcl {
+				dict size [yajl::json2dict [string trim $json]]
+			}
+		}
+		bench parse-3.1 {Parse a large json doc with deep nesting and many UTF-8 chars} -batch 3 -setup {
+			# Sample from the json-test-suite project: https://code.google.com/p/json-test-suite/downloads/detail?name=sample.zip
+			set json [readfile [file join [file dirname [file normalize [info script]]] sample.json]]
+		} -compare $variants -cleanup {
+			unset -nocomplain json
+		} -result 3
 	}
-	yajltcl {
-		dict size [yajl::json2dict [string trim $json]]
-	}
-	valid {
-		json valid $json
-		return -level 0 3
-	}
-} -cleanup {
-	unset -nocomplain json
-} -result 3
-#>>>
-}
+	#>>>
 }
 main
 
