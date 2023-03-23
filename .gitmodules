@@ -5,4 +5,5 @@
 [submodule "tests/JSONTestSuite"]
 	path = tests/JSONTestSuite
 	url = https://github.com/nst/JSONTestSuite
+	update = none
 	shallow = true
