@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace path {::rl_json}
 
 test string-1.1 {Create a json string} -body { #<<<
 	json string foo

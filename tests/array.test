@@ -4,6 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
+namespace import ::rl_json::*
 
 source [file join [file dirname [info script]] helpers.tcl]
 

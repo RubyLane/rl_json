@@ -6,31 +6,6 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
-if {$tcl_platform(platform) eq "windows" && ![catch {package require twapi}]} {
-	proc my_rss {} {
-		# Not clear what would correspond to VMRss on Linux.
-		# -workingset is too volatile. -pagefilebytes seems
-		# a little better but even that has variations
-		# (positive and negative)
-		lindex [twapi::get_process_info -pagefilebytes] 1
-	}
-} else {
-	proc my_rss {} { # Linux only!  Need alternatives for Mac, Win <<<
-		set h	[open /proc/self/statm r]
-		try {
-			read $h
-		} on ok statm {
-			expr {
-				[lindex $statm 1] * 4
-			}
-		} finally {
-			close $h
-		}
-	}
-
-	#>>>
-}
-
 test memory-1.1 {memory leak with static object} -setup { #<<<
 	proc test_memory-1.1 it {
 		for {set i 0} {$i < $it} {incr i} {
@@ -38,17 +13,11 @@ test memory-1.1 {memory leak with static object} -setup { #<<<
 			json set doc foo null
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.1 10000
-	set before	[my_rss]
 } -body {
 	test_memory-1.1 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.1 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.2 {memory leak with object parsing} -setup { #<<<
 	proc test_memory-1.2 it {
@@ -56,17 +25,11 @@ test memory-1.2 {memory leak with object parsing} -setup { #<<<
 			json get [string trim "{} "] ?size
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.2 2000
-	set before	[my_rss]
 } -body {
 	test_memory-1.2 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.2 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.3 {memory leak with array parsing} -setup { #<<<
 	proc test_memory-1.3 it {
@@ -74,17 +37,11 @@ test memory-1.3 {memory leak with array parsing} -setup { #<<<
 			json get [string trim {[] }] ?length
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.3 10000
-	set before	[my_rss]
 } -body {
 	test_memory-1.3 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.3 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.4 {memory leak with string parsing} -setup { #<<<
 	proc test_memory-1.4 it {
@@ -92,17 +49,11 @@ test memory-1.4 {memory leak with string parsing} -setup { #<<<
 			json get [string trim {"foo" }] ?length
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.4 2000
-	set before	[my_rss]
 } -body {
 	test_memory-1.4 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.4 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.5 {memory leak with number parsing} -setup { #<<<
 	proc test_memory-1.5 it {
@@ -110,17 +61,11 @@ test memory-1.5 {memory leak with number parsing} -setup { #<<<
 			json get [string trim {1234 }] ?type
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.5 2000
-	set before	[my_rss]
 } -body {
 	test_memory-1.5 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.5 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.6 {memory leak with boolean true parsing} -setup { #<<<
 	proc test_memory-1.6 it {
@@ -128,17 +73,11 @@ test memory-1.6 {memory leak with boolean true parsing} -setup { #<<<
 			json get [string trim {true }] ?type
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.6 2000
-	set before	[my_rss]
 } -body {
 	test_memory-1.6 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.6 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.7 {memory leak with boolean false parsing} -setup { #<<<
 	proc test_memory-1.7 it {
@@ -146,17 +85,11 @@ test memory-1.7 {memory leak with boolean false parsing} -setup { #<<<
 			json get [string trim {false }] ?type
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.7 2000
-	set before	[my_rss]
 } -body {
 	test_memory-1.7 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.7 {}
-} -result 0
+} -result {}
 #>>>
 test memory-1.8 {memory leak with null parsing} -setup { #<<<
 	proc test_memory-1.8 it {
@@ -164,17 +97,11 @@ test memory-1.8 {memory leak with null parsing} -setup { #<<<
 			json get [string trim {null }] ?type
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-1.8 2000
-	set before	[my_rss]
 } -body {
 	test_memory-1.8 10000
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-1.8 {}
-} -result 0
+} -result {}
 #>>>
 test memory-2.1 {json foreach} -setup { #<<<
 	proc test_memory-2.1 {} {
@@ -191,41 +118,30 @@ test memory-2.1 {json foreach} -setup { #<<<
 			close $h
 		}
 	}
-
-	# Warm caches, overhead, etc
-	test_memory-2.1
-	set before	[my_rss]
 } -body {
 	test_memory-2.1
-	expr {[my_rss] - $before}
 } -cleanup {
-	unset -nocomplain before
 	rename test_memory-2.1 {}
-} -result 0
+} -result {}
 #>>>
 test memory-2.2 {deeply nested array error} -setup { #<<<
 	proc test_memory-2.2 {} {
 		json normalize [string repeat "\[" 10000]
 	}
-
-	# Warm caches, overhead, etc
-	catch {test_memory-2.2}
-	set before	[my_rss]
 } -body {
-	set code [catch {test_memory-2.2} r o]
-	list [expr {[my_rss] - $before}] $code $r
+	list [catch {test_memory-2.2} r o] $r
 } -cleanup {
-	unset -nocomplain before code r o
+	unset -nocomplain r o
 	rename test_memory-2.2 {}
-} -match glob -result {0 1 {Error parsing JSON value: Unterminated array at offset *}}
+} -match glob -result {1 {Error parsing JSON value: Unterminated array at offset *}}
 #>>>
 if {[llength [info commands ::memtest2]]} {
-memtest2 memory-3.1 {Deliberate memory leak} -constraints {} -body { #<<<
+memtest2 memory-3.1 {Deliberate memory leak} -constraints {deliberateLeak} -body { #<<<
 	json _leak_obj
 } -returnCodes error -match regexp -result {^Leaked memory:\n\t0x[0-9a-f]+\s+-\s+0x[0-9a-f]+\s+[0-9]+\s+@\s+\./generic/rl_json.c\s+[0-9]+\s+memory-3.1$}
 #>>>
 }
-test memory-3.2 {Deliberate memory leak} -constraints {} -body { #<<<
+test memory-3.2 {Deliberate memory leak} -constraints {deliberateLeak} -body { #<<<
 	json _leak_obj
 } -result {}
 #>>>

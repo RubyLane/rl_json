@@ -1098,17 +1098,14 @@ finally:
 int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj** decodedstring) //{{{
 {
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	Tcl_Obj*			ov[4];
-	int					i, retval;
+	Tcl_Obj*			ov[4] = {l->apply, l->decode_bytes};
+	int					retval;
 
-	ov[0] = l->apply;
-	ov[1] = l->decode_bytes;
-	ov[2] = bytes;
-	ov[3] = encoding;
-
-	for (i=0; i<4 && ov[i]; i++) if (ov[i]) Tcl_IncrRefCount(ov[i]);
-	retval = Tcl_EvalObjv(interp, i, ov, TCL_EVAL_GLOBAL);
-	for (i=0; i<4 && ov[i]; i++) release_tclobj(&ov[i]);
+	replace_tclobj(&ov[2], bytes);
+	replace_tclobj(&ov[3], encoding);
+	retval = Tcl_EvalObjv(interp, encoding ? 4 : 3, ov, TCL_EVAL_GLOBAL);
+	replace_tclobj(&ov[2], NULL);
+	replace_tclobj(&ov[3], NULL);
 
 	if (retval == TCL_OK) {
 		replace_tclobj(decodedstring, Tcl_GetObjResult(interp));

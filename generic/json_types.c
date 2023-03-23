@@ -1,6 +1,90 @@
 #include "rl_jsonInt.h"
 #include "parser.h"
 
+#if UNLOAD
+TCL_DECLARE_MUTEX(g_instances_mutex);
+Tcl_HashTable	g_instances;
+int				g_instances_initialized = 0;
+
+static void record_instance(Tcl_Obj* obj) //{{{
+{
+_Pragma("GCC diagnostic push");
+_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"");
+	Tcl_HashEntry*	he;
+_Pragma("GCC diagnostic pop");
+	int				isnew;
+
+	//DBG("Recording instance %s: %p\n", name(obj), obj);
+	Tcl_MutexLock(&g_instances_mutex);
+	he = Tcl_CreateHashEntry(&g_instances, obj, &isnew);
+	Tcl_MutexUnlock(&g_instances_mutex);
+}
+
+//}}}
+static void release_instance(Tcl_Obj* obj) //{{{
+{
+	Tcl_HashEntry*	he;
+
+	//DBG("--> Releasing instance %s: %p\n", name(obj), obj);
+	Tcl_MutexLock(&g_instances_mutex);
+	he = Tcl_FindHashEntry(&g_instances, obj);
+	if (!he) Tcl_Panic("rl_json release_instance: No record found for instance %p", obj);
+	Tcl_DeleteHashEntry(he);
+	Tcl_MutexUnlock(&g_instances_mutex);
+	//DBG("<-- Releasing instance %s: %p\n", name(obj), obj);
+}
+
+//}}}
+void release_instances(void) // transmute all remaining json objtypes to pure strings {{{
+{
+	Tcl_HashEntry*	he = NULL;
+	Tcl_HashSearch	search;
+
+	Tcl_MutexLock(&g_instances_mutex);
+	if (g_instances_initialized) {
+		const char*	hashstats = Tcl_HashStats(&g_instances);
+		DBG("------> orphan all remaining instances\n");
+		DBG("g_instances stats:\n%s\n", hashstats);
+		ckfree(hashstats);
+		// Have to re-start the search each time because freeing an intrep
+		// could cascade to freeing other instances, which we would then
+		// walk into in with Tcl_NextHashEntry
+		while ((he = Tcl_FirstHashEntry(&g_instances, &search))) {
+			Tcl_Obj* obj = (Tcl_Obj*)Tcl_GetHashKey(&g_instances, he);
+			DBG("Orphan %-25s refCount %d, stringrep? %d >%s<\n", name(obj), obj->refCount, Tcl_HasStringRep(obj), Tcl_GetString(obj));
+			if (!Tcl_HasStringRep(obj)) Tcl_GetString(obj);	// Ensure obj has a valid stringrep
+			Tcl_FreeInternalRep(obj);
+		}
+		DBG("<------ orphan all remaining instances\n");
+		Tcl_DeleteHashTable(&g_instances);
+		g_instances_initialized = 0;
+	}
+	Tcl_MutexUnlock(&g_instances_mutex);
+	Tcl_MutexFinalize(&g_instances_mutex);
+}
+
+//}}}
+static void init_instances() //{{{
+{
+	if (!g_instances_initialized) {
+		Tcl_MutexLock(&g_instances_mutex);
+		if (!g_instances_initialized) {
+			Tcl_InitHashTable(&g_instances, TCL_ONE_WORD_KEYS);
+			g_instances_initialized = 1;
+		}
+		Tcl_MutexUnlock(&g_instances_mutex);
+	}
+}
+
+//}}}
+#else
+#define record_instance(obj)
+#define release_instance(obj)
+void release_instances(void){}
+#define init_instances()
+#endif
+
+
 static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype);
 static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype);
 static void update_string_rep(Tcl_Obj* obj, Tcl_ObjType* objtype);
@@ -235,7 +319,7 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 	// ptr2 holds the template actions, if any have been generated for this value 
 	replace_tclobj((Tcl_Obj**)&intrep.twoPtrValue.ptr1, rep);
 
-	Tcl_StoreInternalRep(target, objtype, &intrep);
+	Tcl_StoreInternalRep(target, objtype, &intrep); record_instance(target);
 
 	Tcl_InvalidateStringRep(target);
 
@@ -316,6 +400,7 @@ static void free_internal_rep(Tcl_Obj* obj, Tcl_ObjType* objtype) //{{{
 			Tcl_DecrRefCount((Tcl_Obj*)ir->twoPtrValue.ptr2); ir->twoPtrValue.ptr2 = NULL;}
 #endif
 	}
+	release_instance(obj);
 }
 
 //}}}
@@ -353,7 +438,7 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 	if (destir.twoPtrValue.ptr1) Tcl_IncrRefCount((Tcl_Obj*)destir.twoPtrValue.ptr1);
 	if (destir.twoPtrValue.ptr2) Tcl_IncrRefCount((Tcl_Obj*)destir.twoPtrValue.ptr2);
 
-	Tcl_StoreInternalRep(dest, objtype, &destir);
+	Tcl_StoreInternalRep(dest, objtype, &destir); record_instance(dest);
 }
 
 //}}}
@@ -509,7 +594,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 			*out_type = JSON_NUMBER;
 			*objtype = g_objtype_for_type[JSON_NUMBER];
 
-			Tcl_StoreInternalRep(obj, *objtype, &ir);
+			Tcl_StoreInternalRep(obj, *objtype, &ir); record_instance(obj);
 			return TCL_OK;
 		}
 	}
@@ -717,7 +802,7 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
 		release_tclobj(&cx[0].val);
 
-		Tcl_StoreInternalRep(obj, top_objtype, &ir);
+		Tcl_StoreInternalRep(obj, top_objtype, &ir); record_instance(obj);
 		*objtype = top_objtype;
 		*out_type = cx[0].container;
 	}
@@ -773,8 +858,9 @@ Tcl_Obj* get_unshared_val(Tcl_ObjInternalRep* ir) //{{{
 
 int init_types(Tcl_Interp* interp) //{{{
 {
-	// We don't define set_from_any callbacks for our types, so they must not be Tcl_RegisterObjType'ed
+	init_instances();
 
+	// We don't define set_from_any callbacks for our types, so they must not be Tcl_RegisterObjType'ed
 	g_objtype_for_type[JSON_UNDEF]			= NULL;
 	g_objtype_for_type[JSON_OBJECT]			= &json_object;
 	g_objtype_for_type[JSON_ARRAY]			= &json_array;

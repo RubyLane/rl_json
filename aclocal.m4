@@ -51,17 +51,42 @@ AC_DEFUN([ENABLE_DEDUP], [
 	#trap '' DEBUG
 ])
 
-AC_DEFUN([CHECK_DEBUG], [
-	AC_MSG_CHECKING([whether to build in debug mode])
+AC_DEFUN([ENABLE_DEBUG], [
+	#trap 'echo "val: (${enable_debug+set}), debug_ok: ($debug_ok), DEBUG: ($DEBUG)"' DEBUG
+	AC_MSG_CHECKING([whether to support debuging])
 	AC_ARG_ENABLE(debug,
-		[  --enable-debug          Build in debug mode (default: off)],
-		[enable_debug=$enableval],
-		[enable_debug="no"])
-	AC_MSG_RESULT($enable_debug)
-	if test "$enable_debug" = "yes"
-	then
-		AC_DEFINE(DEBUG)
+		AS_HELP_STRING([--enable-debug],[Enable debug mode (not symbols, but portions of the code that are only used in debug builds) (default: no)]),
+		[debug_ok=$enableval], [debug_ok=no])
+
+	if test "$debug_ok" = "yes" -o "${DEBUG}" = 1; then
+		DEBUG=1
+		AC_MSG_RESULT([yes])
+	else
+		DEBUG=0
+		AC_MSG_RESULT([no])
 	fi
+
+	AC_DEFINE_UNQUOTED([DEBUG], [$DEBUG], [Debug enabled?])
+	#trap '' DEBUG
+])
+
+AC_DEFUN([ENABLE_UNLOAD], [
+	#trap 'echo "val: (${enable_unload+set}), unload_ok: ($unload_ok), UNLOAD: ($UNLOAD)"' DEBUG
+	AC_MSG_CHECKING([whether to support unloading])
+	AC_ARG_ENABLE(unload,
+		AS_HELP_STRING([--enable-unload],[Add support for unloading this shared library (default: no)]),
+		[unload_ok=$enableval], [unload_ok=no])
+
+	if test "$unload_ok" = "yes" -o "${UNLOAD}" = 1; then
+		UNLOAD=1
+		AC_MSG_RESULT([yes])
+	else
+		UNLOAD=0
+		AC_MSG_RESULT([no])
+	fi
+
+	AC_DEFINE_UNQUOTED([UNLOAD], [$UNLOAD], [Unload enabled?])
+	#trap '' DEBUG
 ])
 
 AC_DEFUN([TIP445], [

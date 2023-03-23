@@ -155,7 +155,7 @@ INCLUDES	= @PKG_INCLUDES@ @TCL_INCLUDES@
 PKG_CFLAGS	= @PKG_CFLAGS@
 
 # TCL_DEFS is not strictly need here, but if you remove it, then you
-# must make sure that configure.in checks for the necessary components
+# must make sure that configure.ac checks for the necessary components
 # that your library may use.  TCL_DEFS can actually be a problem if
 # you do not compile with a similar machine setup as the Tcl core was
 # compiled with.
@@ -173,9 +173,10 @@ CFLAGS		= @CFLAGS@
 COMPILE		= $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 
 VALGRIND	= valgrind
+VALGRINDEXTRA =
 VALGRINDARGS	= --tool=memcheck --num-callers=8 --leak-resolution=high \
 		  --leak-check=yes -v --suppressions=suppressions --keep-debuginfo=yes \
-		  --trace-children=yes
+		  --trace-children=yes $(VALGRINDEXTRA)
 PGOGEN_BUILD = -fprofile-generate=prof
 PGO_BUILD = @PGO_BUILD@
 PGO=
@@ -264,7 +265,7 @@ tests/JSONTestSuite/test_parsing: binaries libraries
 			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
 
 benchmark: binaries libraries
-	$(TCLSH) `@CYGPATH@ $(srcdir)/bench/run.tcl` $(TESTFLAGS)
+	$(TCLSH) `@CYGPATH@ $(srcdir)/bench/run.tcl` $(TESTFLAGS) -load package\ ifneeded\ $(PACKAGE_NAME)\ $(PACKAGE_VERSION)\ [list\ load\ `@CYGPATH@ $(PKG_LIB_FILE)`\ [string\ totitle\ $(PACKAGE_NAME)]]
 
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)
@@ -388,7 +389,7 @@ genstubs:
 
 #========================================================================
 # Don't modify the file to clean here.  Instead, set the "CLEANFILES"
-# variable in configure.in
+# variable in configure.ac
 #========================================================================
 
 clean:
@@ -492,7 +493,7 @@ coverage:
 	make -C . PGO="--coverage" clean binaries libraries test
 
 .PHONY: all binaries clean depend distclean doc install libraries test
-.PHONY: valgrind valgrind-shell vim-gdb vim-core pgo coverage benchmark
+.PHONY: shell gdb valgrind valgrindshell vim-gdb vim-core pgo coverage benchmark
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

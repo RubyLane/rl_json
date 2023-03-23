@@ -352,6 +352,26 @@ static void init()
 }
 
 
+void names_shutdown()
+{
+	Tcl_MutexLock(&things_mutex);
+	if (hash_tables_initialized) {
+		Tcl_HashEntry*	he;
+		Tcl_HashSearch	search;
+
+		for (he = Tcl_FirstHashEntry(&things, &search); he; he = Tcl_NextHashEntry(&search)) {
+			char*	chosen = Tcl_GetHashValue(he);
+			ckfree(chosen);
+		}
+		Tcl_DeleteHashTable(&things);
+		Tcl_DeleteHashTable(&names);
+		hash_tables_initialized = 0;
+	}
+	Tcl_MutexUnlock(&things_mutex);
+	Tcl_MutexFinalize(&things_mutex);
+}
+
+
 const char* randwords()
 {
 	const int	maxlen = 41;

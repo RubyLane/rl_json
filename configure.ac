@@ -19,15 +19,13 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([rl_json],[0.12.0])
+AC_INIT([rl_json],[0.12.1])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
 # This will define a ${TEA_PLATFORM} variable == "unix" or "windows"
 # as well as PKG_LIB_FILE and PKG_STUB_LIB_FILE.
 #--------------------------------------------------------------------
-
-CHECK_DEBUG
 
 TEA_INIT()
 
@@ -66,6 +64,8 @@ TEA_SETUP_COMPILER
 # Check for feature toggles
 ENABLE_ENSEMBLE
 ENABLE_DEDUP
+ENABLE_DEBUG
+ENABLE_UNLOAD
 
 #-----------------------------------------------------------------------
 # __CHANGE__
