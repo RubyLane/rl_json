@@ -4114,7 +4114,9 @@ DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 				}
 			}
 
+#if DEBUG
 			names_shutdown();
+#endif
 			break;
 		default:
 			THROW_ERROR("Unhandled flags");

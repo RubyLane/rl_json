@@ -176,8 +176,6 @@ VALGRIND	= valgrind
 
 .SUFFIXES: .c .$(OBJEXT)
 
-include teabase/Makefile
-
 #========================================================================
 # Start of user-definable TARGETS section
 #========================================================================
@@ -191,6 +189,8 @@ include teabase/Makefile
 #========================================================================
 
 all: binaries libraries doc
+
+include teabase/Makefile
 
 #========================================================================
 # The binaries target builds executable programs, Windows .dll's, unix
