@@ -152,18 +152,8 @@ TEA_CONFIG_CFLAGS
 TIP445
 AC_CHECK_FUNCS_ONCE([ffsll])
 AX_GCC_BUILTIN(__builtin_ffsll)
+TEABASE_INIT()
 
-# Build tools needed on the build host to produce some of the source
-# files.  This macro attempts to set CC_FOR_BUILD to a compiler that
-# can produce binaries that run on the build host rather than the
-# target / host when cross-compiling
-AX_CC_FOR_BUILD
-
-# Test for -fprofile-partial-training, introduced in GCC 10
-AX_CHECK_COMPILE_FLAG([-fprofile-partial-training],
-					  [AC_SUBST(PGO_BUILD,"-fprofile-use=prof -fprofile-partial-training")],
-					  [AC_SUBST(PGO_BUILD,"-fprofile-use=prof")],
-					  [-Werror])
 #--------------------------------------------------------------------
 # Set the default compiler switches based on the --enable-symbols option.
 #--------------------------------------------------------------------
@@ -206,7 +196,7 @@ TEA_PROG_TCLSH
 # substituting the AC variables in. Include these here.
 #--------------------------------------------------------------------
 
-AC_CONFIG_FILES([Makefile pkgIndex.tcl])
+AC_CONFIG_FILES([Makefile teabase/Makefile pkgIndex.tcl])
 
 #--------------------------------------------------------------------
 # Finally, substitute all of the various values into the files

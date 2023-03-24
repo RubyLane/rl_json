@@ -7,3 +7,6 @@
 	url = https://github.com/nst/JSONTestSuite
 	update = none
 	shallow = true
+[submodule "teabase"]
+	path = teabase
+	url = https://github.com/cyanogilvie/teabase

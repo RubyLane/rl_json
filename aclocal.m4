@@ -8,9 +8,7 @@ builtin(include,tclconfig/tcl.m4)
 # Add here whatever m4 macros you want to define for your package
 #
 
-builtin(include,ax_gcc_builtin.m4)
-builtin(include,ax_cc_for_build.m4)
-builtin(include,ax_check_compile_flag.m4)
+builtin(include,teabase/teabase.m4)
 
 AC_DEFUN([ENABLE_ENSEMBLE], [
 	#trap 'echo "val: (${enable_ensemble+set}), ensemble_ok: ($ensemble_ok), ensemble: ($ENSEMBLE)"' DEBUG
@@ -49,60 +47,6 @@ AC_DEFUN([ENABLE_DEDUP], [
 
 	AC_DEFINE_UNQUOTED([DEDUP], [$DEDUP], [Dedup enabled?])
 	#trap '' DEBUG
-])
-
-AC_DEFUN([ENABLE_DEBUG], [
-	#trap 'echo "val: (${enable_debug+set}), debug_ok: ($debug_ok), DEBUG: ($DEBUG)"' DEBUG
-	AC_MSG_CHECKING([whether to support debuging])
-	AC_ARG_ENABLE(debug,
-		AS_HELP_STRING([--enable-debug],[Enable debug mode (not symbols, but portions of the code that are only used in debug builds) (default: no)]),
-		[debug_ok=$enableval], [debug_ok=no])
-
-	if test "$debug_ok" = "yes" -o "${DEBUG}" = 1; then
-		DEBUG=1
-		AC_MSG_RESULT([yes])
-	else
-		DEBUG=0
-		AC_MSG_RESULT([no])
-	fi
-
-	AC_DEFINE_UNQUOTED([DEBUG], [$DEBUG], [Debug enabled?])
-	#trap '' DEBUG
-])
-
-AC_DEFUN([ENABLE_UNLOAD], [
-	#trap 'echo "val: (${enable_unload+set}), unload_ok: ($unload_ok), UNLOAD: ($UNLOAD)"' DEBUG
-	AC_MSG_CHECKING([whether to support unloading])
-	AC_ARG_ENABLE(unload,
-		AS_HELP_STRING([--enable-unload],[Add support for unloading this shared library (default: no)]),
-		[unload_ok=$enableval], [unload_ok=no])
-
-	if test "$unload_ok" = "yes" -o "${UNLOAD}" = 1; then
-		UNLOAD=1
-		AC_MSG_RESULT([yes])
-	else
-		UNLOAD=0
-		AC_MSG_RESULT([no])
-	fi
-
-	AC_DEFINE_UNQUOTED([UNLOAD], [$UNLOAD], [Unload enabled?])
-	#trap '' DEBUG
-])
-
-AC_DEFUN([TIP445], [
-	AC_MSG_CHECKING([whether we need to polyfill TIP 445])
-	saved_CFLAGS="$CFLAGS"
-	CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <tcl.h>]], [[Tcl_ObjInternalRep ir;]])],[have_tcl_objintrep=yes],[have_tcl_objintrep=no])
-	CFLAGS="$saved_CFLAGS"
-
-	if test "$have_tcl_objintrep" = yes; then
-		AC_DEFINE(TIP445_SHIM, 0, [Do we need to polyfill TIP 445?])
-		AC_MSG_RESULT([no])
-	else
-		AC_DEFINE(TIP445_SHIM, 1, [Do we need to polyfill TIP 445?])
-		AC_MSG_RESULT([yes])
-	fi
 ])
 
 

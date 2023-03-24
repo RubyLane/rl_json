@@ -1,12 +1,9 @@
-if {"bench" ni [info commands bench]} {
-	package require bench
-	namespace import bench::*
-}
-
+set here	[file normalize [file dirname [info script]]]
+if {$here ni [tcl::tm::path list]} {tcl::tm::path add $here}
 package require rl_json
 package require json_old
 
-namespace import rl_json::json
+namespace import ::rl_json::json
 
 proc main {} {
 	set variants {

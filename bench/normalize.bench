@@ -1,12 +1,7 @@
-if {"bench" ni [info commands bench]} {
-	package require bench
-	namespace import bench::*
-}
-
 package require rl_json
 #package require yajltcl
 
-namespace import rl_json::json
+namespace import ::rl_json::json
 
 proc main {} {
 bench normalize-1.1 {Normalize a JSON doc} -setup { #<<<

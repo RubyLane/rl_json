@@ -1,11 +1,6 @@
-if {"bench" ni [info commands bench]} {
-	package require bench
-	namespace import bench::*
-}
-
 package require rl_json
 
-namespace import rl_json::json
+namespace import ::rl_json::json
 
 proc main {} {
 bench as_json-1.1 {[json boolean] vs implicit} -setup { #<<<
@@ -38,7 +33,7 @@ bench as_json-1.1 {[json boolean] vs implicit} -setup { #<<<
 	implicit_parsed {
 		set doc {[]}
 		for {set i 0} {$i < 10} {incr i} {
-			json set doc end+1 [string trim " true"]
+			json set doc end+1 [json test_string true]
 		}
 		set doc
 	}

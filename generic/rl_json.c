@@ -3637,8 +3637,11 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 				static struct teststring tstr[] = {
 					{"obj1",	"{\"foo\":null,\"empty\":{},\"emptyarr\":[],\"hello, world\":\"bar\",\"This is a much longer key\":[\"str\",123,123.4,true,false,null,{\"inner\": \"obj\"}]}"},
 					{"obj2",	"{\"foo\":null,\"hello, world\":\"bar\",\"This is a much longer key\":null}"},
+					{"obj3",	"\n\t\t\t{\n\t\t\t\t\"foo\": \"bar\",\n\t\t\t\t\"baz\": [\"str\", 123, 123.4, true, false, null, {\"inner\": \"obj\"}]\n\t\t\t}\n\t\t"},
 					{"str1",	"\"foo\""},
 					{"null",	"null"},
+					{"true",	"true"},
+					{"false",	"false"},
 					{0}
 				};
 				int idx;
