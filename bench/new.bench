@@ -6,7 +6,26 @@ package require json_old
 namespace import ::rl_json::json
 
 proc main {} {
-	set variants {
+	bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
+		array set a {
+			x		"str\"foo\nbar"
+			y		123
+			on		yes
+			off		0
+			subdoc	{{"inner": "~S:bar"}}
+			subdoc2	{{"inner2": "~S:bar"}}
+		}
+
+		set bar	"Bar"
+
+		dict set d bar $bar
+		foreach {k v} [array get a] {
+			dict set d a($k) $v
+		}
+		unset -nocomplain k v
+	} -deps {
+		yajl - yajl_dict	{package require yajl}
+	} -compare {
 		old_json_fmt {
 			json_old fmt obj [list \
 				"foo" [list s $bar] \
@@ -97,13 +116,8 @@ proc main {} {
 				}
 			} $d
 		}
-	}
 
-	try {
-		package require yajltcl
-	} on error {} {
-	} on ok {} {
-		lappend variants yajl {
+		yajl {
 			yajl create y
 			try {
 				y \
@@ -134,7 +148,9 @@ proc main {} {
 			} finally {
 				y delete
 			}
-		} yajl_dict {
+		}
+		
+		yajl_dict {
 			yajl create y
 			try {
 				y \
@@ -166,29 +182,10 @@ proc main {} {
 				y delete
 			}
 		}
-	}
-
-bench new-1.1 {Various ways of dynamically assembling a JSON doc} -setup { #<<<
-	array set a {
-		x		"str\"foo\nbar"
-		y		123
-		on		yes
-		off		0
-		subdoc	{{"inner": "~S:bar"}}
-		subdoc2	{{"inner2": "~S:bar"}}
-	}
-
-	set bar	"Bar"
-
-	dict set d bar $bar
-	foreach {k v} [array get a] {
-		dict set d a($k) $v
-	}
-	unset -nocomplain k v
-} -compare $variants -cleanup {
-	unset -nocomplain a d
-} -result {{"foo":"Bar","baz":["str\"foo\nbar",123,123.4,true,false,null,"~S:not a subst",{"inner":"Bar"},{"inner2":"Bar"}]}}
-#>>>
+	} -cleanup {
+		unset -nocomplain a d
+	} -result {{"foo":"Bar","baz":["str\"foo\nbar",123,123.4,true,false,null,"~S:not a subst",{"inner":"Bar"},{"inner2":"Bar"}]}}
+	#>>>
 }
 main
 

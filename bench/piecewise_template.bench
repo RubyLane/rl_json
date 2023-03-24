@@ -3,43 +3,39 @@ package require rl_json
 namespace import ::rl_json::json
 
 proc main {} {
-bench piecewise_template-1.1 {Templated document creation in multiple steps} -setup { #<<<
-	set tmpl {
+	bench piecewise_template-1.1 {Templated document creation in multiple steps} -setup { #<<<
+		set tmpl {
+			{
+				"foo": "~S:foo",
+				"bar": "~S:a(bar)",
+				"baz": "~N:baz",
+				"recurse": "~J:last"
+			}
+		}
+		set foo	Foo
+		array set a {
+			foo		X
+			bar		Bar
+		}
+	} -compare {
+		serialize {
+			unset -nocomplain last
+			for {set i 0} {$i < 6} {incr i} {
+				set last	[json template_string $tmpl]
+			}
+			set last
+		}
+		direct {
+			unset -nocomplain last
+			for {set i 0} {$i < 6} {incr i} {
+				set last	[json template $tmpl]
+			}
+			set last
+		}
+	} -cleanup {
+		unset -nocomplain tmpl a foo i last
+	} -result [json normalize {
 		{
-			"foo": "~S:foo",
-			"bar": "~S:a(bar)",
-			"baz": "~N:baz",
-			"recurse": "~J:last"
-		}
-	}
-	set foo	Foo
-	array set a {
-		foo		X
-		bar		Bar
-	}
-} -compare {
-	serialize {
-		unset -nocomplain last
-		for {set i 0} {$i < 6} {incr i} {
-			set last	[json template_string $tmpl]
-		}
-		set last
-	}
-	direct {
-		unset -nocomplain last
-		for {set i 0} {$i < 6} {incr i} {
-			set last	[json template $tmpl]
-		}
-		set last
-	}
-} -cleanup {
-	unset -nocomplain tmpl a foo i last
-} -result [json normalize {
-	{
-		"foo": "Foo",
-		"bar": "Bar",
-		"baz": null,
-		"recurse": {
 			"foo": "Foo",
 			"bar": "Bar",
 			"baz": null,
@@ -59,171 +55,175 @@ bench piecewise_template-1.1 {Templated document creation in multiple steps} -se
 							"foo": "Foo",
 							"bar": "Bar",
 							"baz": null,
-							"recurse": null
+							"recurse": {
+								"foo": "Foo",
+								"bar": "Bar",
+								"baz": null,
+								"recurse": null
+							}
 						}
 					}
 				}
 			}
 		}
-	}
-}]
-#>>>
-bench piecewise_template-1.2 {Templated document creation in a loop} -setup { #<<<
-	set tmpl {
-		{
-			"foo": "~S:foo",
-			"bar": "~S:a(bar)",
-			"baz": "~N:baz",
-			"recurse": "~J:last"
+	}]
+	#>>>
+	bench piecewise_template-1.2 {Templated document creation in a loop} -setup { #<<<
+		set tmpl {
+			{
+				"foo": "~S:foo",
+				"bar": "~S:a(bar)",
+				"baz": "~N:baz",
+				"recurse": "~J:last"
+			}
 		}
-	}
-	set foo	Foo
-	array set a {
-		foo		X
-		bar		Bar
-	}
-} -compare {
-	serialize {
-		set res {[]}
-		for {set i 0} {$i < 20} {incr i} {
-			json set res end+1 [json template_string $tmpl]
+		set foo	Foo
+		array set a {
+			foo		X
+			bar		Bar
 		}
-		set res
-	}
-	direct {
-		set res {[]}
-		for {set i 0} {$i < 20} {incr i} {
-			json set res end+1 [json template $tmpl]
+	} -compare {
+		serialize {
+			set res {[]}
+			for {set i 0} {$i < 20} {incr i} {
+				json set res end+1 [json template_string $tmpl]
+			}
+			set res
 		}
-		set res
-	}
-} -cleanup {
-	unset -nocomplain tmpl a foo i last res
-} -result [json normalize {
-	[
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
-		},
-		{
-			"foo": "Foo",
-			"bar": "Bar",
-			"baz": null,
-			"recurse": null
+		direct {
+			set res {[]}
+			for {set i 0} {$i < 20} {incr i} {
+				json set res end+1 [json template $tmpl]
+			}
+			set res
 		}
-	]
-}]
-#>>>
+	} -cleanup {
+		unset -nocomplain tmpl a foo i last res
+	} -result [json normalize {
+		[
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			},
+			{
+				"foo": "Foo",
+				"bar": "Bar",
+				"baz": null,
+				"recurse": null
+			}
+		]
+	}]
+	#>>>
 }
 main
 

@@ -4,21 +4,23 @@ package require rl_json
 namespace import ::rl_json::json
 
 proc main {} {
-bench normalize-1.1 {Normalize a JSON doc} -setup { #<<<
-	set json {
-		{
-			"foo": "bar",
-			"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+	bench normalize-1.1 {Normalize a JSON doc} -setup { #<<<
+		set json {
+			{
+				"foo": "bar",
+				"baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+			}
 		}
-	}
-} -compare {
-	ours {
-		json normalize [string trim $json]
-	}
-} -cleanup {
-	unset -nocomplain json
-} -result {{"foo":"bar","baz":["str",123,123.4,true,false,null,{"inner":"obj"}]}}
-#>>>
+	} -compare {
+		ours {
+			json normalize [string trim $json]
+		}
+	} -overhead {
+		ours	{string trim $json}
+	} -cleanup {
+		unset -nocomplain json
+	} -result {{"foo":"bar","baz":["str",123,123.4,true,false,null,{"inner":"obj"}]}}
+	#>>>
 }
 main
 
