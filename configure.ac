@@ -19,7 +19,7 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([rl_json],[0.12.2])
+AC_INIT([rl_json],[0.14])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -195,6 +195,46 @@ TEA_PROG_TCLSH
 # have a special pkgIndex.tcl.in or other files which require
 # substituting the AC variables in. Include these here.
 #--------------------------------------------------------------------
+
+TEAX_CONFIG_INCLUDE_LINE(RL_JSON_INCLUDE_SPEC,		[${includedir}])
+TEAX_CONFIG_LINK_LINE(RL_JSON_LIB_SPEC,
+					  [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}])
+TEAX_CONFIG_LINK_LINE(RL_JSON_STUB_LIB_SPEC,
+					  [${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}], [${PACKAGE_NAME}stub])
+
+BUILD_DIR="$(pwd | sed -e 's/ /\\\\ /g')"
+TEAX_CONFIG_INCLUDE_LINE(RL_JSON_BUILD_INCLUDE_SPEC, [${BUILD_DIR}/generic])
+TEAX_CONFIG_LINK_LINE(RL_JSON_BUILD_LIB_SPEC,
+					 [${BUILD_DIR}], [${PACKAGE_NAME}])
+TEAX_CONFIG_LINK_LINE(RL_JSON_BUILD_STUB_LIB_SPEC,
+					 [${BUILD_DIR}], [${PACKAGE_NAME}stub])
+
+#eval "RL_JSON_INCLUDE_PATH_INSTALL=\"${includedir}\""
+eval "RL_JSON_INCLUDE_PATH_INSTALL=\"${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}\""
+eval "RL_JSON_LIBRARY_PATH_INSTALL=\"${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}\""
+eval "RL_JSON_PACKAGE_PATH_INSTALL=\"${libdir}/${PACKAGE_NAME}${PACKAGE_VERSION}\""
+AS_IF([test ${TCL_LIB_VERSIONS_OK} = nodots], [
+	eval "RL_JSON_LIBRARY=\"lib${PACKAGE_NAME}${TCL_TRIM_DOTS}\""
+	eval "RL_JSON_STUBLIB=\"lib${PACKAGE_NAME}$stub{TCL_TRIM_DOTS}\""
+], [
+	eval "RL_JSON_LIBRARY=\"lib${PACKAGE_NAME}${PACKAGE_VERSION}\""
+	eval "RL_JSON_STUBLIB=\"lib${PACKAGE_NAME}stub${PACKAGE_VERSION}\""
+])
+RL_JSON_HEADER="rl_json.h"
+
+AC_DEFINE_UNQUOTED(RL_JSON_INCLUDE_PATH_INSTALL, ["$RL_JSON_INCLUDE_PATH_INSTALL"])
+AC_DEFINE_UNQUOTED(RL_JSON_LIBRARY_PATH_INSTALL, ["$RL_JSON_LIBRARY_PATH_INSTALL"])
+AC_DEFINE_UNQUOTED(RL_JSON_PACKAGE_PATH_INSTALL, ["$RL_JSON_PACKAGE_PATH_INSTALL"])
+AC_DEFINE_UNQUOTED(RL_JSON_LIBRARY, ["$RL_JSON_LIBRARY"])
+AC_DEFINE_UNQUOTED(RL_JSON_STUBLIB, ["$RL_JSON_STUBLIB"])
+AC_DEFINE_UNQUOTED(RL_JSON_HEADER, ["$RL_JSON_HEADER"])
+
+AC_SUBST(RL_JSON_INCLUDE_PATH_INSTALL)
+AC_SUBST(RL_JSON_LIBRARY_PATH_INSTALL)
+AC_SUBST(RL_JSON_PACKAGE_PATH_INSTALL)
+AC_SUBST(RL_JSON_LIBRARY)
+AC_SUBST(RL_JSON_STUBLIB)
+AC_SUBST(RL_JSON_HEADER)
 
 AC_CONFIG_FILES([Makefile teabase/Makefile pkgIndex.tcl])
 

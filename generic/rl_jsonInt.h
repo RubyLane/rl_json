@@ -204,6 +204,7 @@ int is_template(const char* s, int len);
 
 extern Tcl_ObjType* g_objtype_for_type[];
 extern const char* type_names_int[];
+extern const char* type_names[];
 
 #ifdef TCL_MEM_DEBUG
 #	undef JSON_NewJvalObj
@@ -248,6 +249,7 @@ int build_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj** acti
 int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out);
 int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def);
 int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds);
+void foreach_state_free(struct foreach_state* state);
 
 #define TEMPLATE_TYPE(s, len, out) \
 	if (s[0] == '~' && (len) >= 3 && s[2] == ':') { \

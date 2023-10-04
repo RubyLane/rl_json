@@ -213,11 +213,11 @@ test new-6.9 {Create new bool: false} -body { #<<<
 #>>>
 test new-6.10.1 {Create new bool: value} -body { #<<<
 	json new bool
-} -returnCodes error -result {Wrong # of arguments.  Must be "boolean val"}
+} -returnCodes error -result {wrong # args: should be "boolean val"}
 #>>>
 test new-6.10.2 {Create new bool: value} -body { #<<<
 	json new bool true false
-} -returnCodes error -result {Wrong # of arguments.  Must be "boolean val"}
+} -returnCodes error -result {wrong # args: should be "boolean val"}
 #>>>
 test new-6.10.3 {Create new bool: value} -body { #<<<
 	json new bool true

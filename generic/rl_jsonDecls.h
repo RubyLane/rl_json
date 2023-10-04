@@ -66,19 +66,22 @@ EXTERN int		JSON_JArrayObjReplace(Tcl_Interp*interp,
 				int objc, Tcl_Obj*objv[]);
 /* 19 */
 EXTERN int		JSON_Get(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, Tcl_Obj**res);
+				Tcl_Obj* path /* can be NULL */,
+				Tcl_Obj**res);
 /* 20 */
 EXTERN int		JSON_Extract(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, Tcl_Obj**res);
+				Tcl_Obj* path /* can be NULL */,
+				Tcl_Obj**res);
 /* 21 */
 EXTERN int		JSON_Exists(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, int*exists);
+				Tcl_Obj* path /* can be NULL */, int*exists);
 /* 22 */
 EXTERN int		JSON_Set(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, Tcl_Obj*replacement);
+				Tcl_Obj* path /* can be NULL */,
+				Tcl_Obj*replacement);
 /* 23 */
 EXTERN int		JSON_Unset(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path);
+				Tcl_Obj* path /* can be NULL */);
 /* 24 */
 EXTERN int		JSON_Normalize(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Obj**normalized);
@@ -90,16 +93,18 @@ EXTERN int		JSON_Template(Tcl_Interp*interp, Tcl_Obj*template,
 				Tcl_Obj*dict, Tcl_Obj**res);
 /* 27 */
 EXTERN int		JSON_IsNULL(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, int*isnull);
+				Tcl_Obj* path /* can be NULL */, int*isnull);
 /* 28 */
 EXTERN int		JSON_Type(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, enum json_types*type);
+				Tcl_Obj* path /* can be NULL */,
+				enum json_types*type);
 /* 29 */
 EXTERN int		JSON_Length(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, int*length);
+				Tcl_Obj* path /* can be NULL */, int*length);
 /* 30 */
 EXTERN int		JSON_Keys(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*path, Tcl_Obj**keyslist);
+				Tcl_Obj* path /* can be NULL */,
+				Tcl_Obj**keyslist);
 /* 31 */
 EXTERN int		JSON_Decode(Tcl_Interp*interp, Tcl_Obj*bytes,
 				Tcl_Obj*encoding, Tcl_Obj**decodedstring);
@@ -136,18 +141,18 @@ typedef struct Rl_jsonStubs {
     int (*jSON_JArrayObjGetElements) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int*objc, Tcl_Obj***objv); /* 16 */
     int (*jSON_JArrayObjIndex) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int index, Tcl_Obj**elem); /* 17 */
     int (*jSON_JArrayObjReplace) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int first, int count, int objc, Tcl_Obj*objv[]); /* 18 */
-    int (*jSON_Get) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, Tcl_Obj**res); /* 19 */
-    int (*jSON_Extract) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, Tcl_Obj**res); /* 20 */
-    int (*jSON_Exists) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, int*exists); /* 21 */
-    int (*jSON_Set) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, Tcl_Obj*replacement); /* 22 */
-    int (*jSON_Unset) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path); /* 23 */
+    int (*jSON_Get) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj**res); /* 19 */
+    int (*jSON_Extract) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj**res); /* 20 */
+    int (*jSON_Exists) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, int*exists); /* 21 */
+    int (*jSON_Set) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj*replacement); /* 22 */
+    int (*jSON_Unset) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */); /* 23 */
     int (*jSON_Normalize) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj**normalized); /* 24 */
     int (*jSON_Pretty) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*indent, Tcl_Obj**prettyString); /* 25 */
     int (*jSON_Template) (Tcl_Interp*interp, Tcl_Obj*template, Tcl_Obj*dict, Tcl_Obj**res); /* 26 */
-    int (*jSON_IsNULL) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, int*isnull); /* 27 */
-    int (*jSON_Type) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, enum json_types*type); /* 28 */
-    int (*jSON_Length) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, int*length); /* 29 */
-    int (*jSON_Keys) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*path, Tcl_Obj**keyslist); /* 30 */
+    int (*jSON_IsNULL) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, int*isnull); /* 27 */
+    int (*jSON_Type) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, enum json_types*type); /* 28 */
+    int (*jSON_Length) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, int*length); /* 29 */
+    int (*jSON_Keys) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj**keyslist); /* 30 */
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
     int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */

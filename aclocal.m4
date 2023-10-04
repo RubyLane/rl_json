@@ -49,15 +49,19 @@ AC_DEFUN([ENABLE_DEDUP], [
 	#trap '' DEBUG
 ])
 
+AC_DEFUN([CygPath],[`${CYGPATH} $1`])
 
-dnl AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [
-dnl     eval "$1=\"-I[]CygPath($2)\""
-dnl     AC_SUBST($1)])
-dnl 
-dnl AC_DEFUN([TEAX_CONFIG_LINK_LINE], [
-dnl     AS_IF([test ${TCL_LIB_VERSIONS_OK} = nodots], [
-dnl 	eval "$1=\"-L[]CygPath($2) -l$3${TCL_TRIM_DOTS}\""
-dnl     ], [
-dnl 	eval "$1=\"-L[]CygPath($2) -l$3${PACKAGE_VERSION}\""
-dnl     ])
-dnl     AC_SUBST($1)])
+AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [
+	eval "$1=\"-I[]CygPath($2)\""
+	AC_SUBST($1)
+])
+
+AC_DEFUN([TEAX_CONFIG_LINK_LINE], [
+	AS_IF([test ${TCL_LIB_VERSIONS_OK} = nodots], [
+		eval "$1=\"-L[]CygPath($2) -l$3${TCL_TRIM_DOTS}\""
+	], [
+		eval "$1=\"-L[]CygPath($2) -l$3${PACKAGE_VERSION}\""
+	])
+	AC_SUBST($1)
+])
+

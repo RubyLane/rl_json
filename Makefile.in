@@ -245,17 +245,13 @@ install-doc: doc
 	done
 
 test: binaries libraries
-	$(TCLSH) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+	$(TCLSH) `@CYGPATH@ $(srcdir)/tests/all.tcl` $(TESTFLAGS) -load $(PACKAGE_LOAD)
 
 jsonsh: $(PKG_OBJECTS) $(TCL_SRC_DIR)/unix/tclAppInit.c $(srcdir)/generic/jsonsh.c
 	$(COMPILE) -DTCL_LOCAL_APPINIT=Json_AppInit $^ $(SHLIB_LD_LIBS) -L$(TCL_BIN_DIR)/parse_args0.3.3 -lparse_args0.3.3 $(TCL_LIB_SPEC) -lm -o $@
 
 tests/JSONTestSuite/test_parsing: binaries libraries
-	$(TCLSH) `@CYGPATH@ $(srcdir)/fetch_test_cases.tcl` \
-		-load "package ifneeded ${PACKAGE_NAME} ${PACKAGE_VERSION} \
-			[list load `@CYGPATH@ $(PKG_LIB_FILE)` $(PACKAGE_NAME)]"
+	$(TCLSH) `@CYGPATH@ $(srcdir)/fetch_test_cases.tcl` -load $(PACKAGE_LOAD)
 
 shell: binaries libraries
 	@$(TCLSH) $(SCRIPT)

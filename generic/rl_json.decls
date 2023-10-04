@@ -68,19 +68,19 @@ declare 18 generic {
 #
 
 declare 19 generic {
-	int JSON_Get(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
+	int JSON_Get(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj** res)
 }
 declare 20 generic {
-	int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
+	int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj** res)
 }
 declare 21 generic {
-	int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists)
+	int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, int* exists)
 }
 declare 22 generic {
-	int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj* replacement)
+	int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj* replacement)
 }
 declare 23 generic {
-	int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path)
+	int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */)
 }
 
 declare 24 generic {
@@ -94,16 +94,16 @@ declare 26 generic {
 }
 
 declare 27 generic {
-	int JSON_IsNULL(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* isnull)
+	int JSON_IsNULL(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, int* isnull)
 }
 declare 28 generic {
-	int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, enum json_types* type)
+	int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, enum json_types* type)
 }
 declare 29 generic {
-	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* length)
+	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, int* length)
 }
 declare 30 generic {
-	int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** keyslist)
+	int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj** keyslist)
 }
 declare 31 generic {
 	int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj** decodedstring)

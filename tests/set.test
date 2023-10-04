@@ -390,7 +390,7 @@ test set-7.1 {Be lenient about the value - if it can't be interpreted as a JSON 
 		null	null
 		string	string
 		arr		{ [1,2,3]}
-		notarr	{ [1,2,3}
+		notarr	" \[1,2,3"
 	} {
 		json set j $k $v
 	}
@@ -404,7 +404,7 @@ test set-7.1 {Be lenient about the value - if it can't be interpreted as a JSON 
 		"null":		null,
 		"string":	"string",
 		"arr":		[1,2,3],
-		"notarr":	" [1,2,3"
+		"notarr":	" [1,2,3"	// Fix vim syntax highlighting confusion: ]"
 	}
 }]
 #>>>
@@ -439,6 +439,56 @@ test set-10.2 {JSON set on shared value} -setup { #<<<
    catch {rename t {}}
    unset -nocomplain object
 } -result {us-west-2 us-west-1 a}
+#>>>
+test set-11.1 {Interaction with var traces: value is always shared} -setup { #<<<
+	set json {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}
+	set saved	$json
+	set g_ref	{}
+	trace add variable json write [list apply {{n1 n2 op} {
+		upvar 1 $n1 v
+		lappend ::g_ref $v	;# Take another ref to the value in the variable
+	}}]
+} -body {
+	list [json set json foo 1 end-1 {"5"}] $g_ref [json normalize $saved]
+} -cleanup {
+	unset -nocomplain json g_ref saved
+} -result [list {{"foo":["~S:a",["1","5","3"],"c"]}} {{{"foo":["~S:a",["1","5","3"],"c"]}}} {{"foo":["~S:a",["1","2","3"],"c"]}}]
+#>>>
+test set-11.2 {Interaction with var traces: traces must fire even if value is unshared} -setup { #<<<
+	set json [string trim {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}]
+	set g_ref	{}
+	trace add variable json write [list apply {{n1 n2 op} {
+		set ::g_ref fired
+	}}]
+} -body {
+	list [json set json foo 1 end-1 {"5"}] $g_ref
+} -cleanup {
+	unset -nocomplain json g_ref
+} -result [list {{"foo":["~S:a",["1","5","3"],"c"]}} fired]
+#>>>
+test set-11.3 {Interaction with var traces: result of an unset is the value of the variable, after the trace} -setup { #<<<
+	set json [string trim {
+		{
+			"foo": ["~S:a", ["1","2","3"], "c"]
+		}
+	}]
+	trace add variable json write [list apply {{n1 n2 op} {
+		upvar 1 $n1 v
+		json set v foo 1 end+1 {"4"}
+	}}]
+} -body {
+	json set json foo 1 end-1 {"5"}
+} -cleanup {
+	unset -nocomplain json
+} -result {{"foo":["~S:a",["1","5","3","4"],"c"]}}
 #>>>
 
 ::tcltest::cleanupTests

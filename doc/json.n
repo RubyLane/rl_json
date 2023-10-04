@@ -4,7 +4,7 @@
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.12.0 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.14.0 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
@@ -12,7 +12,7 @@
 json \- Parse, manipulate and produce JSON documents 
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.12.0\fR? 
+\fBpackage require rl_json\fR ?\fB0.14.0\fR? 
 
 \fBjson get\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson extract\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
@@ -206,22 +206,22 @@ Each entry in the dictionary will be added to the result object.  If the value
 for each key in the iteration result is a JSON value it is added to the array
 as-is, otherwise it is converted to a JSON string.
 .TP
-\fBjson isnull \fIjsonVariableName\fR ?\fIkey ...\fR?
+\fBjson isnull \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Return a boolean indicating whether the named JSON value is null.
 .TP
-\fBjson type \fIjsonVariableName\fR ?\fIkey ...\fR?
+\fBjson type \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Return the type of the named JSON value, one of "object", "array", "string",
 "number", "boolean" or "null".
 .TP
-\fBjson length \fIjsonVariableName\fR ?\fIkey ...\fR?
+\fBjson length \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Return the length of the of the named JSON array, number of entries in the
 named JSON object, or number of characters in the named JSON string.  Other
 value types aren't supported.
 .TP
-\fBjson keys \fIjsonVariableName\fR ?\fIkey ...\fR?
+\fBjson keys \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Return the keys in the of the named JSON object, found by following the path of \fIkey\fRs.
 .TP
