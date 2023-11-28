@@ -39,6 +39,14 @@ const Rl_jsonStubs rl_jsonStubs = {
     JSON_Decode, /* 31 */
     JSON_Foreach, /* 32 */
     JSON_Valid, /* 33 */
+    0, /* 34 */
+    0, /* 35 */
+    0, /* 36 */
+    0, /* 37 */
+    0, /* 38 */
+    0, /* 39 */
+    CBOR_GetDataItemFromPath, /* 40 */
+    CBOR_Length, /* 41 */
 };
 
 /* !END!: Do not edit above this line. */

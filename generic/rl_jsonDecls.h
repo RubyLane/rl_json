@@ -117,6 +117,20 @@ EXTERN int		JSON_Foreach(Tcl_Interp*interp, Tcl_Obj*iterators,
 EXTERN int		JSON_Valid(Tcl_Interp*interp, Tcl_Obj*json,
 				int*valid, enum extensions extensions,
 				struct parse_error*details);
+/* Slot 34 is reserved */
+/* Slot 35 is reserved */
+/* Slot 36 is reserved */
+/* Slot 37 is reserved */
+/* Slot 38 is reserved */
+/* Slot 39 is reserved */
+/* 40 */
+EXTERN int		CBOR_GetDataItemFromPath(Tcl_Interp*interp,
+				Tcl_Obj*cborObj, Tcl_Obj*pathObj,
+				const uint8_t**dataitemPtr,
+				const uint8_t**ePtr, Tcl_DString*tagsPtr);
+/* 41 */
+EXTERN int		CBOR_Length(Tcl_Interp*interp, const uint8_t*p,
+				const uint8_t*e, size_t*lenPtr);
 
 typedef struct Rl_jsonStubs {
     int magic;
@@ -156,6 +170,14 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
     int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */
+    void (*reserved34)(void);
+    void (*reserved35)(void);
+    void (*reserved36)(void);
+    void (*reserved37)(void);
+    void (*reserved38)(void);
+    void (*reserved39)(void);
+    int (*cBOR_GetDataItemFromPath) (Tcl_Interp*interp, Tcl_Obj*cborObj, Tcl_Obj*pathObj, const uint8_t**dataitemPtr, const uint8_t**ePtr, Tcl_DString*tagsPtr); /* 40 */
+    int (*cBOR_Length) (Tcl_Interp*interp, const uint8_t*p, const uint8_t*e, size_t*lenPtr); /* 41 */
 } Rl_jsonStubs;
 
 extern const Rl_jsonStubs *rl_jsonStubsPtr;
@@ -238,6 +260,16 @@ extern const Rl_jsonStubs *rl_jsonStubsPtr;
 	(rl_jsonStubsPtr->jSON_Foreach) /* 32 */
 #define JSON_Valid \
 	(rl_jsonStubsPtr->jSON_Valid) /* 33 */
+/* Slot 34 is reserved */
+/* Slot 35 is reserved */
+/* Slot 36 is reserved */
+/* Slot 37 is reserved */
+/* Slot 38 is reserved */
+/* Slot 39 is reserved */
+#define CBOR_GetDataItemFromPath \
+	(rl_jsonStubsPtr->cBOR_GetDataItemFromPath) /* 40 */
+#define CBOR_Length \
+	(rl_jsonStubsPtr->cBOR_Length) /* 41 */
 
 #endif /* defined(USE_RL_JSON_STUBS) */
 

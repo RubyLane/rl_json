@@ -19,7 +19,7 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([rl_json],[0.14])
+AC_INIT([rl_json],[0.15])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -77,7 +77,7 @@ ENABLE_UNLOAD
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c cbor.c])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h generic/rl_json.h])
 TEA_ADD_INCLUDES([])
 TEA_ADD_LIBS([])
