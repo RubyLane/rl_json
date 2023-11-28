@@ -104,39 +104,39 @@ test cbor-2.36 {} -body {cbor get \xff} -returnCodes error -errorCode {CBOR INVA
 
 # cbor-3.* - trailing garbage
 test cbor-3.1 {Trailing garbage} -body { #<<<
-	cbor get [binary decode hex {00 00}]
+	cbor wellformed [binary decode hex {00 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.2 {Trailing garbage after binary chunk} -body { #<<<
-	cbor get [binary decode hex {5f 43 66 6f 6f 41 61 FF 00}]
+	cbor wellformed [binary decode hex {5f 43 66 6f 6f 41 61 FF 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.3 {Trailing garbage after string chunk} -body { #<<<
-	cbor get [binary decode hex {7f 63 66 6f 6f 61 61 FF 00}]
+	cbor wellformed [binary decode hex {7f 63 66 6f 6f 61 61 FF 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.4.1 {Trailing garbage after array, indefinite} -body { #<<<
-	cbor get [binary decode hex {9f 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e FF 00}]
+	cbor wellformed [binary decode hex {9f 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e FF 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.4.2 {Trailing garbage after array, definite} -body { #<<<
-	cbor get [binary decode hex {82 01 02 00}]
+	cbor wellformed [binary decode hex {82 01 02 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.5.1 {Trailing garbage after map chunk, indefinite} -body { #<<<
-	cbor get [binary decode hex {bf 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e FF 00}]
+	cbor wellformed [binary decode hex {bf 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e FF 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.5.2 {Trailing garbage after map chunk, definite} -body { #<<<
-	cbor get [binary decode hex {a2 01 02 03 04 00}]
+	cbor wellformed [binary decode hex {a2 01 02 03 04 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.6 {Trailing garbage after break, no chunks} -body { #<<<
-	cbor get [binary decode hex {5f ff 00}]
+	cbor wellformed [binary decode hex {5f ff 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 test cbor-3.7 {Trailing garbage after break, one chunks} -body { #<<<
-	cbor get [binary decode hex {5f 43 66 6f 6f ff 00}]
+	cbor wellformed [binary decode hex {5f 43 66 6f 6f ff 00}]
 } -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
 #>>>
 
@@ -312,6 +312,23 @@ test_get 1.78	9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff	[lseq 1
 test_get 1.79	bf61610161629f0203ffff										{a 1 b {2 3}}					;# {_ "a": 1, "b": [_ 2, 3]}
 test_get 1.80	826161bf61626163ff											{a {b c}}						;# ["a", {_ "b": "c"}]
 test_get 1.81	bf6346756ef563416d7421ff									{Fun true Amt -2}				;# {_ "Fun": true, "Amt": -2}
+
+test cbor_get-2.1 {fetch first key from map} -body { #<<<
+	cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] fmt
+} -result none
+#>>>
+test cbor_get-2.2 {fetch middle key from map} -body { #<<<
+	cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] attStmt
+} -result {}
+#>>>
+test cbor_get-2.3 {fetch end key from map} -body { #<<<
+	binary encode hex [cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] authData]
+} -result e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463
+#>>>
+test cbor_get-2.4 {fetch non-existent key from map} -body { #<<<
+	cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] nonesuch
+} -returnCodes error -errorCode {CBOR NOTFOUND nonesuch} -result "path not found"
+#>>>
 
 unset -nocomplain done
 coroutine coro_tests apply {{} {

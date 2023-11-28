@@ -1187,8 +1187,11 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 			const uint8_t*	dataitem = NULL;
 			const uint8_t*	e = NULL;
 			TEST_OK_LABEL(finally, code, CBOR_GetDataItemFromPath(interp, objv[A_CBOR], path, &dataitem, &e, &tags));
+			if (dataitem == NULL) {
+				Tcl_SetErrorCode(interp, "CBOR", "NOTFOUND", Tcl_GetString(path), NULL);
+				THROW_ERROR_LABEL(finally, code, "path not found");
+			}
 			TEST_OK_LABEL(finally, code, cbor_get_obj(interp, &dataitem, e, &res, NULL));
-			if (dataitem != e) CBOR_TRAILING(finally, code);
 
 			/*
 			const int tagcount = Tcl_DStringLength(&tags)/sizeof(uint64_t);
@@ -1234,10 +1237,13 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 			const uint8_t*	dataitem = NULL;
 			const uint8_t*	e = NULL;
 			TEST_OK_LABEL(finally, code, CBOR_GetDataItemFromPath(interp, objv[A_CBOR], path, &dataitem, &e, &tags));
+			if (dataitem == NULL) {
+				Tcl_SetErrorCode(interp, "CBOR", "NOTFOUND", Tcl_GetString(path), NULL);
+				THROW_ERROR_LABEL(finally, code, "path not found");
+			}
 
 			size_t		len = 0;
 			TEST_OK_LABEL(finally, code, CBOR_Length(interp, dataitem, e, &len));
-			if (dataitem+len < e) CBOR_TRAILING(finally, code);
 			Tcl_SetObjResult(interp, Tcl_NewByteArrayObj(dataitem, len));
 			break;
 		}
