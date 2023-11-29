@@ -236,17 +236,17 @@ test number-2.2 {Too many args} -body { #<<<
 #>>>
 test number-2.3 {json number, not a number} -body { #<<<
 	set code [catch {json number foo} r o]
-	list $code $r [dict get $o -errorcode]
+	list $code [regexp {^can't use non-numeric string( "foo")? as operand of "\+"$} $r] [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {can't use non-numeric string "foo" as operand of "+"} {ARITH DOMAIN {non-numeric string}}]
+} -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
 #>>>
 test number-2.4 {json number, not a number: empty string} -body { #<<<
 	set code [catch {json number ""} r o]
-	list $code $r [dict get $o -errorcode]
+	list $code [regexp {^can't use empty string( "")? as operand of "\+"$} $r] [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -result [list 1 {can't use empty string "" as operand of "+"} {ARITH DOMAIN {empty string}}]
+} -match regexp -result {1 1 {ARITH DOMAIN {empty string}}}
 #>>>
 
 ::tcltest::cleanupTests

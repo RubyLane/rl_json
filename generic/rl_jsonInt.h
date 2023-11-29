@@ -279,4 +279,16 @@ void foreach_state_free(struct foreach_state* state);
 int cbor_init(Tcl_Interp* interp, struct interp_cx* l);
 void cbor_release(Tcl_Interp* interp);
 
+// Polyfill
+#ifndef Tcl_GetBytesFromObj
+//#define Tcl_GetBytesFromObj(interp, obj, lenptr) Tcl_GetByteArrayFromObj(obj, lenptr)
+static inline uint8_t* Tcl_GetBytesFromObj(Tcl_Interp* interp, Tcl_Obj* obj, size_t* lenPtr)
+{
+	int	len;
+	uint8_t*	bytes = Tcl_GetByteArrayFromObj(obj, &len);
+	*lenPtr = len;
+	return bytes;
+}
+#endif
+
 #endif

@@ -1,7 +1,5 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
+package require tcltest 2.5.1
+namespace import ::tcltest::*
 
 ::tcltest::loadTestedCommands
 
