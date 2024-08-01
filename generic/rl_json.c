@@ -160,9 +160,9 @@ static int _setdir(Tcl_Interp* interp) //{{{
 		cfg[0].value = Tcl_GetString(g_packagedir);		// Under global ref
 		cfg[1].value = Tcl_GetString(g_includedir);		// Under global ref
 		cfg[2].value = Tcl_GetString(g_packagedir);		// Under global ref
-
-		Tcl_RegisterConfig(interp, PACKAGE_NAME, cfg, "utf-8");
 	}
+
+	Tcl_RegisterConfig(interp, PACKAGE_NAME, cfg, "utf-8");
 
 finally:
 	Tcl_MutexUnlock(&g_config_mutex); //>>>
