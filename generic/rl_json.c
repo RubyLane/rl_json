@@ -4106,7 +4106,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("decode",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("isnull",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template",   -1));
-			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("_template",  -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template_string", -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("foreach",    -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("lmap",       -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("amap",       -1));
