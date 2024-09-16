@@ -105,7 +105,7 @@ test memory-1.8 {memory leak with null parsing} -setup { #<<<
 #>>>
 test memory-2.1 {json foreach} -setup { #<<<
 	proc test_memory-2.1 {} {
-		set h	[open tests/foreach_data r]
+		set h	[open [file join [testsDirectory] foreach_data] r]
 		try {
 			chan configure $h -encoding utf-8
 			while {![set result [gets $h]; eof $h]} {
