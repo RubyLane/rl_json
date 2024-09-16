@@ -15,7 +15,10 @@
 #endif
 #include <endian.h>
 #include <tclTomMath.h>
+#if TIP445_SHIM
+#define Tcl_InitStringRep
 #include "tip445.h"
+#endif
 #include "names.h"
 
 #define CX_STACK_SIZE	6
