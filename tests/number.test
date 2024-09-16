@@ -3,6 +3,8 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
+testConstraint tcl8 [package vsatisfies [package present Tcl] 8]
+
 package require rl_json
 namespace path {::rl_json}
 
@@ -77,20 +79,20 @@ test number-1.13 {string} -body { #<<<
 } -result 42
 #>>>
 test number-1.14.1 {positive octal} -body { #<<<
-	set n	077
+	set n	0o77
 	expr {$n+0}	;# Convert to number type
 	list [json number $n] $n
 } -cleanup {
 	unset -nocomplain n
-} -result {63 077}
+} -result {63 0o77}
 #>>>
 test number-1.14.2 {negative octal} -body { #<<<
-	set n	-077
+	set n	-0o77
 	expr {$n+0}	;# Convert to number type
 	list [json number $n] $n
 } -cleanup {
 	unset -nocomplain n
-} -result {-63 -077}
+} -result {-63 -0o77}
 #>>>
 test number-1.15.1 {positive hex} -body { #<<<
 	set n	0xA0
@@ -236,12 +238,12 @@ test number-2.2 {Too many args} -body { #<<<
 #>>>
 test number-2.3 {json number, not a number} -body { #<<<
 	set code [catch {json number foo} r o]
-	list $code [regexp {^can't use non-numeric string( "foo")? as operand of "\+"$} $r] [dict get $o -errorcode]
+	list $code [regexp {^(can't|cannot) use non-numeric string( "foo")? as( right)? operand of "\+"$} $r] [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
 } -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
 #>>>
-test number-2.4 {json number, not a number: empty string} -body { #<<<
+test number-2.4 {json number, not a number: empty string} -constraints tcl8 -body { #<<<
 	set code [catch {json number ""} r o]
 	list $code [regexp {^can't use empty string( "")? as operand of "\+"$} $r] [dict get $o -errorcode]
 } -cleanup {
