@@ -34,7 +34,7 @@ test new-1.1.1 {Create an array from type-value pairs, syntax error in elem (too
 	json new array {*}$typevalues
 } -cleanup {
 	unset -nocomplain typevalues
-} -returnCodes error -result {wrong # args: should be "number value"}
+} -returnCodes error -result [resultopts {wrong # args: should be "number value"} {wrong # args: should be "json new value"}]
 #>>>
 
 test new-1.2 {Create an array from JSON values} -setup { #<<<
@@ -213,11 +213,11 @@ test new-6.9 {Create new bool: false} -body { #<<<
 #>>>
 test new-6.10.1 {Create new bool: value} -body { #<<<
 	json new bool
-} -returnCodes error -result {wrong # args: should be "boolean val"}
+} -returnCodes error -result [resultopts {wrong # args: should be "boolean val"} {wrong # args: should be "json new val"}]
 #>>>
 test new-6.10.2 {Create new bool: value} -body { #<<<
 	json new bool true false
-} -returnCodes error -result {wrong # args: should be "boolean val"}
+} -returnCodes error -result [resultopts {wrong # args: should be "boolean val"} {wrong # args: should be "json new val"}]
 #>>>
 test new-6.10.3 {Create new bool: value} -body { #<<<
 	json new bool true

@@ -1219,8 +1219,8 @@ test get-61.25 {Get a template point} -body { #<<<
 #>>>
 
 # Coverage golf
-test get-jsonGet-1.1 {check args} -body {json get} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "get ?-default defaultValue? json_val ?path ...?"}
-test get-jsonGet-2.1 {check args} -body {json get -default def} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "get ?-default defaultValue? json_val ?path ...?"}
+test get-jsonGet-1.1 {check args} -body {json get} -returnCodes error -errorCode {TCL WRONGARGS} -result [resultopts {wrong # args: should be "get ?-default defaultValue? json_val ?path ...?"} {wrong # args: should be "json get ?-default defaultValue? json_val ?path ...?"}]
+test get-jsonGet-2.1 {check args} -body {json get -default def} -returnCodes error -errorCode {TCL WRONGARGS} -result [resultopts {wrong # args: should be "get ?-default defaultValue? json_val ?path ...?"} {wrong # args: should be "json get ?-default defaultValue? json_val ?path ...?"}]
 test get-jsonGet-3.1 {check args} -body {json get -foo def} -returnCodes error -errorCode {TCL LOOKUP INDEX option -foo} -result {bad option "-foo": must be *} -match glob
 test get-jsonGet-4.1 {check args} -body {json get -default} -returnCodes error -errorCode {TCL ARGUMENT MISSING} -result {missing argument to "-default"}
 test get-jsonGet-5.1 {check args} -body {json get -- true} -result 1
