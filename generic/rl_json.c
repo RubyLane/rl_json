@@ -3596,6 +3596,7 @@ collect_interp_result:
 }
 
 //}}}
+#if !ENSEMBLE
 static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int subcommand;
@@ -3781,6 +3782,7 @@ static int jsonObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 }
 
 //}}}
+#endif
 
 void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 {
