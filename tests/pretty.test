@@ -4,8 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
-package require parse_args
-namespace path {::rl_json ::parse_args}
+namespace path {::rl_json}
 
 test pretty-1.1 {Basic pretty-print} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
@@ -51,7 +50,7 @@ test pretty-1.2 {Basic pretty-print, different indent} -body { #<<<
 #>>>
 test pretty-2.1 {too few args} -body { #<<<
 	json pretty
-} -returnCodes error -result {wrong # args: should be "pretty pretty ?-indent indent? json_val ?key ...?"}
+} -returnCodes error -result [resultopts {wrong # args: should be "pretty pretty ?-indent indent? json_val ?key ...?"} {wrong # args: should be "json pretty pretty ?-indent indent? json_val ?key ...?"}]
 #>>>
 test pretty-3.1 {path} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} {This is a much longer key}
@@ -96,7 +95,7 @@ test debug-1.1 {Basic debug pretty-print} -body { #<<<
 # Coverage golf
 test pretty-jsonPretty-1.1 {} -body {json pretty -indent} -returnCodes error -result {missing argument to "-indent"} -errorCode {TCL ARGUMENT MISSING}
 test pretty-jsonPretty-2.1 {} -body {json pretty -- 1} -result 1
-test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -result {wrong # args: should be "pretty ?-default defaultValue? json_val ?key ...?"} -errorCode {TCL WRONGARGS}
+test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -result [resultopts {wrong # args: should be "pretty ?-default defaultValue? json_val ?key ...?"} {wrong # args: should be "json pretty ?-default defaultValue? json_val ?key ...?"}] -errorCode {TCL WRONGARGS}
 test pretty-jsonPretty-4.1 {} -body {json pretty bad} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
 test pretty-jsonPretty-5.1 {} -body {json pretty -bad} -returnCodes error -result {bad option "-bad": must be *} -errorCode {TCL LOOKUP INDEX option -bad} -match glob
 

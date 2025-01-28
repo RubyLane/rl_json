@@ -63,13 +63,13 @@ enum cbor_mt {
 // Stubs exported API
 
 #ifdef USE_RL_JSON_STUBS
-EXTERN CONST char* Rl_jsonInitStubs _ANSI_ARGS_((Tcl_Interp* interp, CONST char* version, int exact));
+EXTERN CONST char* Rl_jsonInitStubs(Tcl_Interp* interp, CONST char* version, int exact);
 #else
 #	define Rl_jsonInitStubs(interp, version, exact) Tcl_PkgRequire(interp, "rl_json", version, exact)
 #endif
 #include "rl_jsonDecls.h"
 
-EXTERN int Rl_json_Init _ANSI_ARGS_((Tcl_Interp* interp));
-EXTERN int Rl_json_SafeInit _ANSI_ARGS_((Tcl_Interp* interp));
+EXTERN int Rl_json_Init(Tcl_Interp* interp);
+EXTERN int Rl_json_SafeInit(Tcl_Interp* interp);
 
 #endif

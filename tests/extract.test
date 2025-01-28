@@ -1254,8 +1254,8 @@ test extract-70.1 {Path tail element isn't interpreted as a modifier - no need t
 #>>>
 
 # Coverage golf
-test extract-jsonExtract-1.1 {check args} -body {json extract} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "extract ?-default defaultValue? json_val ?path ...?"}
-test extract-jsonExtract-2.1 {check args} -body {json extract -default {"def"}} -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "extract ?-default defaultValue? json_val ?path ...?"}
+test extract-jsonExtract-1.1 {check args} -body {json extract} -returnCodes error -errorCode {TCL WRONGARGS} -result [resultopts {wrong # args: should be "extract ?-default defaultValue? json_val ?path ...?"} {wrong # args: should be "json extract ?-default defaultValue? json_val ?path ...?"}]
+test extract-jsonExtract-2.1 {check args} -body {json extract -default {"def"}} -returnCodes error -errorCode {TCL WRONGARGS} -result [resultopts {wrong # args: should be "extract ?-default defaultValue? json_val ?path ...?"} {wrong # args: should be "json extract ?-default defaultValue? json_val ?path ...?"}]
 test extract-jsonExtract-3.1 {check args} -body {json extract -foo def} -returnCodes error -errorCode {TCL LOOKUP INDEX option -foo} -result {bad option "-foo": must be *} -match glob
 test extract-jsonExtract-4.1 {check args} -body {json extract -default} -returnCodes error -errorCode {TCL ARGUMENT MISSING} -result {missing argument to "-default"}
 test extract-jsonExtract-4.2 {check args} -body {json extract -default bad} -returnCodes error -errorCode {RL JSON PARSE {Illegal character} bad 0} -result {Error parsing JSON value: Illegal character at offset 0}
