@@ -1,10 +1,14 @@
 #include "rl_jsonInt.h"
 
+/*
+ * Renamed enum values, see:
+ * https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/hresult-values
+ */
 enum svalue_types {
-	S_FALSE = 20,
-	S_TRUE  = 21,
-	S_NULL  = 22,
-	S_UNDEF = 23
+    CBOR_FALSE = 20,
+    CBOR_TRUE  = 21,
+    CBOR_NULL  = 22,
+    CBOR_UNDEF = 23
 };
 
 enum indexmode {
@@ -413,7 +417,13 @@ read_dataitem:
 					uint64_t			chunk_val;
 
 					switch (chunk_ai) {
-						case 0 ... 23:    chunk_val = chunk_ai; break;
+					    //case 0 ... 23:
+						case 0: case 1: case 2: case 3: case 4:
+						case 5: case 6: case 7: case 8: case 9:
+						case 10: case 11: case 12: case 13: case 14:
+						case 15: case 16: case 17: case 18: case 19:
+						case 20: case 21: case 22: case 23:
+						  chunk_val = chunk_ai; break;
 						case 24: TAKE(1); chunk_val = *(uint8_t*)valPtr;           break;
 						case 25: TAKE(2); chunk_val = be16toh(*(uint16_t*)valPtr); break;
 						case 26: TAKE(4); chunk_val = be32toh(*(uint32_t*)valPtr); break;
@@ -479,16 +489,29 @@ read_dataitem:
 		case M_REAL:
 		{
 			switch (ai) {
-				case 0 ... 19:				replace_tclobj(&res, Tcl_ObjPrintf("simple(%" PRIu64 ")", val));	break;
-				case S_FALSE:				replace_tclobj(&res, l->cbor_false);		break;
-				case S_TRUE:				replace_tclobj(&res, l->cbor_true);			break;
-				case S_NULL:				replace_tclobj(&res, l->cbor_null);			break;
-				case S_UNDEF:				replace_tclobj(&res, l->cbor_undefined);	break;
+			    //case 0 ... 19:
+			  case 0: case 1: case 2: case 3: case 4:
+			  case 5: case 6: case 7: case 8: case 9:
+			  case 10: case 11: case 12: case 13: case 14:
+			  case 15: case 16: case 17: case 18: case 19:
+			    replace_tclobj(&res, Tcl_ObjPrintf("simple(%" PRIu64 ")", val));	break;
+				case CBOR_FALSE:				replace_tclobj(&res, l->cbor_false);		break;
+				case CBOR_TRUE:				replace_tclobj(&res, l->cbor_true);			break;
+				case CBOR_NULL:				replace_tclobj(&res, l->cbor_null);			break;
+				case CBOR_UNDEF:				replace_tclobj(&res, l->cbor_undefined);	break;
 				case 24:	
+#if 1
+				  if (val >= 32 && val <= 255) {
+				      replace_tclobj(&res, Tcl_ObjPrintf("simple(%" PRIu64 ")", val));
+				  } else {
+				      CBOR_INVALID(finally, code, "invalid simple value: %" PRIu64, val);
+				  }
+#else
 					switch (val) {
 						case 32 ... 255:	replace_tclobj(&res, Tcl_ObjPrintf("simple(%" PRIu64 ")", val));	break;
-						default:			CBOR_INVALID(finally, code, "invalid simple value: %" PRIu64, val);
+					  default:			CBOR_INVALID(finally, code, "invalid simple value: %" PRIu64, val);
 					}
+#endif
 					break;
 				case 25:	replace_tclobj(&res, Tcl_NewDoubleObj( decode_half(valPtr)   ));	break;
 				case 26:	replace_tclobj(&res, Tcl_NewDoubleObj( decode_float(valPtr)  ));	break;
