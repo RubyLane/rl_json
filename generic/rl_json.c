@@ -25,7 +25,7 @@ static Tcl_Config cfg[] = {
 #define snprintf _snprintf
 /* start PRS changes */
 # define _Pragma(x)
-# define mkstemp(x) mktemp(x,sizeof(x))
+# define mkstemp(x) mktemp(x)
 /* end PRS changes */
 #endif
 
@@ -3830,7 +3830,7 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 
 
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
-	fd = mkstemp(temp);
+	fd = (int)mkstemp(temp);
 	h_before = fdopen(fd, "r");
 
 #if DEDUP
@@ -3848,7 +3848,7 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	free_cache(l);
 #endif
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
-	fd = mkstemp(temp);
+	fd = (int)mkstemp(temp);
 	h_after = fdopen(fd, "r");
 	Tcl_DumpActiveMemory(temp);
 	if (unlink(temp) != 0) {

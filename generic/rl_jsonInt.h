@@ -39,14 +39,29 @@
 # define be64toh(x) OSSwapBigToHostInt64(x)
 # define le64toh(x) OSSwapLittleToHostInt64(x)
 
+
+
 #elif defined(__WINDOWS__)
 # include <winsock2.h>
+# include <ws2tcpip.h>
 # if defined(_WIN32)
 #  define ssize_t int
 # elif defined(_WIN64)
 #  define ssize_t __int64
 # endif
 # if BYTE_ORDER == LITTLE_ENDIAN
+
+// implement missing 
+inline uint64_t be64Itoh(uint64_t value) {
+    if (htonl(1) != 1) {
+        uint32_t high_part = ntohl((uint32_t)(value >> 32));
+        uint32_t low_part = ntohl((uint32_t)(value & 0xFFFFFFFFLL));
+        return ((uint64_t)low_part << 32) | high_part;
+    } else {
+        return value;
+    }
+}
+
 #  define htobe16(x) htons(x)
 #  define htole16(x) (x)
 #  define be16toh(x) ntohs(x)
@@ -57,7 +72,7 @@
 #  define le32toh(x) (x)
 #  define htobe64(x) htonll(x)
 #  define htole64(x) (x)
-#  define be64toh(x) ntohll(x)
+// #  define be64Itoh(x) ntohll(x)
 #  define le64toh(x) (x)
 # elif BYTE_ORDER == BIG_ENDIAN
    		/* that would be xbox 360 */
