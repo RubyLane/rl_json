@@ -98,6 +98,7 @@ inline uint64_t be64Itoh(uint64_t value) {
 
 #else
 # include <endian.h>
+# define be64Itoh(x) be64toh(x)
 #endif
 /* end PRS changes */
 #include <tclTomMath.h>
