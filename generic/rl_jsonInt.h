@@ -13,7 +13,94 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#include <endian.h>
+/* start PRS changes */
+#if (defined(_WIN16) || defined(_WIN32) || defined(_WIN64)) && !defined(__WINDOWS__)
+# define __WINDOWS__
+#endif
+
+#if defined(__APPLE__)
+/*
+ * Compatibility header for endian.h.
+ * A simple compatibility shim to convert
+ * BSD/Linux endian macros to the Mac OS X equivalents.
+ * */
+# include <libkern/OSByteOrder.h>
+
+# define htobe16(x) OSSwapHostToBigInt16(x)
+# define htole16(x) OSSwapHostToLittleInt16(x)
+# define be16toh(x) OSSwapBigToHostInt16(x)
+# define le16toh(x) OSSwapLittleToHostInt16(x)
+# define htobe32(x) OSSwapHostToBigInt32(x)
+# define htole32(x) OSSwapHostToLittleInt32(x)
+# define be32toh(x) OSSwapBigToHostInt32(x)
+# define le32toh(x) OSSwapLittleToHostInt32(x)
+# define htobe64(x) OSSwapHostToBigInt64(x)
+# define htole64(x) OSSwapHostToLittleInt64(x)
+# define be64toh(x) OSSwapBigToHostInt64(x)
+# define le64toh(x) OSSwapLittleToHostInt64(x)
+
+
+
+#elif defined(__WINDOWS__)
+# include <winsock2.h>
+# include <ws2tcpip.h>
+# if defined(_WIN32)
+#  define ssize_t int
+# elif defined(_WIN64)
+#  define ssize_t __int64
+# endif
+# if BYTE_ORDER == LITTLE_ENDIAN
+
+// implement missing 
+inline uint64_t be64Itoh(uint64_t value) {
+    if (htonl(1) != 1) {
+        uint32_t high_part = ntohl((uint32_t)(value >> 32));
+        uint32_t low_part = ntohl((uint32_t)(value & 0xFFFFFFFFLL));
+        return ((uint64_t)low_part << 32) | high_part;
+    } else {
+        return value;
+    }
+}
+
+#  define htobe16(x) htons(x)
+#  define htole16(x) (x)
+#  define be16toh(x) ntohs(x)
+#  define le16toh(x) (x)
+#  define htobe32(x) htonl(x)
+#  define htole32(x) (x)
+#  define be32toh(x) ntohl(x)
+#  define le32toh(x) (x)
+#  define htobe64(x) htonll(x)
+#  define htole64(x) (x)
+// #  define be64Itoh(x) ntohll(x)
+#  define le64toh(x) (x)
+# elif BYTE_ORDER == BIG_ENDIAN
+   		/* that would be xbox 360 */
+#  define htobe16(x) (x)
+#  define htole16(x) __builtin_bswap16(x)
+#  define be16toh(x) (x)
+#  define le16toh(x) __builtin_bswap16(x)
+#  define htobe32(x) (x)
+#  define htole32(x) __builtin_bswap32(x)
+#  define be32toh(x) (x)
+#  define le32toh(x) __builtin_bswap32(x)
+#  define htobe64(x) (x)
+#  define htole64(x) __builtin_bswap64(x)
+#  define be64toh(x) (x)
+#  define le64toh(x) __builtin_bswap64(x)
+# else
+#  error byte order not supported
+# endif
+//# define __BYTE_ORDER    BYTE_ORDER
+//# define __BIG_ENDIAN    BIG_ENDIAN
+//# define __LITTLE_ENDIAN LITTLE_ENDIAN
+//# define __PDP_ENDIAN    PDP_ENDIAN
+
+#else
+# include <endian.h>
+# define be64Itoh(x) be64toh(x)
+#endif
+/* end PRS changes */
 #include <tclTomMath.h>
 #include "tip445.h"
 #include "names.h"
@@ -155,6 +242,13 @@ struct kc_entry {
 /* _BitScanForward64 numbers bits starting with 0, ffsll starts with 1 */
 #	define FFS(x)			(_BitScanForward64(&ix, x) ? ix+1 : 0)
 #	define FREEMAP_TYPE		long long
+/* start PRS changes */
+#elif defined(_WIN32)
+/* _BitScanForward numbers bits starting with 0, ffsll starts with 1 */
+#     define FFS_TMP_STORAGE  unsigned long ix;
+#     define FFS(x)                   (_BitScanForward(&ix, x) ? ix+1 : 0)
+#     define FREEMAP_TYPE             long
+/* end PRS changes */
 #else
 #	define FFS_TMP_STORAGE	/* nothing to declare */
 #	define FFS				ffs

@@ -377,3 +377,38 @@ License
 -------
 
 Copyright 2015-2023 Ruby Lane.  Licensed under the same terms as the Tcl core.
+
+Building under Windows msys2
+-------
+
+* Install msys2: `choco.exe install -y msys2`
+* Start Terminal: `C:\tools\msys64\mingw64.exe`
+* Install tools:
+```bash
+    pacman --noconfirm -S --needed autoconf \
+        base-devel\
+        development\
+        cmake\
+        mingw-w64-x86_64-toolchain\
+        mingw-w64-cross-binutils\
+        gcc\
+        rsync\
+        unzip\
+        git\
+        vim
+```
+* Make sure tcl is installed
+* git clone <repo>
+* cd <repo>
+* build:
+```bash
+    INSTALLDIR="${INSTALLDIR:-build/x64}"
+    SHAREDIR=${INSTALLDIR}/share
+    VERSION="0.15.2"
+    BUILD_OPTS="${CONFIG:- --prefix=$(pwd)/${INSTALLDIR} --mandir=$(pwd)/${SHAREDIR}}"
+
+    autoconf
+    ./configure ${BUILD_OPTS}
+    make -j8
+    make install
+```

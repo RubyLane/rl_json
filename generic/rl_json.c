@@ -23,6 +23,10 @@ static Tcl_Config cfg[] = {
 
 #if defined(_WIN32)
 #define snprintf _snprintf
+/* start PRS changes */
+# define _Pragma(x)
+# define mkstemp(x) mktemp(x)
+/* end PRS changes */
 #endif
 
 static const char* dyn_prefix[] = {
@@ -3254,7 +3258,9 @@ static int jsonValid(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 {
 	struct interp_cx*	l = (struct interp_cx*)cdata;
 	int					i, valid, retval=TCL_OK;
-	struct parse_error	details = {};
+	/* start PRS changes */
+	struct parse_error	details = {0};
+	/* end PRS changes */
 	Tcl_Obj*			detailsvar = NULL;		// ref is borrowed from variable
 	Tcl_Obj*			details_obj = NULL;
 	Tcl_Obj*			k = NULL;
@@ -3824,7 +3830,7 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 
 
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
-	fd = mkstemp(temp);
+	fd = (int)mkstemp(temp);
 	h_before = fdopen(fd, "r");
 
 #if DEDUP
@@ -3842,7 +3848,7 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	free_cache(l);
 #endif
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
-	fd = mkstemp(temp);
+	fd = (int)mkstemp(temp);
 	h_after = fdopen(fd, "r");
 	Tcl_DumpActiveMemory(temp);
 	if (unlink(temp) != 0) {
