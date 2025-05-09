@@ -326,17 +326,42 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 }
 
 //}}}
-#ifdef TCL_MEM_DEBUG
-Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line)
-#else
-Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val)
-#endif
-{ //{{{
-#ifdef TCL_MEM_DEBUG
+Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line) //{{{
+{
 	Tcl_Obj*	res = Tcl_DbNewObj(file, line);
-#else
+
+	/*
+	switch (type) {
+		case JSON_OBJECT:
+		case JSON_ARRAY:
+		case JSON_STRING:
+		case JSON_NUMBER:
+		case JSON_BOOL:
+		case JSON_NULL:
+
+		case JSON_DYN_STRING:
+		case JSON_DYN_NUMBER:
+		case JSON_DYN_BOOL:
+		case JSON_DYN_JSON:
+		case JSON_DYN_TEMPLATE:
+		case JSON_DYN_LITERAL:
+			break;
+
+		default:
+			Tcl_Panic("JSON_NewJvalObj, unhandled type: %d", type);
+	}
+	*/
+
+	if (JSON_SetIntRep(res, type, val) != TCL_OK)
+		Tcl_Panic("Couldn't set JSON intrep");
+
+	return res;
+}
+
+//}}}
+Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val) //{{{
+{
 	Tcl_Obj*	res = Tcl_NewObj();
-#endif
 
 	/*
 	switch (type) {

@@ -214,14 +214,6 @@ extern Tcl_ObjType* g_objtype_for_type[];
 extern const char* type_names_int[];
 extern const char* type_names[];
 
-#ifdef TCL_MEM_DEBUG
-#	undef JSON_NewJvalObj
-Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line);
-#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
-#else
-Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val);
-#endif
-
 // Taken from tclInt.h:
 #if !defined(INT2PTR) && !defined(PTR2INT)
 #   if defined(HAVE_INTPTR_T) || defined(intptr_t)

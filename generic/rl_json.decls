@@ -115,6 +115,12 @@ declare 32 generic {
 declare 33 generic {
 	int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions extensions, struct parse_error* details)
 }
+declare 34 generic {
+	Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val)
+}
+declare 35 generic {
+	Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line)
+}
 
 # CBOR
 declare 40 generic {

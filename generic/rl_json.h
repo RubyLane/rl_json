@@ -60,6 +60,12 @@ enum cbor_mt {
 	M_REAL = 7
 };
 
+
+#ifdef TCL_MEM_DEBUG
+#	undef JSON_NewJvalObj
+#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
+#endif
+
 // Stubs exported API
 
 #ifdef USE_RL_JSON_STUBS
