@@ -103,6 +103,9 @@ if test "${TEA_PLATFORM}" = "windows" ; then
     :
     #TEA_ADD_SOURCES([win/winFile.c])
     #TEA_ADD_INCLUDES([-I\"$(${CYGPATH} ${srcdir}/win)\"])
+    dnl start PRS changes
+    TEA_ADD_LIBS([ws2_32.lib])
+    dnl end PRS changes
 else
     # Ensure no empty else clauses
     :
