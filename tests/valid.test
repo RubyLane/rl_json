@@ -10,43 +10,43 @@ test valid-0.1 {Too few args} -body { #<<<
 	list [catch {json valid} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {wrong # args: should be "valid ?-extensions extensionslist -details detailsvar? json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid ?-extensions extensionslist -details detailsvar? json_val"} {wrong # args: should be "json valid ?-extensions extensionslist -details detailsvar? json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.2 {Too few args: missing value for -extensions} -body { #<<<
 	list [catch {json valid -extensions true} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {wrong # args: should be "valid -extensions extensionslist json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid -extensions extensionslist json_val"} {wrong # args: should be "json valid -extensions extensionslist json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.3 {Too few args: missing value for -details} -body { #<<<
 	list [catch {json valid -details true} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {wrong # args: should be "valid -details detailsvar json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid -details detailsvar json_val"} {wrong # args: should be "json valid -details detailsvar json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.4 {Too few args: missing json_val folling -extensions} -body { #<<<
 	list [catch {json valid -extensions {}} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o
-} -result {1 {wrong # args: should be "valid -extensions extensionslist json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid -extensions extensionslist json_val"} {wrong # args: should be "json valid -extensions extensionslist json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.5 {Too few args: missing json_val folling -details} -body { #<<<
 	list [catch {json valid -details d} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o d
-} -result {1 {wrong # args: should be "valid -details detailsvar json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid -details detailsvar json_val"} {wrong # args: should be "json valid -details detailsvar json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.6 {Too few args: missing json_val folling -extensions -details} -body { #<<<
 	list [catch {json valid -extensions {} -details d} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o d
-} -result {1 {wrong # args: should be "valid -extensions {} -details detailsvar json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid -extensions {} -details detailsvar json_val"} {wrong # args: should be "json valid -extensions {} -details detailsvar json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.7 {Too few args: missing json_val folling -details -extensions} -body { #<<<
 	list [catch {json valid -details d -extensions {}} r o] $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain r o d
-} -result {1 {wrong # args: should be "valid -details d -extensions extensionslist json_val"} {TCL WRONGARGS}}
+} -result [list 1 [resultopts {wrong # args: should be "valid -details d -extensions extensionslist json_val"} {wrong # args: should be "json valid -details d -extensions extensionslist json_val"}] {TCL WRONGARGS}]
 #>>>
 test valid-0.8 {Too many args: no options} -body { #<<<
 	list [catch {json valid true false} r o] $r [dict get $o -errorcode]

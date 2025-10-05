@@ -31,10 +31,10 @@ int JSON_NewJNumberObj(Tcl_Interp* interp, Tcl_Obj* number, Tcl_Obj** new) //{{{
 int JSON_NewJBooleanObj(Tcl_Interp* interp, Tcl_Obj* boolean, Tcl_Obj** new) //{{{
 {
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	int					bool;
+	int					flag;
 
-	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &bool));
-	replace_tclobj(new, bool ? l->json_true : l->json_false);
+	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &flag));
+	replace_tclobj(new, flag ? l->json_true : l->json_false);
 
 	return TCL_OK;
 }
@@ -306,13 +306,17 @@ int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, int* objc, 
 {
 	enum json_types	type;
 	Tcl_Obj*		val = NULL;
+    Tcl_Size		count;
 
 	TEST_OK(JSON_GetJvalFromObj(interp, arrayObj, &type, &val));
 	if (type != JSON_ARRAY) {
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Expecting a JSON array, but got a JSON %s", get_type_name(type)));
 		return TCL_ERROR;
 	}
-	TEST_OK(Tcl_ListObjGetElements(interp, val, objc, objv));
+	TEST_OK(Tcl_ListObjGetElements(interp, val, &count, objv));
+	if (objc != NULL) {
+		*objc = count;
+	}
 
 	return TCL_OK;
 }
@@ -392,7 +396,7 @@ int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
 	Tcl_Obj*	target = NULL;
 	Tcl_Obj**	pathv = NULL;
 	Tcl_Obj*	def = NULL;
-	int			pathc = 0;
+	Tcl_Size	pathc = 0;
 
 	if (path)
 		TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
@@ -418,7 +422,7 @@ int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //
 {
 	Tcl_Obj*			target = NULL;
 	Tcl_Obj**			pathv = NULL;
-	int					pathc = 0;
+	Tcl_Size			pathc = 0;
 
 	if (path)
 		TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
@@ -451,7 +455,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 	Tcl_Obj*			newval;
 	Tcl_Obj*			rep = NULL;
 	Tcl_Obj**			pathv = NULL;
-	int					pathc = 0;
+	Tcl_Size			pathc = 0;
 
 	if (Tcl_IsShared(obj))
 		THROW_ERROR_LABEL(finally, code, "JSON_Set called with shared object");
@@ -498,7 +502,8 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 				//}}}
 			case JSON_ARRAY: //{{{
 				{
-					int			ac, index_str_len, ok=1;
+					Tcl_Size	ac, index_str_len;
+					int			ok=1;
 					long		index;
 					const char*	index_str;
 					char*		end;
@@ -658,7 +663,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 	Tcl_Obj*		step = NULL;
 	Tcl_Obj*		src = NULL;
 	Tcl_Obj*		target = NULL;
-	int				pathc = 0;
+	Tcl_Size		pathc = 0;
 	Tcl_Obj**		pathv = NULL;
 	int				retval = TCL_OK;
 
@@ -711,7 +716,8 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 				//}}}
 			case JSON_ARRAY: //{{{
 				{
-					int			ac, index_str_len, ok=1;
+					Tcl_Size	ac, index_str_len;
+					int			ok=1;
 					long		index;
 					const char*	index_str;
 					char*		end;
@@ -809,7 +815,8 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 			//}}}
 		case JSON_ARRAY: //{{{
 			{
-				int			ac, index_str_len, ok=1;
+				Tcl_Size	ac, index_str_len;
+				int			ok=1;
 				long		index;
 				const char*	index_str;
 				char*		end;
@@ -1030,15 +1037,21 @@ int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* length) //
 	int				retval = TCL_OK;
 	Tcl_Obj*		val = NULL;
 	Tcl_Obj*		target = NULL;
+	Tcl_Size		len;
 
 	TEST_OK_LABEL(finally, retval, JSON_Extract(interp, obj, path, &target));
 
 	TEST_OK_LABEL(finally, retval, JSON_GetJvalFromObj(interp, target, &type, &val));
 
 	switch (type) {
-		case JSON_ARRAY:  retval = Tcl_ListObjLength(interp, val, length); break;
-		case JSON_OBJECT: retval = Tcl_DictObjSize(interp, val, length);   break;
-
+		case JSON_ARRAY:
+			retval = Tcl_ListObjLength(interp, val, &len);
+			if (length != NULL) *length = len;
+			break;
+		case JSON_OBJECT:
+			retval = Tcl_DictObjSize(interp, val, &len);
+			if (length != NULL) *length = len;
+			break;
 		case JSON_DYN_STRING:
 		case JSON_DYN_NUMBER:
 		case JSON_DYN_BOOL:
@@ -1126,7 +1139,7 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 	unsigned int			i;
 	int						retcode=TCL_OK;
 	struct foreach_state*	state = NULL;
-	int						objc;
+	Tcl_Size				objc;
 	Tcl_Obj**				objv = NULL;
 	Tcl_Obj*				it_res = NULL;
 	struct interp_cx*		l = Tcl_GetAssocData(interp, "rl_json", NULL);
@@ -1173,14 +1186,16 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 	}
 
 	for (i=0; i<state->iterators; i++) {
-		int				loops, j;
+		Tcl_Size		loops, count;
+		int				j;
 		enum json_types	type;
 		Tcl_Obj*		val = NULL;
 		Tcl_Obj*		varlist = objv[i*2];
 
 		replace_tclobj(&state->it[i].varlist, varlist);
 
-		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, state->it[i].varlist, &state->it[i].var_c, &state->it[i].var_v));
+		TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, state->it[i].varlist, &count, &state->it[i].var_v));
+		state->it[i].var_c = count;
 		for (j=0; j < state->it[i].var_c; j++)
 			Tcl_IncrRefCount(state->it[i].var_v[j]);
 
@@ -1191,7 +1206,8 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 		switch (type) {
 			case JSON_ARRAY:
 				TEST_OK_LABEL(done, retcode,
-						Tcl_ListObjGetElements(interp, val, &state->it[i].data_c, &state->it[i].data_v));
+						Tcl_ListObjGetElements(interp, val, &count, &state->it[i].data_v));
+				state->it[i].data_c = count;
 				state->it[i].data_i = 0;
 				state->it[i].is_array = 1;
 				loops = (int)ceil(state->it[i].data_c / (double)state->it[i].var_c);
@@ -1318,7 +1334,8 @@ cleanup_search:
 											break;
 											//}}}
 										} else { // Iterate over it_res as a list {{{
-											int			oc, i;
+											Tcl_Size	oc;
+											int			i;
 											Tcl_Obj**	ov = NULL;
 
 											TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, it_res, &oc, &ov));
@@ -1385,7 +1402,7 @@ int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions ex
 	const unsigned char*	p;
 	const unsigned char*	e;
 	const unsigned char*	val_start;
-	int						len;
+	Tcl_Size				len;
 	struct parse_context	cx[CX_STACK_SIZE];
 
 	if (interp)

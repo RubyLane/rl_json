@@ -222,6 +222,14 @@ if {[llength [info commands memory]] == 1} {
 	proc memtest args {tailcall ::tcltest::test {*}$args}
 }
 
+proc resultopts {regular {ensemble ""}} {
+    if {![namespace ensemble exists json]} {
+	return $regular
+    } else {
+	return $ensemble
+    }
+}
+
 set ::tcltest::testSingleFile false
 set ::tcltest::testsDirectory [file dir [info script]]
 

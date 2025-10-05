@@ -15,7 +15,10 @@
 #endif
 #include <endian.h>
 #include <tclTomMath.h>
+#if TIP445_SHIM
+#define Tcl_InitStringRep
 #include "tip445.h"
+#endif
 #include "names.h"
 
 #define CX_STACK_SIZE	6
@@ -273,14 +276,7 @@ void cbor_release(Tcl_Interp* interp);
 
 // Polyfill
 #ifndef Tcl_GetBytesFromObj
-//#define Tcl_GetBytesFromObj(interp, obj, lenptr) Tcl_GetByteArrayFromObj(obj, lenptr)
-static inline uint8_t* Tcl_GetBytesFromObj(Tcl_Interp* interp, Tcl_Obj* obj, size_t* lenPtr)
-{
-	int	len;
-	uint8_t*	bytes = Tcl_GetByteArrayFromObj(obj, &len);
-	*lenPtr = len;
-	return bytes;
-}
+#define Tcl_GetBytesFromObj(interp, obj, lenptr) Tcl_GetByteArrayFromObj(obj, lenptr)
 #endif
 
 #endif
