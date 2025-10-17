@@ -13,7 +13,7 @@ autom4te.cache
 configure
 config.log
 config.status
-Makefile
+/Makefile
 pkgIndex.tcl
 rl_jsonConfig.sh
 cachegrind.out*

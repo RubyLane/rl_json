@@ -709,7 +709,7 @@ data_item: // loop: read off tags
 		//}}}
 		case M_BSTR: // Compare as byte strings {{{
 		{
-			size_t				pathlen;
+			int					pathlen;
 			const uint8_t*		pathval = (const uint8_t*)Tcl_GetBytesFromObj(interp, pathElem, &pathlen);
 			const uint8_t*const	pathend = pathval + pathlen;
 			const uint8_t*const	pe = p + val;
@@ -961,7 +961,7 @@ int CBOR_GetDataItemFromPath(Tcl_Interp* interp, Tcl_Obj* cborObj, Tcl_Obj* path
 	Tcl_Obj**				pathv = NULL;
 	int						pathc = 0;
 	const uint8_t*			p = NULL;
-	size_t					byteslen = 0;
+	int						byteslen = 0;
 	const uint8_t*			bytes = NULL;
 	const uint8_t**			circular = g_circular_buf;
 
@@ -1307,7 +1307,7 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 			switch (tag) {
 				case 2: // Unsigned bignum
 				{
-					size_t			bytelen;
+					int				bytelen;
 					const uint8_t*	bytes = Tcl_GetBytesFromObj(interp, objv[A_VALUE], &bytelen);
 					if (bytes == NULL) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Tag 2 (unsigned bignum) requires a byte array value"));
@@ -1339,7 +1339,7 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 
 				case 3: // Negative bignum: -1 - n
 				{
-					size_t			bytelen;
+					int				bytelen;
 					const uint8_t*	bytes = Tcl_GetBytesFromObj(interp, objv[A_VALUE], &bytelen);
 					if (bytes == NULL) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Tag 3 (negative bignum) requires a byte array value"));
