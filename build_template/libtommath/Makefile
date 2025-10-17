@@ -1,4 +1,5 @@
-src = $(abspath ../../deps/libtommath)
+#src = $(abspath ../../deps/libtommath)
+src = $(SRCDIR)/deps/libtommath
 VPATH = $(src)
 include $(src)/makefile
 
