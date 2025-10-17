@@ -279,7 +279,7 @@ depend:
 # source files above.
 #========================================================================
 
-$(PKG_LIB_FILE): $(PKG_OBJECTS)
+$(PKG_LIB_FILE): deps $(PKG_OBJECTS)
 	-rm -f $(PKG_LIB_FILE)
 	${MAKE_LIB}
 	$(RANLIB) $(PKG_LIB_FILE)
@@ -319,6 +319,10 @@ COMPRESS	= tar zcvf $(PKG_DIR).tar.gz $(PKG_DIR)
 DIST_ROOT	= /tmp/dist
 DIST_DIR	= $(DIST_ROOT)/$(PKG_DIR)
 
+DIST_INSTALL_DATA	= CPPROG='cp -p' $(INSTALL) -m 644
+DIST_INSTALL_SCRIPT	= CPPROG='cp -p' $(INSTALL)
+DIST_INSTALL_ASIS	= cp -a
+
 dist-clean:
 	rm -rf $(DIST_DIR) $(DIST_ROOT)/$(PKG_DIR).tar.*
 
@@ -350,6 +354,17 @@ dist: dist-clean
 	    fi; \
 	done
 
+	# Recursive dirs
+	list='build_template'; \
+	for p in $$list; do \
+	    if test -d $(srcdir)/$$p ; then \
+		$(INSTALL_DATA_DIR) $(DIST_DIR)/$$p; \
+		cd $(srcdir)/$$p && tar cf - . | (cd $(DIST_DIR)/$$p && tar xf -); \
+	    fi; \
+	done
+
+	$(DIST_INSTALL_ASIS) $(srcdir)/deps $(DIST_DIR)/deps/
+
 	(cd $(DIST_ROOT); $(COMPRESS);)
 
 #========================================================================
@@ -374,6 +389,9 @@ clean:
 	-rm -f *.$(OBJEXT) core *.core
 	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 	-rm -f *.gcda *.gcno *.gcov
+
+deps-clean:
+	-rm -rf local build
 
 distclean: clean
 	-rm -f *.tab.c
@@ -461,8 +479,17 @@ uninstall-binaries:
 	  rm -f $(DESTDIR)$(bindir)/$$p; \
 	done
 
+deps: local/lib/libtommath.a
+
+build:
+	mkdir -p $(top_builddir)/build
+	cp -a build_template/* $(top_builddir)/build
+
+local/lib/libtommath.a: build
+	make -C build/libtommath --include-dir=$(abspath $(srcdir)/deps/libtommath) CFLAGS="-fPIC -g" DESTDIR="$(abspath $(top_builddir))" PREFIX=/local -j 12 custom_install
+
 .PHONY: all binaries clean depend distclean doc install libraries test
-.PHONY: shell gdb valgrind valgrindshell
+.PHONY: shell gdb valgrind valgrindshell deps-clean deps
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

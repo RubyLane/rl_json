@@ -60,7 +60,7 @@ static double decode_double(const uint8_t* p) { //{{{
 
 // Private API {{{
 // From RFC8949 {{{
-static int well_formed_indefinite(Tcl_Interp* interp, const uint8_t** pPtr, const uint8_t* e, int breakable, uint8_t* mtPtr, uint8_t mt);
+static int well_formed_indefinite(Tcl_Interp* interp, const uint8_t** pPtr, const uint8_t* e, int breakable, int* mtPtr, uint8_t mt);
 
 static double decode_half(const uint8_t* halfp) { //{{{
 	uint32_t	half = (halfp[0] << 8) + halfp[1];
@@ -91,7 +91,7 @@ finally:
 }
 
 //}}}
-static int well_formed(Tcl_Interp* interp, const uint8_t** pPtr, const uint8_t* e, int breakable, uint8_t* mtPtr) //{{{
+static int well_formed(Tcl_Interp* interp, const uint8_t** pPtr, const uint8_t* e, int breakable, int* mtPtr) //{{{
 {
 	int				code = TCL_OK;
 	const uint8_t*	part = NULL;
@@ -129,17 +129,19 @@ finally:
 }
 
 //}}}
-static int well_formed_indefinite(Tcl_Interp* interp, const uint8_t** pPtr, const uint8_t* e, int breakable, uint8_t* mtPtr, uint8_t mt) //{{{
+static int well_formed_indefinite(Tcl_Interp* interp, const uint8_t** pPtr, const uint8_t* e, int breakable, int* mtPtr, uint8_t mt) //{{{
 {
 	int		code = TCL_OK;
 	uint8_t	it;
+	int		res;
 
 	switch (mt) {
 		case 2:
 		case 3:
 			for (;;) {
-				TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 1, &it));
-				if (it == -1) break;
+				TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 1, &res));
+				if (res == -1) break;
+				it = res;
 				// need definite-length chunk of the same type
 				if (it != mt) CBOR_INVALID(finally, code, "indefinite-length chunk type: %d doesn't match parent: %d", it, mt);
 			}
@@ -147,17 +149,17 @@ static int well_formed_indefinite(Tcl_Interp* interp, const uint8_t** pPtr, cons
 
 		case 4:
 			for (;;) {
-				TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 1, &it));
-				if (it == -1) break;
+				TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 1, &res));
+				if (res == -1) break;
 			}
 			break;
 
 		case 5:
 			for (;;) {
-				TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 1, &it));
-				if (it == -1) break;
+				TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 1, &res));
+				if (res == -1) break;
 			}
-			TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 0, &it));
+			TEST_OK_LABEL(finally, code, well_formed(interp, pPtr, e, 0, &res));
 			break;
 
 		case 7:
@@ -276,7 +278,7 @@ finally:
 }
 
 //}}}
-static Tcl_Obj* new_tcl_uint64(uint64_t val) //<<<
+static Tcl_Obj* new_tcl_uint64(uint64_t val) //{{{
 {
 	Tcl_Obj*	res = NULL;
 
@@ -301,7 +303,7 @@ static Tcl_Obj* new_tcl_uint64(uint64_t val) //<<<
 }
 
 //}}}
-static Tcl_Obj* new_tcl_nint64(uint64_t val) //<<<
+static Tcl_Obj* new_tcl_nint64(uint64_t val) //{{{
 {
 	Tcl_Obj*	res = NULL;
 
@@ -310,26 +312,24 @@ static Tcl_Obj* new_tcl_nint64(uint64_t val) //<<<
 	} else {
 		int		rc;
 		mp_int	n = {0};
-		mp_int	minusone = {0};
 		const int	digits = (sizeof(uint64_t)*CHAR_BIT + MP_DIGIT_BIT-1) / (MP_DIGIT_BIT);	// Need at least 64 bits to represent val
 
 		//if ((rc = mp_init_size(&n, digits)) != MP_OKAY) Tcl_Panic("mp_init_size failed: %s", mp_error_to_string(rc));
-		//if ((rc = mp_init(&minusone)) != MP_OKAY) Tcl_Panic("mp_init failed: %s", mp_error_to_string(rc));
 		if ((rc = mp_init_size(&n, digits)) != MP_OKAY) Tcl_Panic("mp_init_size failed");
-		if ((rc = mp_init(&minusone)) != MP_OKAY) Tcl_Panic("mp_init failed");
 
-		n.sign = MP_NEG;
+		// Compute -(val+1): start with val (positive), add 1, then negate
+		n.sign = MP_ZPOS;
 		n.used = digits;
 		for (int i=0; i<digits; i++) n.dp[i] = (val >> (i*MP_DIGIT_BIT)) & MP_MASK;
 
-		mp_set(&minusone, -1);
+		//if ((rc = mp_add_d(&n, 1, &n)) != MP_OKAY) Tcl_Panic("mp_add_d failed: %s", mp_error_to_string(rc));
+		if ((rc = mp_add_d(&n, 1, &n)) != MP_OKAY) Tcl_Panic("mp_add_d failed");
 
-		//if ((rc = mp_add(&n, &minusone, &n)) != MP_OKAY) Tcl_Panic("mp_add failed: %s", mp_error_to_string(rc));
-		if ((rc = mp_add(&n, &minusone, &n)) != MP_OKAY) Tcl_Panic("mp_add failed");
+		//if ((rc = mp_neg(&n, &n)) != MP_OKAY) Tcl_Panic("mp_neg failed: %s", mp_error_to_string(rc));
+		if ((rc = mp_neg(&n, &n)) != MP_OKAY) Tcl_Panic("mp_neg failed");
 
 		res = Tcl_NewBignumObj(&n);
 		mp_clear(&n);
-		mp_clear(&minusone);
 	}
 
 	return res;
@@ -704,7 +704,7 @@ data_item: // loop: read off tags
 			Tcl_WideInt		pathval;
 			TEST_OK_LABEL(finally, code, Tcl_GetWideIntFromObj(interp, pathElem, &pathval));
 			if (pathval == (mt == M_UINT ? val : -1-val)) goto matches;
-			break;
+			goto mismatch;
 		}
 		//}}}
 		case M_BSTR: // Compare as byte strings {{{
@@ -842,9 +842,9 @@ data_item: // loop: read off tags
 			if (TCL_OK != Tcl_ListObjGetElements(NULL, pathElem, &oc, &ov)) {
 				// Skip remaining elements {{{
 				for (;;) {
-					uint8_t		elem_mt;
-					TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, &elem_mt));
-					if (elem_mt == -1) break;
+					int			res;
+					TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, &res));
+					if (res == -1) break;
 				}
 				//}}}
 				goto mismatch;
@@ -859,9 +859,9 @@ data_item: // loop: read off tags
 					if (!matches) {
 						// Skip remaining elements {{{
 						for (;;) {
-							uint8_t		elem_mt;
-							TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, &elem_mt));
-							if (elem_mt == -1) break;
+							int		res;
+							TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, &res));
+							if (res == -1) break;
 						}
 						//}}}
 						goto mismatch;
@@ -870,9 +870,9 @@ data_item: // loop: read off tags
 				if (*p != 0xFF) { // End of pathelem before end of indefinite length array
 					// Skip remaining elements {{{
 					for (;;) {
-						uint8_t		elem_mt;
-						TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, &elem_mt));
-						if (elem_mt == -1) break;
+						int		res;
+						TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, &res));
+						if (res == -1) break;
 					}
 					//}}}
 					goto mismatch;
@@ -1036,7 +1036,7 @@ int CBOR_GetDataItemFromPath(Tcl_Interp* interp, Tcl_Obj* cborObj, Tcl_Obj* path
 				const size_t	absofs = ofs < 0 ? ofs*-1 : ofs;
 				if (mode == IDX_ENDREL) { //{{{
 					if (ai == 31) { // end-x, indefinite length array {{{
-						uint8_t		elem_mt;
+						int		elem_mt;
 
 						// Skip absofs elements
 						for (ssize_t i=0; i<absofs; i++) {
@@ -1061,7 +1061,7 @@ int CBOR_GetDataItemFromPath(Tcl_Interp* interp, Tcl_Obj* cborObj, Tcl_Obj* path
 						}
 						//}}}
 					} else { // end-x, known length array {{{
-						if (val-1 - ofs < 0) goto not_found;	// Index before start
+						if ((int64_t)val-1 - ofs < 0) goto not_found;	// Index before start
 						// Skip val-1+ofs elements
 						const size_t skip = val-1+ofs;
 						for (ssize_t i=0; i<skip; i++) TEST_OK_LABEL(finally, code, well_formed(interp, &p, e, 1, NULL));
@@ -1072,7 +1072,7 @@ int CBOR_GetDataItemFromPath(Tcl_Interp* interp, Tcl_Obj* cborObj, Tcl_Obj* path
 					if (ai == 31) { // ofs x, indefinite length array {{{
 						const uint8_t*	last_p = p;
 						for (ssize_t i=0; i<ofs+1; i++) { // Need to visit the referenced elem to be sure it isn't the break symbol (end of array)
-							uint8_t	elem_mt;
+							int	elem_mt;
 							last_p = p;
 							TEST_OK_LABEL(finally, code, well_formed_indefinite(interp, &p, e, 1, &elem_mt, mt));
 							if (elem_mt == -1) goto not_found;	// Index beyond end
@@ -1154,19 +1154,24 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 	struct interp_cx*	l = cdata;
 	static const char* ops[] = {
 		"get",
+		"tget",			// Get with tags
 		"extract",
 		"wellformed",
+		"apply_tag",
 		NULL
 	};
 	enum {
 		OP_GET,
+		OP_TGET,
 		OP_EXTRACT,
 		OP_WELLFORMED,
+		OP_APPLY_TAG,
 	};
 	int			op;
 	Tcl_Obj*	res = NULL;
 	Tcl_Obj*	path = NULL;
 	Tcl_DString	tags;
+	Tcl_Obj*	tagslist = NULL;
 
 	Tcl_DStringInit(&tags);
 
@@ -1226,6 +1231,33 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 			break;
 		}
 		//}}}
+		case OP_TGET: //{{{
+		{
+			enum {A_cmd=A_OP, A_TAGSVAR, A_CBOR, A_args};
+			const int A_PATH = A_args;
+			CHECK_MIN_ARGS_LABEL(finally, code, "tagsvar cbor ?key ...?");
+
+			replace_tclobj(&path, Tcl_NewListObj(objc-A_PATH, objv+A_PATH));
+
+			const uint8_t*	dataitem = NULL;
+			const uint8_t*	e = NULL;
+			TEST_OK_LABEL(finally, code, CBOR_GetDataItemFromPath(interp, objv[A_CBOR], path, &dataitem, &e, &tags));
+			if (dataitem == NULL) {
+				Tcl_SetErrorCode(interp, "CBOR", "NOTFOUND", Tcl_GetString(path), NULL);
+				THROW_ERROR_LABEL(finally, code, "path not found");
+			}
+			replace_tclobj(&tagslist, Tcl_NewListObj(0, NULL));
+			TEST_OK_LABEL(finally, code, cbor_get_obj(interp, &dataitem, e, &res, &tagslist));
+
+			if (NULL == Tcl_ObjSetVar2(interp, objv[A_TAGSVAR], NULL, tagslist, TCL_LEAVE_ERR_MSG)) {
+				code = TCL_ERROR;
+				goto finally;
+			}
+
+			Tcl_SetObjResult(interp, res);
+			break;
+		}
+		//}}}
 		case OP_EXTRACT: //{{{
 		{
 			enum {A_cmd=A_OP, A_CBOR, A_args};
@@ -1264,12 +1296,111 @@ static int cbor_nr_cmd(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj*c
 			break;
 		}
 		//}}}
+		case OP_APPLY_TAG: //{{{
+		{
+			enum {A_cmd=A_OP, A_TAG, A_VALUE, A_objc};
+			CHECK_ARGS_LABEL(finally, code, "tag value");
+
+			Tcl_WideInt	tag;
+			TEST_OK_LABEL(finally, code, Tcl_GetWideIntFromObj(interp, objv[A_TAG], &tag));
+
+			switch (tag) {
+				case 2: // Unsigned bignum
+				{
+					size_t			bytelen;
+					const uint8_t*	bytes = Tcl_GetBytesFromObj(interp, objv[A_VALUE], &bytelen);
+					if (bytes == NULL) {
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Tag 2 (unsigned bignum) requires a byte array value"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					int		rc;
+					mp_int	n = {0};
+
+					if ((rc = mp_init(&n)) != MP_OKAY) {
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Failed to initialize bignum"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					// mp_from_ubin reads big-endian unsigned binary
+					if ((rc = mp_from_ubin(&n, bytes, bytelen)) != MP_OKAY) {
+						mp_clear(&n);
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Failed to convert byte array to bignum"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					replace_tclobj(&res, Tcl_NewBignumObj(&n));
+					mp_clear(&n);
+					break;
+				}
+
+				case 3: // Negative bignum: -1 - n
+				{
+					size_t			bytelen;
+					const uint8_t*	bytes = Tcl_GetBytesFromObj(interp, objv[A_VALUE], &bytelen);
+					if (bytes == NULL) {
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Tag 3 (negative bignum) requires a byte array value"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					int		rc;
+					mp_int	n = {0};
+
+					if ((rc = mp_init(&n)) != MP_OKAY) {
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Failed to initialize bignum"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					// mp_from_ubin reads big-endian unsigned binary
+					if ((rc = mp_from_ubin(&n, bytes, bytelen)) != MP_OKAY) {
+						mp_clear(&n);
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Failed to convert byte array to bignum"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					// Compute -(n + 1)
+					if ((rc = mp_add_d(&n, 1, &n)) != MP_OKAY) {
+						mp_clear(&n);
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Failed to add 1 to bignum"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					if ((rc = mp_neg(&n, &n)) != MP_OKAY) {
+						mp_clear(&n);
+						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Failed to negate bignum"));
+						code = TCL_ERROR;
+						goto finally;
+					}
+
+					replace_tclobj(&res, Tcl_NewBignumObj(&n));
+					mp_clear(&n);
+					break;
+				}
+
+				default:
+					Tcl_SetObjResult(interp, Tcl_ObjPrintf("Tag %" TCL_LL_MODIFIER "d not supported", tag));
+					code = TCL_ERROR;
+					goto finally;
+			}
+
+			Tcl_SetObjResult(interp, res);
+			break;
+		}
+		//}}}
 		default: THROW_ERROR_LABEL(finally, code, "op not implemented yet");
 	}
 
 finally:
 	replace_tclobj(&path, NULL);
 	replace_tclobj(&res, NULL);
+	replace_tclobj(&tagslist, NULL);
 	Tcl_DStringFree(&tags);
 	return code;
 }

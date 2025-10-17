@@ -10,3 +10,6 @@
 [submodule "teabase"]
 	path = teabase
 	url = https://github.com/cyanogilvie/teabase
+[submodule "deps/libtommath"]
+	path = deps/libtommath
+	url = https://github.com/libtom/libtommath

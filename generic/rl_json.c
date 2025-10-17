@@ -1189,6 +1189,8 @@ cleanup_search:
 					}
 					break;
 			}
+			retcode = TCL_OK;
+			break;
 
 		case TCL_CONTINUE:
 			retcode = TCL_OK;
@@ -3905,8 +3907,6 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 
 #ifdef USE_TCL_STUBS
 	if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL)
-		return TCL_ERROR;
-	if (Tcl_TomMath_InitStubs(interp, TCL_VERSION) == NULL)
 		return TCL_ERROR;
 #endif // USE_TCL_STUBS
 

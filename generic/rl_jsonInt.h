@@ -1,5 +1,7 @@
 #ifndef _RL_JSONINT
 #define _RL_JSONINT
+#define _POSIX_C_SOURCE	200809L
+#define _DEFAULT_SOURCE
 
 #include "rl_json.h"
 #include "tclstuff.h"
@@ -10,11 +12,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <limits.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #include <endian.h>
-#include <tclTomMath.h>
+#include <tommath.h>
 #include "tip445.h"
 #include "names.h"
 
