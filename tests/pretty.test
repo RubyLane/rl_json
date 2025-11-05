@@ -4,8 +4,7 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 package require rl_json
-package require parse_args
-namespace path {::rl_json ::parse_args}
+namespace path {::rl_json}
 
 test pretty-1.1 {Basic pretty-print} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
