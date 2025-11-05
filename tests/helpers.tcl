@@ -154,19 +154,14 @@ proc _compare_json {opts j1 j2 {path {}}} { #<<<
 
 #>>>
 proc compare_json args { #<<<
-	parse_args $args {
-		-subset	{-default none}
-		j1		{}
-		j2		{}
-	} opts
-
-	try {
-		_compare_json $opts [dict get $opts j1] [dict get $opts j2]
-	} trap {RL TEST JSON_MISMATCH} {errmsg options} {
-		return $errmsg
-	} on ok {} {
-		return match
-	}
+    set opts [list -subset none j1 [lindex $args 0] j2 [lindex $args 1]]
+    try {
+        _compare_json $opts [dict get $opts j1] [dict get $opts j2]
+    } trap {RL TEST JSON_MISMATCH} {errmsg options} {
+        return $errmsg
+    } on ok {} {
+        return match
+    }
 }
 
 #>>>
