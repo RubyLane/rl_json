@@ -87,7 +87,7 @@ declare 24 generic {
 	int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** normalized)
 }
 declare 25 generic {
-	int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** prettyString)
+        int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, int nopadding, int compact, int arrays_inline, Tcl_Obj** prettyString)
 }
 declare 26 generic {
 	int JSON_Template(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* dict, Tcl_Obj** res)

@@ -6,7 +6,9 @@ if {"::tcltest" ni [namespace children]} {
 package require rl_json
 namespace path {::rl_json}
 
-test pretty-1.1 {Basic pretty-print} -body { #<<<
+test pretty-jsonPretty-1.1 {} -body {json pretty -indent} -returnCodes error -result {missing argument to "-indent"} -errorCode {TCL ARGUMENT MISSING}
+#>>>
+test pretty-1.2 {Basic pretty-print} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
 } -cleanup {
 	unset -nocomplain o
@@ -28,7 +30,7 @@ test pretty-1.1 {Basic pretty-print} -body { #<<<
     ]
 }}
 #>>>
-test pretty-1.2 {Basic pretty-print, different indent} -body { #<<<
+test pretty-1.3 {Basic pretty-print, different indent} -body { #<<<
 	json pretty -indent "  " {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
 } -result {{
   "foo":          null,
@@ -48,11 +50,15 @@ test pretty-1.2 {Basic pretty-print, different indent} -body { #<<<
   ]
 }}
 #>>>
-test pretty-2.1 {too few args} -body { #<<<
-	json pretty
-} -returnCodes error -result {wrong # args: should be "pretty pretty ?-indent indent? json_val ?key ...?"}
+test pretty-jsonPretty-2.1 {} -body {json pretty -- 1} -result 1
 #>>>
-test pretty-3.1 {path} -body { #<<<
+test pretty-2.2 {too few args} -body { #<<<
+	json pretty
+} -returnCodes error -result {wrong # args: should be "pretty pretty ?-indent indent? ?-compact? ?-nopadding? ?-arrays inline|multiline? json_val ?key ...?"}
+#>>>
+test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -result {wrong # args: should be "pretty ?-indent indent? ?-compact? ?-nopadding? ?-arrays inline|multiline? json_val ?key ...?"} -errorCode {TCL WRONGARGS}
+#>>>
+test pretty-3.2 {path} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} {This is a much longer key}
 } -result {[
     "str",
@@ -66,11 +72,220 @@ test pretty-3.1 {path} -body { #<<<
     }
 ]}
 #>>>
-test pretty-3.2 {bad path} -body { #<<<
+test pretty-3.3 {bad path} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} bad
 } -returnCodes error -result {Path element 2: "bad" not found} -errorCode NONE
 #>>>
-
+test pretty-jsonPretty-4.1 {} -body {json pretty bad} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
+#>>>
+test pretty-4.2 {compact output} -body {
+	json pretty -compact {{"foo":"bar","array":[1,2,3]}}
+} -result {{"foo":"bar","array":[1,2,3]}}
+#>>>
+test pretty-jsonPretty-5.1 {} -body {json pretty -bad} -returnCodes error -result {bad option "-bad": must be *} -errorCode {TCL LOOKUP INDEX option -bad} -match glob
+#>>>
+test pretty-5.2 {arrays inline mode} -body {
+	json pretty -arrays inline {{"arr":[1,2,3,4,5]}}
+} -result {{
+    "arr": [1,2,3,4,5]
+}}
+#>>>
+test pretty-5.3 {arrays multiline mode} -body {
+	json pretty -arrays multiline {{"arr":[1,2,3]}}
+} -result {{
+    "arr": [
+        1,
+        2,
+        3
+    ]
+}}
+#>>>
+test pretty-5.4 {arrays default auto mode - small inline} -body {
+	json pretty {{"small":[1,2,3]}}
+} -result {{
+    "small": [1,2,3]
+}}
+#>>>
+test pretty-5.5 {arrays default auto mode - large multiline} -body {
+	json pretty {{"large":[1,2,3,4,5]}}
+} -result {{
+    "large": [
+        1,
+        2,
+        3,
+        4,
+        5
+    ]
+}}
+#>>>
+test pretty-6.1 {combine -indent with -arrays inline} -body {
+	json pretty -indent "  " -arrays inline {{"arr":[1,2,3,4,5]}}
+} -result {{
+  "arr": [1,2,3,4,5]
+}}
+#>>>
+test pretty-6.2 {combine -indent with -arrays multiline} -body {
+	json pretty -indent "  " -arrays multiline {{"arr":[1,2,3]}}
+} -result {{
+  "arr": [
+    1,
+    2,
+    3
+  ]
+}}
+#>>>
+test pretty-6.3 {tab indent with arrays inline} -body {
+	json pretty -indent "\t" -arrays inline {{"data":[10,20,30]}}
+} -result {{
+	"data": [10,20,30]
+}}
+#>>>
+test pretty-6.4 {tab indent with arrays multiline} -body {
+	json pretty -indent "\t" -arrays multiline {{"data":[10,20]}}
+} -result {{
+	"data": [
+		10,
+		20
+	]
+}}
+#>>>
+test pretty-7.1 {compact overrides indent} -body {
+	json pretty -compact -indent "    " {{"foo":"bar"}}
+} -result {{"foo":"bar"}}
+#>>>
+test pretty-7.2 {compact overrides arrays inline} -body {
+	json pretty -compact -arrays inline {{"arr":[1,2,3]}}
+} -result {{"arr":[1,2,3]}}
+#>>>
+test pretty-7.3 {compact overrides arrays multiline} -body {
+	json pretty -compact -arrays multiline {{"arr":[1,2,3,4,5]}}
+} -result {{"arr":[1,2,3,4,5]}}
+#>>>
+test pretty-7.4 {compact with all options} -body {
+	json pretty -compact -indent "\t" -arrays multiline {{"x":[1,2],"y":{"z":"w"}}}
+} -result {{"x":[1,2],"y":{"z":"w"}}}
+#>>>
+test pretty-8.1 {nested objects with custom indent} -body {
+	json pretty -indent "  " {{"outer":{"inner":{"deep":"value"}}}}
+} -result {{
+  "outer": {
+    "inner": {
+      "deep": "value"
+    }
+  }
+}}
+#>>>
+test pretty-8.2 {nested arrays with multiline} -body {
+	json pretty -arrays multiline {{"matrix":[[1,2],[3,4]]}}
+} -result {{
+    "matrix": [
+        [
+            1,
+            2
+        ],
+        [
+            3,
+            4
+        ]
+    ]
+}}
+#>>>
+test pretty-8.3 {nested arrays with inline} -body {
+	json pretty -arrays inline {{"matrix":[[1,2],[3,4]]}}
+} -result {{
+    "matrix": [[1,2],[3,4]]
+}}
+#>>>
+test pretty-8.4 {mixed nested structures} -body {
+	json pretty -indent "  " {{"users":[{"name":"Alice","age":30},{"name":"Bob","age":25}]}}
+} -result {{
+  "users": [{
+      "name": "Alice",
+      "age":  30
+    },{
+      "name": "Bob",
+      "age":  25
+    }]
+}}
+#>>>
+test pretty-9.1 {empty array with default} -body {
+	json pretty {{"empty":[]}}
+} -result {{
+    "empty": []
+}}
+#>>>
+test pretty-9.2 {empty array with arrays inline} -body {
+	json pretty -arrays inline {{"empty":[]}}
+} -result {{
+    "empty": []
+}}
+#>>>
+test pretty-9.3 {empty array with arrays multiline} -body {
+	json pretty -arrays multiline {{"empty":[]}}
+} -result {{
+    "empty": []
+}}
+#>>>
+test pretty-9.4 {empty object} -body {
+	json pretty {{"empty":{}}}
+} -result {{
+    "empty": {}
+}}
+#>>>
+test pretty-10.1 {complex structure default formatting} -body {
+	json pretty {{"api":{"version":"1.0","endpoints":["/user","/data","/login","/logout"]}}}
+} -result {{
+    "api": {
+        "version":   "1.0",
+        "endpoints": [
+            "/user",
+            "/data",
+            "/login",
+            "/logout"
+        ]
+    }
+}}
+#>>>
+test pretty-10.2 {complex structure with indent and inline arrays} -body {
+	json pretty -indent "\t" -arrays inline {{"config":{"debug":true,"ports":[8080,8081,8082],"name":"server"}}}
+} -result {{
+	"config": {
+		"debug": true,
+		"ports": [8080,8081,8082],
+		"name":  "server"
+	}
+}}
+#>>>
+test pretty-10.3 {multiple data types} -body {
+	json pretty {{"string":"text","number":42,"bool":true,"null":null,"array":[1,2]}}
+} -result {{
+    "string": "text",
+    "number": 42,
+    "bool":   true,
+    "null":   null,
+    "array":  [1,2]
+}}
+#>>>
+test pretty-11.1 {single space indent} -body {
+	json pretty -indent " " {{"a":"b"}}
+} -result {{
+ "a": "b"
+}}
+#>>>
+test pretty-11.2 {large indent} -body {
+	json pretty -indent "        " {{"x":"y"}}
+} -result {{
+        "x": "y"
+}}
+#>>>
+test pretty-11.3 {three space indent with nested} -body {
+	json pretty -indent "   " {{"outer":{"inner":"val"}}}
+} -result {{
+   "outer": {
+      "inner": "val"
+   }
+}}
+#>>>
 test debug-1.1 {Basic debug pretty-print} -body { #<<<
 	json debug {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
 } -match regexp -result {^\(0x[0-9a-fA-F]+\[[0-9]+\]+/0x[0-9a-fA-F]+\[[0-9]+\]+ [a-z ]+\){
@@ -90,14 +305,6 @@ test debug-1.1 {Basic debug pretty-print} -body { #<<<
         }
     \]
 }$}
-#>>>
-
-# Coverage golf
-test pretty-jsonPretty-1.1 {} -body {json pretty -indent} -returnCodes error -result {missing argument to "-indent"} -errorCode {TCL ARGUMENT MISSING}
-test pretty-jsonPretty-2.1 {} -body {json pretty -- 1} -result 1
-test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -result {wrong # args: should be "pretty ?-default defaultValue? json_val ?key ...?"} -errorCode {TCL WRONGARGS}
-test pretty-jsonPretty-4.1 {} -body {json pretty bad} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
-test pretty-jsonPretty-5.1 {} -body {json pretty -bad} -returnCodes error -result {bad option "-bad": must be *} -errorCode {TCL LOOKUP INDEX option -bad} -match glob
 
 json free_cache
 

@@ -87,7 +87,8 @@ EXTERN int		JSON_Normalize(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Obj**normalized);
 /* 25 */
 EXTERN int		JSON_Pretty(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*indent, Tcl_Obj**prettyString);
+                                Tcl_Obj*indent, int nopadding, int compact,
+				int arrays_inline, Tcl_Obj**prettyString);
 /* 26 */
 EXTERN int		JSON_Template(Tcl_Interp*interp, Tcl_Obj*template,
 				Tcl_Obj*dict, Tcl_Obj**res);
@@ -118,7 +119,7 @@ EXTERN int		JSON_Valid(Tcl_Interp*interp, Tcl_Obj*json,
 				int*valid, enum extensions extensions,
 				struct parse_error*details);
 
-typedef struct Rl_jsonStubs {
+typedef struct TcljsonStubs {
     int magic;
     void *hooks;
 
@@ -147,7 +148,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Set) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj*replacement); /* 22 */
     int (*jSON_Unset) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */); /* 23 */
     int (*jSON_Normalize) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj**normalized); /* 24 */
-    int (*jSON_Pretty) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*indent, Tcl_Obj**prettyString); /* 25 */
+    int (*jSON_Pretty) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*indent, int nopadding, int compact, int arrays_inline, Tcl_Obj**prettyString); /* 25 */
     int (*jSON_Template) (Tcl_Interp*interp, Tcl_Obj*template, Tcl_Obj*dict, Tcl_Obj**res); /* 26 */
     int (*jSON_IsNULL) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, int*isnull); /* 27 */
     int (*jSON_Type) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, enum json_types*type); /* 28 */
@@ -156,6 +157,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
     int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */
+    
 } Rl_jsonStubs;
 
 extern const Rl_jsonStubs *rl_jsonStubsPtr;
