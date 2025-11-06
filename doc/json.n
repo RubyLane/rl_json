@@ -9,10 +9,10 @@
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
 .SH NAME
-json \- Parse, manipulate and produce JSON documents 
+json \- Parse, manipulate and produce JSON documents
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.15.0\fR? 
+\fBpackage require rl_json\fR ?\fB0.15.0\fR?
 
 \fBjson get\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson extract\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
@@ -31,7 +31,7 @@ json \- Parse, manipulate and produce JSON documents
 \fBjson autoarray\fR \fIvalue ...\fR
 \fBjson bool\fR \fIvalue\fR
 \fBjson normalize\fR \fIjsonValue\fR
-\fBjson pretty\fR ?\fB-intent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? ?\fB-compact\fR? ?\fB-arrays\fR \fImode\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson template\fR \fIjsonValue\fR ?\fIdictionary\fR?
 \fBjson isnull\fR \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson type\fR \fIjsonValue\fR ?\fIkey ...\fR?
@@ -253,12 +253,38 @@ Return a
 version of the input \fIjsonValue\fR, i.e., with all optional whitespace
 trimmed.
 .TP
-\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? ?\fB-compact\fR? ?\fB-arrays\fR \fImode\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Returns a pretty-printed string representation of \fIjsonValue\fR, found by
 following the path of \fIkey\fRs.  Useful for debugging or inspecting the
-structure of JSON data.  If \fB-indent\fR is supplied, use \fIindent\fR for
-each level of indent, otherwise default to four spaces.
+structure of JSON data.
+.RS
+.PP
+The following options control the formatting:
+.TP
+\fB-indent\fR \fIindent\fR
+.
+Use \fIindent\fR for each level of indent.  Defaults to four spaces if not specified.
+.TP
+\fB-compact\fR
+.
+Return a compact, single-line representation with no extra whitespace.  This is equivalent
+to \fBjson normalize\fR but provided for convenience when using other pretty options.
+When this option is used, \fB-indent\fR and \fB-arrays\fR are ignored.
+.TP
+\fB-arrays\fR \fImode\fR
+.
+Control how arrays are formatted.  \fImode\fR must be one of:
+.RS
+.IP \fBinline\fR 10
+All arrays are formatted on a single line: [1,2,3]
+.IP \fBmultiline\fR 10
+All arrays are formatted with one element per line.
+.RE
+.PP
+If not specified, arrays with 3 or fewer elements are formatted inline, while larger
+arrays are formatted with one element per line.
+.RE
 .TP
 \fBjson decode \fIbytes\fR ?\fIencoding\fR?
 .

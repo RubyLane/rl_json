@@ -1339,7 +1339,7 @@ done:
 }
 
 //}}}
-int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds) //{{{
+int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, int nopadding, Tcl_Obj* pad, int arrays_inline, Tcl_DString* ds) //{{{
 {
 	int							pad_len, next_pad_len, count;
 	enum json_types				type;
@@ -1377,6 +1377,20 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 
 				TEST_OK_LABEL(finally, retval, Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
 
+                // keep the default behaviour, if wanted add the -nopadding option
+                // and the output will be condensed
+                if (!nopadding) {
+                    for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
+                        Tcl_GetStringFromObj(k, &k_len);
+                        if (k_len <= 20 && k_len > max)
+                            max = k_len;
+                    }
+                    Tcl_DictObjDone(&search);
+
+                    if (max > 20)
+                        max = 20;		// If this cap is changed be sure to adjust the key_pad_buf length above
+                }
+
 				replace_tclobj(&next_pad, Tcl_DuplicateObj(pad));
 				Tcl_AppendObjToObj(next_pad, indent);
 
@@ -1391,7 +1405,14 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 					append_json_string(&scx, k);
 					Tcl_DStringAppend(ds, ": ", 2);
 
-					if (json_pretty(interp, v, indent, next_pad, ds) != TCL_OK) {
+                    // keep the default behaviour, if wanted add the -nopadding option
+                    if (!nopadding) {
+                        Tcl_GetStringFromObj(k, &k_len);
+                        if (k_len < max)
+                            Tcl_DStringAppend(ds, key_pad_buf, max-k_len);
+                    }
+                    
+					if (json_pretty(interp, v, indent, nopadding, next_pad, arrays_inline, ds) != TCL_OK) {
 						Tcl_DictObjDone(&search);
 						retval = TCL_ERROR;
 						goto finally;
@@ -1415,6 +1436,7 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 			{
 				int			i, oc;
 				Tcl_Obj**	ov;
+				int			force_inline, force_multiline, should_inline;
 
 				TEST_OK_LABEL(finally, retval, Tcl_ListObjGetElements(interp, val, &oc, &ov));
 
@@ -1422,17 +1444,39 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 				Tcl_AppendObjToObj(next_pad, indent);
 				next_pad_str = Tcl_GetStringFromObj(next_pad, &next_pad_len);
 
+				// Determine array formatting: inline vs multiline
+				force_inline = (arrays_inline == 1);
+				force_multiline = (arrays_inline == 0);
+				// Auto heuristic: small arrays (<=3 elements) inline by default
+				should_inline = (!force_multiline) && (force_inline || oc <= 3);
+
 				if (oc == 0) {
 					Tcl_DStringAppend(ds, "[]", 2);
-				} else {
+				} else if (should_inline) {
+					// Inline format: [1,2,3]
 					Tcl_DStringAppend(ds, "[", 1);
 					count = 0;
 					for (i=0; i<oc; i++) {
-						TEST_OK_LABEL(finally, retval, json_pretty(interp, ov[i], indent, next_pad, ds));
+						TEST_OK_LABEL(finally, retval, json_pretty(interp, ov[i], indent, nopadding, next_pad, arrays_inline, ds));
 						if (++count < oc) {
 							Tcl_DStringAppend(ds, ",", 1);
 						}
 					}
+					Tcl_DStringAppend(ds, "]", 1);
+				} else {
+					// Multiline format with indentation
+					Tcl_DStringAppend(ds, "[", 1);
+					count = 0;
+					for (i=0; i<oc; i++) {
+						Tcl_DStringAppend(ds, "\n", 1);
+						Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
+						TEST_OK_LABEL(finally, retval, json_pretty(interp, ov[i], indent, nopadding, next_pad, arrays_inline, ds));
+						if (++count < oc) {
+							Tcl_DStringAppend(ds, ",", 1);
+						}
+					}
+							Tcl_DStringAppend(ds, "\n", 1);
+					Tcl_DStringAppend(ds, pad_str, pad_len);
 					Tcl_DStringAppend(ds, "]", 1);
 				}
 			}
@@ -3211,18 +3255,36 @@ static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 	Tcl_Obj*	indent = NULL;
 	Tcl_Obj*	target = NULL;
 	int			argbase = 1;
+	int			compact = 0;
+    int         nopadding = 0;
+	int			arrays_inline = -1;		// -1 = default/auto, 0 = multiline, 1 = inline
 	static const char* opts[] = {
 		"-indent",
+		"-compact",
+        "-nopadding",
+		"-arrays",
 		"--",			// Unnecessary for this case, but supported for convention
 		NULL
 	};
 	enum {
 		OPT_INDENT,
+		OPT_COMPACT,
+        OPT_NOPADDING,
+		OPT_ARRAYS,
 		OPT_END_OPTIONS
+	};
+	static const char* array_modes[] = {
+		"inline",
+		"multiline",
+		NULL
+	};
+	enum {
+		ARRAYS_INLINE,
+		ARRAYS_MULTILINE
 	};
 
 	enum {A_cmd, A_VAL, A_args};
-	CHECK_MIN_ARGS_LABEL(finally, code, "pretty ?-indent indent? json_val ?key ...?");
+	CHECK_MIN_ARGS_LABEL(finally, code, "pretty ?-indent indent? ?-compact? ?-nopadding? ?-arrays inline|multiline? json_val ?key ...?");
 
 	// Consume any leading options {{{
 	while (argbase < objc) {
@@ -3244,18 +3306,40 @@ static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 				argbase += 2;
 				break;
 
+			case OPT_COMPACT:
+				compact = 1;
+				argbase++;
+				break;
+
+			case OPT_NOPADDING:
+				nopadding = 1;
+				argbase++;
+				break;
+
+            case OPT_ARRAYS: {
+				int array_mode;
+				if (objc - argbase < 2) {
+					Tcl_SetErrorCode(interp, "TCL", "ARGUMENT", "MISSING", NULL);
+					THROW_ERROR_LABEL(finally, code, "missing argument to \"-arrays\"");
+				}
+				TEST_OK_LABEL(finally, code, Tcl_GetIndexFromObj(interp, objv[argbase+1], array_modes, "array mode", TCL_EXACT, &array_mode));
+				arrays_inline = (array_mode == ARRAYS_INLINE) ? 1 : 0;
+				argbase += 2;
+				break;
+			}
+
 			case OPT_END_OPTIONS:
 				argbase++;
 				goto endoptions;
 
 			default:
-				THROW_ERROR_LABEL(finally, code, "Unhandled get option idx");
+				THROW_ERROR_LABEL(finally, code, "Unhandled pretty option idx");
 		}
 	}
 endoptions:
 
 	if (objc == argbase) {
-		Tcl_WrongNumArgs(interp, 1, objv, "?-default defaultValue? json_val ?key ...?");
+		Tcl_WrongNumArgs(interp, 1, objv, "?-indent indent? ?-compact? ?-nopadding? ?-arrays inline|multiline? json_val ?key ...?");
 		code = TCL_ERROR;
 		goto finally;
 	}
@@ -3267,7 +3351,7 @@ endoptions:
 		replace_tclobj(&target, objv[argbase]);
 	}
 
-	TEST_OK_LABEL(finally, code, JSON_Pretty(interp, target, indent, &pretty));
+	TEST_OK_LABEL(finally, code, JSON_Pretty(interp, target, indent, nopadding, compact, arrays_inline, &pretty));
 
 	Tcl_SetObjResult(interp, pretty);
 
