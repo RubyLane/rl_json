@@ -19,7 +19,7 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([rl_json],[0.15.4])
+AC_INIT([rl_json],[0.15.5])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -66,6 +66,15 @@ ENABLE_ENSEMBLE
 ENABLE_DEDUP
 ENABLE_DEBUG
 ENABLE_UNLOAD
+ENABLE_CBOR
+
+# Set CBOR source files conditionally
+if test "$CBOR" = "1"; then
+	CBOR_SOURCES="cbor.c"
+else
+	CBOR_SOURCES=""
+fi
+AC_SUBST(CBOR_SOURCES)
 
 #-----------------------------------------------------------------------
 # __CHANGE__
@@ -77,7 +86,7 @@ ENABLE_UNLOAD
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c cbor.c])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c ${CBOR_SOURCES}])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h generic/rl_json.h])
 TEA_ADD_INCLUDES([-Igeneric -Ilocal/include])
 TEA_ADD_LIBS([-Llocal/lib -ltommath -lm])

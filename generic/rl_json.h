@@ -49,6 +49,7 @@ struct parse_error {
 
 typedef int (JSON_ForeachBody)(ClientData cdata, Tcl_Interp* interp, Tcl_Obj* loopvars);
 
+#if CBOR
 enum cbor_mt {
 	M_UINT = 0,
 	M_NINT = 1,
@@ -59,6 +60,7 @@ enum cbor_mt {
 	M_TAG  = 6,
 	M_REAL = 7
 };
+#endif
 
 
 #ifdef TCL_MEM_DEBUG

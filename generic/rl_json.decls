@@ -122,10 +122,12 @@ declare 35 generic {
 	Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line)
 }
 
+if 0 {
 # CBOR
 declare 40 generic {
 	int CBOR_GetDataItemFromPath(Tcl_Interp* interp, Tcl_Obj* cborObj, Tcl_Obj* pathObj, const uint8_t** dataitemPtr, const uint8_t** ePtr, Tcl_DString* tagsPtr) 
 }
 declare 41 generic {
 	int CBOR_Length(Tcl_Interp* interp, const uint8_t* p, const uint8_t* e, size_t* lenPtr)
+}
 }

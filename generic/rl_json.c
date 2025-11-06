@@ -3797,10 +3797,12 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 	release_tclobj(&l->apply);
 	release_tclobj(&l->decode_bytes);
 
+#if CBOR
 	release_tclobj(&l->cbor_true);
 	release_tclobj(&l->cbor_false);
 	release_tclobj(&l->cbor_null);
 	release_tclobj(&l->cbor_undefined);
+#endif
 
 	free(l); l = NULL;
 }
@@ -4061,10 +4063,12 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		"}\n" , -1));
 	//}}}
 
+#if CBOR
 	replace_tclobj(&l->cbor_true,      Tcl_NewStringObj("true",  4));
 	replace_tclobj(&l->cbor_false,     Tcl_NewStringObj("false", 5));
 	replace_tclobj(&l->cbor_null,      Tcl_NewStringObj("", 0));
 	replace_tclobj(&l->cbor_undefined, Tcl_NewStringObj("", 0));
+#endif
 
 	Tcl_SetAssocData(interp, "rl_json", free_interp_cx, l);
 
@@ -4161,7 +4165,9 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, NS "::checkmem", checkmem, l, NULL);
 	}
 
+#if CBOR
 	if (TCL_OK != cbor_init(interp, l)) return TCL_ERROR;
+#endif
 
 	if (TCL_OK != _setdir(interp)) return TCL_ERROR;
 
@@ -4189,7 +4195,9 @@ DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 
 	release_instances();
 
+#if CBOR
 	cbor_release(interp);
+#endif
 
 	Tcl_DeleteAssocData(interp, "rl_json");
 

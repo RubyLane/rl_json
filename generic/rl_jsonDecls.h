@@ -122,18 +122,6 @@ EXTERN Tcl_Obj*		JSON_NewJvalObj(enum json_types type, Tcl_Obj*val);
 /* 35 */
 EXTERN Tcl_Obj*		JSON_DbNewJvalObj(enum json_types type, Tcl_Obj*val,
 				const char*file, int line);
-/* Slot 36 is reserved */
-/* Slot 37 is reserved */
-/* Slot 38 is reserved */
-/* Slot 39 is reserved */
-/* 40 */
-EXTERN int		CBOR_GetDataItemFromPath(Tcl_Interp*interp,
-				Tcl_Obj*cborObj, Tcl_Obj*pathObj,
-				const uint8_t**dataitemPtr,
-				const uint8_t**ePtr, Tcl_DString*tagsPtr);
-/* 41 */
-EXTERN int		CBOR_Length(Tcl_Interp*interp, const uint8_t*p,
-				const uint8_t*e, size_t*lenPtr);
 
 typedef struct Rl_jsonStubs {
     int magic;
@@ -175,12 +163,6 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */
     Tcl_Obj* (*jSON_NewJvalObj) (enum json_types type, Tcl_Obj*val); /* 34 */
     Tcl_Obj* (*jSON_DbNewJvalObj) (enum json_types type, Tcl_Obj*val, const char*file, int line); /* 35 */
-    void (*reserved36)(void);
-    void (*reserved37)(void);
-    void (*reserved38)(void);
-    void (*reserved39)(void);
-    int (*cBOR_GetDataItemFromPath) (Tcl_Interp*interp, Tcl_Obj*cborObj, Tcl_Obj*pathObj, const uint8_t**dataitemPtr, const uint8_t**ePtr, Tcl_DString*tagsPtr); /* 40 */
-    int (*cBOR_Length) (Tcl_Interp*interp, const uint8_t*p, const uint8_t*e, size_t*lenPtr); /* 41 */
 } Rl_jsonStubs;
 
 extern const Rl_jsonStubs *rl_jsonStubsPtr;
@@ -267,14 +249,6 @@ extern const Rl_jsonStubs *rl_jsonStubsPtr;
 	(rl_jsonStubsPtr->jSON_NewJvalObj) /* 34 */
 #define JSON_DbNewJvalObj \
 	(rl_jsonStubsPtr->jSON_DbNewJvalObj) /* 35 */
-/* Slot 36 is reserved */
-/* Slot 37 is reserved */
-/* Slot 38 is reserved */
-/* Slot 39 is reserved */
-#define CBOR_GetDataItemFromPath \
-	(rl_jsonStubsPtr->cBOR_GetDataItemFromPath) /* 40 */
-#define CBOR_Length \
-	(rl_jsonStubsPtr->cBOR_Length) /* 41 */
 
 #endif /* defined(USE_RL_JSON_STUBS) */
 

@@ -49,6 +49,26 @@ AC_DEFUN([ENABLE_DEDUP], [
 	#trap '' DEBUG
 ])
 
+
+AC_DEFUN([ENABLE_CBOR], [
+	#trap 'echo "val: (${enable_cbor+set}), cbor_ok: ($cbor_ok), CBOR: ($CBOR)"' DEBUG
+	AC_MSG_CHECKING([whether to enable CBOR functionality])
+	AC_ARG_ENABLE(cbor,
+		AS_HELP_STRING([--enable-cbor],[Enable CBOR (Concise Binary Object Representation) encoding/decoding functionality (default: no)]),
+		[cbor_ok=$enableval], [cbor_ok=no])
+
+	if test "$cbor_ok" = "yes" -o "${CBOR}" = 1; then
+		CBOR=1
+		AC_MSG_RESULT([yes])
+	else
+		CBOR=0
+		AC_MSG_RESULT([no])
+	fi
+
+	AC_DEFINE_UNQUOTED([CBOR], [$CBOR], [CBOR enabled?])
+	#trap '' DEBUG
+])
+
 AC_DEFUN([CygPath],[`${CYGPATH} $1`])
 
 AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [

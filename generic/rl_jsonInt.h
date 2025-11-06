@@ -16,7 +16,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#if CBOR
 #include <endian.h>
+#endif
 #include <tommath.h>
 #include "tip445.h"
 #include "names.h"
@@ -199,10 +201,12 @@ struct interp_cx {
 	const Tcl_ObjType*	typeBignum;
 	Tcl_Obj*		apply;
 	Tcl_Obj*		decode_bytes;
+#if CBOR
 	Tcl_Obj*		cbor_true;			// cbor_true/false distinct from tcl_true/false because they have different string reps
 	Tcl_Obj*		cbor_false;
 	Tcl_Obj*		cbor_null;
 	Tcl_Obj*		cbor_undefined;
+#endif
 };
 
 void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
@@ -270,9 +274,11 @@ void foreach_state_free(struct foreach_state* state);
 
 #include "dedup.h"
 
+#if CBOR
 // CBOR private headers:
 int cbor_init(Tcl_Interp* interp, struct interp_cx* l);
 void cbor_release(Tcl_Interp* interp);
+#endif
 
 // Polyfill
 #ifndef Tcl_GetBytesFromObj

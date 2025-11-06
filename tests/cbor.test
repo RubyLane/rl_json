@@ -6,6 +6,8 @@ namespace import ::tcltest::*
 package require rl_json
 namespace path {::rl_json}
 
+if {[llength [info commands ::rl_json::cbor]] == 0} return
+
 if {[llength [info commands lseq]] == 0} { # lseq polyfill #<<<
 	proc lseq {from to} {
 		set res {}
