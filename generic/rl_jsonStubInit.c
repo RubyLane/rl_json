@@ -39,6 +39,7 @@ const Rl_jsonStubs rl_jsonStubs = {
     JSON_Decode, /* 31 */
     JSON_Foreach, /* 32 */
     JSON_Valid, /* 33 */
+    JSON_Pretty_Ex, /* 34 */
 };
 
 /* !END!: Do not edit above this line. */

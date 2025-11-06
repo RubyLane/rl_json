@@ -117,8 +117,12 @@ EXTERN int		JSON_Foreach(Tcl_Interp*interp, Tcl_Obj*iterators,
 EXTERN int		JSON_Valid(Tcl_Interp*interp, Tcl_Obj*json,
 				int*valid, enum extensions extensions,
 				struct parse_error*details);
+/* 34 */
+EXTERN int		JSON_Pretty_Ex(Tcl_Interp*interp, Tcl_Obj*obj,
+				Tcl_Obj*indent, int compact,
+				int arrays_inline, Tcl_Obj**prettyString);
 
-typedef struct Rl_jsonStubs {
+typedef struct TcljsonStubs {
     int magic;
     void *hooks;
 
@@ -156,6 +160,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
     int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */
+    int (*jSON_Pretty_Ex) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*indent, int compact, int arrays_inline, Tcl_Obj**prettyString); /* 34 */
 } Rl_jsonStubs;
 
 extern const Rl_jsonStubs *rl_jsonStubsPtr;
@@ -238,6 +243,8 @@ extern const Rl_jsonStubs *rl_jsonStubsPtr;
 	(rl_jsonStubsPtr->jSON_Foreach) /* 32 */
 #define JSON_Valid \
 	(rl_jsonStubsPtr->jSON_Valid) /* 33 */
+#define JSON_Pretty_Ex \
+	(rl_jsonStubsPtr->jSON_Pretty_Ex) /* 34 */
 
 #endif /* defined(USE_RL_JSON_STUBS) */
 

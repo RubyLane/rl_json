@@ -115,3 +115,6 @@ declare 32 generic {
 declare 33 generic {
 	int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions extensions, struct parse_error* details)
 }
+declare 34 generic {
+	int JSON_Pretty_Ex(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, int compact, int arrays_inline, Tcl_Obj** prettyString)
+}

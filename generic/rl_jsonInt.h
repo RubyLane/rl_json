@@ -1,6 +1,10 @@
 #ifndef _RL_JSONINT
 #define _RL_JSONINT
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "rl_json.h"
 #include "tclstuff.h"
 #include <string.h>
@@ -249,6 +253,7 @@ int build_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj** acti
 int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out);
 int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def);
 int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds);
+int json_pretty_ex(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, int arrays_inline, Tcl_DString* ds);
 void foreach_state_free(struct foreach_state* state);
 
 #define TEMPLATE_TYPE(s, len, out) \

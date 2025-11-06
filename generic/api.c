@@ -31,10 +31,10 @@ int JSON_NewJNumberObj(Tcl_Interp* interp, Tcl_Obj* number, Tcl_Obj** new) //{{{
 int JSON_NewJBooleanObj(Tcl_Interp* interp, Tcl_Obj* boolean, Tcl_Obj** new) //{{{
 {
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	int					bool;
+	int boolVal;
 
-	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &bool));
-	replace_tclobj(new, bool ? l->json_true : l->json_false);
+	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &boolVal));
+	replace_tclobj(new, boolVal ? l->json_true : l->json_false);
 
 	return TCL_OK;
 }
@@ -952,7 +952,42 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 
 	replace_tclobj(&pad, l->tcl_empty);
 	Tcl_DStringInit(&ds);
-	retval = json_pretty(interp, obj, indent, pad, &ds);
+	retval = json_pretty_ex(interp, obj, indent, pad, -1, &ds);
+
+	if (retval == TCL_OK)
+		replace_tclobj(prettyString, Tcl_NewStringObj(Tcl_DStringValue(&ds), Tcl_DStringLength(&ds)));
+
+	Tcl_DStringFree(&ds);
+	release_tclobj(&pad);
+	release_tclobj(&lindent);
+
+	return retval;
+}
+
+//}}}
+int JSON_Pretty_Ex(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, int compact, int arrays_inline, Tcl_Obj** prettyString) //{{{
+{
+	int					retval = TCL_OK;
+	Tcl_DString			ds;
+	Tcl_Obj*			lindent = NULL;
+	Tcl_Obj*			pad = NULL;
+	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
+
+	// Handle compact mode - just normalize (remove all whitespace)
+	if (compact) {
+		retval = JSON_Normalize(interp, obj, prettyString);
+		return retval;
+	}
+
+	// Normal pretty printing with formatting options
+	if (indent == NULL) {
+		replace_tclobj(&lindent, get_string(l, "    ", 4));
+		indent = lindent;
+	}
+
+	replace_tclobj(&pad, l->tcl_empty);
+	Tcl_DStringInit(&ds);
+	retval = json_pretty_ex(interp, obj, indent, pad, arrays_inline, &ds);
 
 	if (retval == TCL_OK)
 		replace_tclobj(prettyString, Tcl_NewStringObj(Tcl_DStringValue(&ds), Tcl_DStringLength(&ds)));
