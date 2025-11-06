@@ -50,6 +50,23 @@ test pretty-1.3 {Basic pretty-print, different indent} -body { #<<<
   ]
 }}
 #>>>
+test pretty-1.4 {Basic pretty-print, nopadding} -body { #<<<
+	json pretty -indent "  " -nopadding {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null]}}
+} -result {{
+  "foo": null,
+  "empty": {},
+  "emptyarr": [],
+  "hello, world": "bar",
+  "This is a much longer key": [
+    "str",
+    123,
+    123.4,
+    true,
+    false,
+    null
+  ]
+}}
+#>>>
 test pretty-jsonPretty-2.1 {} -body {json pretty -- 1} -result 1
 #>>>
 test pretty-2.2 {too few args} -body { #<<<
