@@ -1377,16 +1377,6 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 
 				TEST_OK_LABEL(finally, retval, Tcl_DictObjFirst(interp, val, &search, &k, &v, &done));
 
-				for (; !done; Tcl_DictObjNext(&search, &k, &v, &done)) {
-					Tcl_GetStringFromObj(k, &k_len);
-					if (k_len <= 20 && k_len > max)
-						max = k_len;
-				}
-				Tcl_DictObjDone(&search);
-
-				if (max > 20)
-					max = 20;		// If this cap is changed be sure to adjust the key_pad_buf length above
-
 				replace_tclobj(&next_pad, Tcl_DuplicateObj(pad));
 				Tcl_AppendObjToObj(next_pad, indent);
 
@@ -1400,10 +1390,6 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 					Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
 					append_json_string(&scx, k);
 					Tcl_DStringAppend(ds, ": ", 2);
-
-					Tcl_GetStringFromObj(k, &k_len);
-					if (k_len < max)
-						Tcl_DStringAppend(ds, key_pad_buf, max-k_len);
 
 					if (json_pretty(interp, v, indent, next_pad, ds) != TCL_OK) {
 						Tcl_DictObjDone(&search);
@@ -1439,18 +1425,14 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad
 				if (oc == 0) {
 					Tcl_DStringAppend(ds, "[]", 2);
 				} else {
-					Tcl_DStringAppend(ds, "[\n", 2);
+					Tcl_DStringAppend(ds, "[", 1);
 					count = 0;
 					for (i=0; i<oc; i++) {
-						Tcl_DStringAppend(ds, next_pad_str, next_pad_len);
 						TEST_OK_LABEL(finally, retval, json_pretty(interp, ov[i], indent, next_pad, ds));
 						if (++count < oc) {
-							Tcl_DStringAppend(ds, ",\n", 2);
-						} else {
-							Tcl_DStringAppend(ds, "\n", 1);
+							Tcl_DStringAppend(ds, ",", 1);
 						}
 					}
-					Tcl_DStringAppend(ds, pad_str, pad_len);
 					Tcl_DStringAppend(ds, "]", 1);
 				}
 			}
@@ -2982,6 +2964,54 @@ finally:
 }
 
 //}}}
+static int jsonAutoArray(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	int			i, retval = TCL_OK;
+	Tcl_Obj*	elem = NULL;
+	Tcl_Obj*	val = NULL;
+	Tcl_Obj*	forced = NULL;
+	const char*	str;
+	int			len;
+
+	replace_tclobj(&val, Tcl_NewListObj(objc-1, NULL));
+
+	for (i=1; i<objc; i++) {
+		str = Tcl_GetStringFromObj(objv[i], &len);
+
+		// Check for boolean values (exact match, case-sensitive)
+		if (len == 4 && strcmp(str, "true") == 0) {
+			replace_tclobj(&elem, JSON_NewJvalObj(JSON_BOOL, l->json_true));
+		} else if (len == 5 && strcmp(str, "false") == 0) {
+			replace_tclobj(&elem, JSON_NewJvalObj(JSON_BOOL, l->json_false));
+		} else {
+			// Try to parse as a number
+			int is_number = (force_json_number(interp, l, objv[i], &forced) == TCL_OK);
+
+			if (is_number) {
+				// It's a valid JSON number
+				replace_tclobj(&elem, JSON_NewJvalObj(JSON_NUMBER, forced));
+				release_tclobj(&forced);
+			} else {
+				// Default to string
+				// Clear any error message from failed number conversion
+				Tcl_ResetResult(interp);
+				replace_tclobj(&elem, JSON_NewJvalObj(JSON_STRING, objv[i]));
+			}
+		}
+
+		TEST_OK_LABEL(finally, retval, Tcl_ListObjAppendElement(interp, val, elem));
+	}
+	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_ARRAY, val));
+
+finally:
+	release_tclobj(&elem);
+	release_tclobj(&val);
+	release_tclobj(&forced);
+	return retval;
+}
+
+//}}}
 static int jsonDecode(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	Tcl_Obj*	encoding = NULL;
@@ -3602,6 +3632,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		"boolean",
 		"object",
 		"array",
+		"autoarray",
 
 		"decode",
 
@@ -3643,6 +3674,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		M_BOOLEAN,
 		M_OBJECT,
 		M_ARRAY,
+		M_AUTOARRAY,
 		M_DECODE,
 		// Debugging
 		M_FREE_CACHE,
@@ -3678,6 +3710,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_BOOLEAN:		return jsonBoolean(cdata, interp, objc-1, objv+1);
 		case M_OBJECT:		return jsonObject(cdata, interp, objc-1, objv+1);
 		case M_ARRAY:		return jsonArray(cdata, interp, objc-1, objv+1);
+		case M_AUTOARRAY:	return jsonAutoArray(cdata, interp, objc-1, objv+1);
 		case M_DECODE:		return jsonDecode(cdata, interp, objc-1, objv+1);
 		case M_ISNULL:		return jsonIsNull(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE:	return jsonTemplate(cdata, interp, objc-1, objv+1);
@@ -4128,6 +4161,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, ENS "boolean",    jsonBoolean, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "object",     jsonObject, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "array",      jsonArray, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "autoarray",  jsonAutoArray, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "decode",     jsonDecode, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "isnull",     jsonIsNull, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "template",   jsonTemplate, l, NULL);
