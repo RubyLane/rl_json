@@ -22,8 +22,8 @@
 #endif
 #if CBOR
 #include <endian.h>
-#endif
 #include <tommath.h>
+#endif
 #include "tip445.h"
 #include "names.h"
 
