@@ -118,6 +118,11 @@ EXTERN int		JSON_Foreach(Tcl_Interp*interp, Tcl_Obj*iterators,
 EXTERN int		JSON_Valid(Tcl_Interp*interp, Tcl_Obj*json,
 				int*valid, enum extensions extensions,
 				struct parse_error*details);
+/* 34 */
+EXTERN Tcl_Obj*		JSON_NewJvalObj(enum json_types type, Tcl_Obj*val);
+/* 35 */
+EXTERN Tcl_Obj*		JSON_DbNewJvalObj(enum json_types type, Tcl_Obj*val,
+				const char*file, int line);
 
 typedef struct TcljsonStubs {
     int magic;
@@ -157,7 +162,8 @@ typedef struct TcljsonStubs {
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
     int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */
     int (*jSON_Valid) (Tcl_Interp*interp, Tcl_Obj*json, int*valid, enum extensions extensions, struct parse_error*details); /* 33 */
-    
+    Tcl_Obj* (*jSON_NewJvalObj) (enum json_types type, Tcl_Obj*val); /* 34 */
+    Tcl_Obj* (*jSON_DbNewJvalObj) (enum json_types type, Tcl_Obj*val, const char*file, int line); /* 35 */
 } Rl_jsonStubs;
 
 extern const Rl_jsonStubs *rl_jsonStubsPtr;
@@ -240,6 +246,10 @@ extern const Rl_jsonStubs *rl_jsonStubsPtr;
 	(rl_jsonStubsPtr->jSON_Foreach) /* 32 */
 #define JSON_Valid \
 	(rl_jsonStubsPtr->jSON_Valid) /* 33 */
+#define JSON_NewJvalObj \
+	(rl_jsonStubsPtr->jSON_NewJvalObj) /* 34 */
+#define JSON_DbNewJvalObj \
+	(rl_jsonStubsPtr->jSON_DbNewJvalObj) /* 35 */
 
 #endif /* defined(USE_RL_JSON_STUBS) */
 

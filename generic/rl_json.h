@@ -2,6 +2,7 @@
 #define _JSON_MAIN_H
 
 #include <tcl.h>
+#include <stdint.h>		// Stubs API uses stdint types
 
 #ifdef BUILD_rl_json
 #undef TCL_STORAGE_CLASS
@@ -47,6 +48,25 @@ struct parse_error {
 };
 
 typedef int (JSON_ForeachBody)(ClientData cdata, Tcl_Interp* interp, Tcl_Obj* loopvars);
+
+#if CBOR
+enum cbor_mt {
+	M_UINT = 0,
+	M_NINT = 1,
+	M_BSTR = 2,
+	M_UTF8 = 3,
+	M_ARR  = 4,
+	M_MAP  = 5,
+	M_TAG  = 6,
+	M_REAL = 7
+};
+#endif
+
+
+#ifdef TCL_MEM_DEBUG
+#	undef JSON_NewJvalObj
+#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
+#endif
 
 // Stubs exported API
 

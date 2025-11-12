@@ -31,7 +31,7 @@ json \- Parse, manipulate and produce JSON documents
 \fBjson autoarray\fR \fIvalue ...\fR
 \fBjson bool\fR \fIvalue\fR
 \fBjson normalize\fR \fIjsonValue\fR
-\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? ?\fB-compact\fR? ?\fB-arrays\fR \fImode\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson template\fR \fIjsonValue\fR ?\fIdictionary\fR?
 \fBjson isnull\fR \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson type\fR \fIjsonValue\fR ?\fIkey ...\fR?

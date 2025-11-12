@@ -31,10 +31,10 @@ int JSON_NewJNumberObj(Tcl_Interp* interp, Tcl_Obj* number, Tcl_Obj** new) //{{{
 int JSON_NewJBooleanObj(Tcl_Interp* interp, Tcl_Obj* boolean, Tcl_Obj** new) //{{{
 {
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	int boolVal;
+	int					bval;
 
-	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &boolVal));
-	replace_tclobj(new, boolVal ? l->json_true : l->json_false);
+	TEST_OK(Tcl_GetBooleanFromObj(interp, boolean, &bval));
+	replace_tclobj(new, bval ? l->json_true : l->json_false);
 
 	return TCL_OK;
 }
@@ -1347,6 +1347,8 @@ cleanup_search:
 							}
 							break;
 					}
+					retcode = TCL_OK;
+					break;
 
 				case TCL_CONTINUE:
 					retcode = TCL_OK;

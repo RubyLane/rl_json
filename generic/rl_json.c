@@ -160,9 +160,9 @@ static int _setdir(Tcl_Interp* interp) //{{{
 		cfg[0].value = Tcl_GetString(g_packagedir);		// Under global ref
 		cfg[1].value = Tcl_GetString(g_includedir);		// Under global ref
 		cfg[2].value = Tcl_GetString(g_packagedir);		// Under global ref
-
-		Tcl_RegisterConfig(interp, PACKAGE_NAME, cfg, "utf-8");
 	}
+
+	Tcl_RegisterConfig(interp, PACKAGE_NAME, cfg, "utf-8");
 
 finally:
 	Tcl_MutexUnlock(&g_config_mutex); //>>>
@@ -1189,6 +1189,8 @@ cleanup_search:
 					}
 					break;
 			}
+			retcode = TCL_OK;
+			break;
 
 		case TCL_CONTINUE:
 			retcode = TCL_OK;
@@ -3912,6 +3914,13 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 	release_tclobj(&l->apply);
 	release_tclobj(&l->decode_bytes);
 
+#if CBOR
+	release_tclobj(&l->cbor_true);
+	release_tclobj(&l->cbor_false);
+	release_tclobj(&l->cbor_null);
+	release_tclobj(&l->cbor_undefined);
+#endif
+
 	free(l); l = NULL;
 }
 
@@ -4016,13 +4025,14 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 	struct interp_cx*	l = NULL;
 
 #ifdef USE_TCL_STUBS
-	if (Tcl_InitStubs(interp, "8.6", 0) == NULL)
+	if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL)
 		return TCL_ERROR;
 #endif // USE_TCL_STUBS
 
 	TEST_OK(init_types(interp));
 
 	l = (struct interp_cx*)malloc(sizeof *l);
+	*l = (struct interp_cx){0};
 	l->interp = interp;
 	Tcl_IncrRefCount(l->tcl_true   = Tcl_NewStringObj("1", 1));
 	Tcl_IncrRefCount(l->tcl_false  = Tcl_NewStringObj("0", 1));
@@ -4170,6 +4180,13 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		"}\n" , -1));
 	//}}}
 
+#if CBOR
+	replace_tclobj(&l->cbor_true,      Tcl_NewStringObj("true",  4));
+	replace_tclobj(&l->cbor_false,     Tcl_NewStringObj("false", 5));
+	replace_tclobj(&l->cbor_null,      Tcl_NewStringObj("", 0));
+	replace_tclobj(&l->cbor_undefined, Tcl_NewStringObj("", 0));
+#endif
+
 	Tcl_SetAssocData(interp, "rl_json", free_interp_cx, l);
 
 	{
@@ -4178,8 +4195,6 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_Namespace*	ns_cmd = NULL;
 		Tcl_Command		ens_cmd = NULL;
 #endif
-
-#define NS	"::rl_json"
 
 		ns = Tcl_CreateNamespace(interp, NS, NULL, NULL);
 		TEST_OK(Tcl_Export(interp, ns, "*", 0));
@@ -4262,11 +4277,15 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, ENS "template_actions",      jsonTemplateActions, l, NULL);
 		//Tcl_CreateObjCommand(interp, ENS "merge",      jsonMerge, l, NULL);
 #else
-		Tcl_NRCreateCommand(interp, "::rl_json::json", jsonObj, jsonNRObj, l, NULL);
+		Tcl_NRCreateCommand(interp, NS "::json", jsonObj, jsonNRObj, l, NULL);
 #endif
 
 		Tcl_CreateObjCommand(interp, NS "::checkmem", checkmem, l, NULL);
 	}
+
+#if CBOR
+	if (TCL_OK != cbor_init(interp, l)) return TCL_ERROR;
+#endif
 
 	if (TCL_OK != _setdir(interp)) return TCL_ERROR;
 
@@ -4293,6 +4312,10 @@ DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 	Tcl_Namespace*		ns;
 
 	release_instances();
+
+#if CBOR
+	cbor_release(interp);
+#endif
 
 	Tcl_DeleteAssocData(interp, "rl_json");
 

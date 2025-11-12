@@ -1,0 +1,356 @@
+package require tcltest 2.5.1
+namespace import ::tcltest::*
+
+::tcltest::loadTestedCommands
+
+package require rl_json
+namespace path {::rl_json}
+
+if {[llength [info commands ::rl_json::cbor]] == 0} return
+
+if {[llength [info commands lseq]] == 0} { # lseq polyfill #<<<
+	proc lseq {from to} {
+		set res {}
+		for {set i $from} {$i <= $to} {incr i} {
+			lappend res $i
+		}
+		set res
+	}
+}
+#>>>
+
+# cbor-0.* argument handling
+test cbor-0.1 {No arguments} 		-body { cbor get                 } -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "cbor get cbor ?key ...?"}
+test cbor-0.2 {Too many arguments}	-body { cbor wellformed	\x00 bad } -returnCodes error -errorCode {TCL WRONGARGS} -result {wrong # args: should be "cbor wellformed bytes"}
+
+# cbor-1.* - Truncated CBOR data
+test cbor-1.0 {Empty input} -body {
+	cbor get {}
+} -returnCodes error -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+#>>>
+
+proc tests {name desc pats args} {
+	set i 0
+	foreach seq [lmap e [split $pats ,] {string trim $e}] {
+		uplevel 1 [list test $name.[incr i] "$desc: $seq" -body "cbor get \[binary decode hex [list $seq]\]" -returnCodes error {*}$args]
+	}
+}
+
+tests cbor-1.1 {End of input in a head} {
+	18, 19, 1a, 1b, 19 01, 1a 01 02, 1b 01 02 03 04 05 06 07, 38, 58, 78, 98,
+	9a 01 ff 00, b8, d8, f8, f9 00, fa 00 00, fb 00 00 00
+} -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+
+tests cbor-1.2 {Definite-length strings with short data} {
+	41, 61, 5a ff ff ff ff 00, 5b ff ff ff ff ff ff ff ff 01 02 03,
+	7a ff ff ff ff 00, 7b 7f ff ff ff ff ff ff ff 01 02 03
+} -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+
+tests cbor-1.3 {Definite-length maps and arrays not closed with enough items} {
+	81, 81 81 81 81 81 81 81 81 81, 82 00, a1, a2 01 02, a1 00, a2 00 00 00
+} -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+
+tests cbor-1.4 {Tag number not followed by tag content} {
+	c0
+} -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+
+tests cbor-1.5 {Indefinite-length strings not closed by a "break" stop code} {
+	5f 41 00, 7f 61 00
+} -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+
+tests cbor-1.6 {Indefinite-length maps and arrays not closed by a "break" stop code} {
+	9f, 9f 01 02, bf, bf 01 02 01 02, 81 9f, 9f 80 00,
+	9f 9f 9f 9f 9f ff ff ff ff, 9f 81 9f 81 9f 9f ff ff ff
+} -errorCode {CBOR TRUNCATED} -result "CBOR value truncated"
+
+
+# cbor-2.* - Invalid CBOR data
+test cbor-2.1  {} -body {cbor get \x18} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.2  {} -body {cbor get \x19} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.3  {} -body {cbor get \x1a} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.4  {} -body {cbor get \x1b} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.5  {} -body {cbor get \x1c} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.6  {} -body {cbor get \x1d} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.7  {} -body {cbor get \x1e} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.8  {} -body {cbor get \x1f} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: invalid indefinite length for major type 0}
+test cbor-2.9  {} -body {cbor get \x3c} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.10 {} -body {cbor get \x3d} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.11 {} -body {cbor get \x3e} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.12 {} -body {cbor get \x3f} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: invalid indefinite length for major type 1}
+test cbor-2.13 {} -body {cbor get \x5c} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.14 {} -body {cbor get \x5d} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.15 {} -body {cbor get \x5e} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.16 {} -body {cbor get \x5f} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.17 {} -body {cbor get \x7c} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.18 {} -body {cbor get \x7d} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.19 {} -body {cbor get \x7e} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.20 {} -body {cbor get \x7f} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.21 {} -body {cbor get \x9c} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.22 {} -body {cbor get \x9d} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.23 {} -body {cbor get \x9e} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.24 {} -body {cbor get \x9f} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.25 {} -body {cbor get \xbc} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.26 {} -body {cbor get \xbd} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.27 {} -body {cbor get \xbe} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.28 {} -body {cbor get \xbf} -returnCodes error -errorCode {CBOR TRUNCATED} -result {CBOR value truncated}
+test cbor-2.29 {} -body {cbor get \xdc} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.30 {} -body {cbor get \xdd} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.31 {} -body {cbor get \xde} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.32 {} -body {cbor get \xdf} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: invalid indefinite length for major type 6}
+test cbor-2.33 {} -body {cbor get \xfc} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 28}
+test cbor-2.34 {} -body {cbor get \xfd} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 29}
+test cbor-2.35 {} -body {cbor get \xfe} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: reserved additional info value: 30}
+test cbor-2.36 {} -body {cbor get \xff} -returnCodes error -errorCode {CBOR INVALID} -result {CBOR syntax error: invalid indefinite length for major type 7}
+
+# cbor-3.* - trailing garbage
+test cbor-3.1 {Trailing garbage} -body { #<<<
+	cbor wellformed [binary decode hex {00 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.2 {Trailing garbage after binary chunk} -body { #<<<
+	cbor wellformed [binary decode hex {5f 43 66 6f 6f 41 61 FF 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.3 {Trailing garbage after string chunk} -body { #<<<
+	cbor wellformed [binary decode hex {7f 63 66 6f 6f 61 61 FF 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.4.1 {Trailing garbage after array, indefinite} -body { #<<<
+	cbor wellformed [binary decode hex {9f 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e FF 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.4.2 {Trailing garbage after array, definite} -body { #<<<
+	cbor wellformed [binary decode hex {82 01 02 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.5.1 {Trailing garbage after map chunk, indefinite} -constraints knownBug -body { #<<<
+	cbor wellformed [binary decode hex {bf 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e FF 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.5.2 {Trailing garbage after map chunk, definite} -body { #<<<
+	cbor wellformed [binary decode hex {a2 01 02 03 04 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.6 {Trailing garbage after break, no chunks} -body { #<<<
+	cbor wellformed [binary decode hex {5f ff 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+test cbor-3.7 {Trailing garbage after break, one chunks} -body { #<<<
+	cbor wellformed [binary decode hex {5f 43 66 6f 6f ff 00}]
+} -returnCodes error -errorCode {CBOR TRAILING} -result "Excess bytes after CBOR value"
+#>>>
+
+# cbor-10.* cbor get - wellformed
+proc test_get {num bytes res {tags {}}} {
+	tailcall test cbor_get-$num $res -body "set res \[cbor tget tags \[binary decode hex [list $bytes]\]\]; list \$res \$tags" -result [list $res $tags] -cleanup {unset -nocomplain res tags}
+}
+
+# Test cases from https://www.rfc-editor.org/rfc/rfc8949.html#name-examples-of-encoded-cbor-da
+if 0 {
+test_get 1.1	00													0
+test_get 1.2	01													1
+test_get 1.3	0a													10
+test_get 1.4	17													23
+test_get 1.5	{18 18}												24
+test_get 1.6	{18 19}												25
+test_get 1.7	{18 64}												100
+test_get 1.8	{19 03 e8}											1000
+test_get 1.9	{1a 00 0f 42 40}									1000000
+test_get 1.10	{1b 00 00 00 e8 d4 a5 10 00}						1000000000000
+test_get 1.11	{1b ff ff ff ff ff ff ff ff}						18446744073709551615
+test_get 1.12	{c2 49 01 00 00 00 00 00 00 00}						18446744073709551616
+test_get 1.13	{3b ff ff ff ff ff ff ff ff}						-18446744073709551616
+test_get 1.14	{c3 49 01 00 00 00 00 00 00 00}						-18446744073709551617
+test_get 1.15	20													-1
+test_get 1.16	29													-10
+test_get 1.17	{38 63}												-100
+test_get 1.18	{39 03 e7}											-1000
+test_get 1.19	{f9 00 00}											0.0
+test_get 1.20	{f9 80 00}											-0.0
+test_get 1.21	{f9 3c 00}											1.0
+test_get 1.22	{fb 3f f1 99 99 99 99 99 9a}						1.1
+test_get 1.23	{f9 3e 00}											1.5
+test_get 1.24	{f9 7b ff}											65504.0
+test_get 1.25	{fa 47 c3 50 00}									100000.0
+test_get 1.26	{fa 7f 7f ff ff}									3.4028234663852886e+38
+test_get 1.27	{fb 7e 37 e4 3c 88 00 75 9c}						1.0e+300
+test_get 1.28	{f9 00 01}											5.960464477539063e-8
+test_get 1.29	{f9 04 00}											6.103515625e-5
+test_get 1.30	{f9 c4 00}											-4.0
+test_get 1.31	{fb c0 10 66 66 66 66 66 66}						-4.1
+test_get 1.32	{f9 7c 00}											Inf
+test_get 1.33	{f9 7e 00}											NaN
+test_get 1.34	{f9 fc 00}											-Inf
+test_get 1.35	{fa 7f 80 00 00}									Inf
+test_get 1.36	{fa 7f c0 00 00}									NaN
+test_get 1.37	{fa ff 80 00 00}									-Inf
+test_get 1.38	{fb 7f f0 00 00 00 00 00 00}						Inf
+test_get 1.39	{fb 7f f8 00 00 00 00 00 00}						NaN
+test_get 1.40	{fb ff f0 00 00 00 00 00 00}						-Inf
+test_get 1.41	f4													false
+test_get 1.42	f5													true
+test_get 1.43	f6													{}			;# null
+test_get 1.44	f7													{}			;# undefined
+test_get 1.45	f0													simple(16)
+test_get 1.46	{f8 ff}												simple(255)
+test_get 1.47	{c0 74 32 30 31 33 2d 30 33 2d 32 31 54 32 30 3a 30 34 3a 30 30 5a}				2013-03-21T20:04:00Z	;# 0("2013-03-21T20:04:00Z")
+test_get 1.48	{c1 1a 51 4b 67 b0}									1363896240											;# 1(1363896240)
+test_get 1.49	{c1 fb 41 d4 52 d9 ec 20 00 00}						1363896240.5										;# 1(1363896240.5)
+test_get 1.50	{d7 44 01 02 03 04}									[binary decode hex 01020304]						;# 23(h'01020304')
+test_get 1.51	{d8 18 44 49 45 54 46}								IETF												;# 24(h'49455446')
+test_get 1.52	{d8 20 76 68 74 74 70 3a 2f 2f 77 77 77 2e 65 78 61 6d 70 6c 65 2e 63 6f 6d}	http://www.example.com	;# 32("http://www.example.com")
+test_get 1.53	40													{}													;# h''
+test_get 1.54	{44 01 02 03 04}									[binary decode hex 01020304]						;# h'01020304'
+test_get 1.55	60													{}													;# ""
+test_get 1.56	{61 61}												a													;# "a"
+test_get 1.57	{64 49 45 54 46}									IETF												;# "IETF"
+test_get 1.58	{62 22 5c}											"\"\\"												;# "\"\\"
+test_get 1.59	{62 c3 bc}											\u00fc												;# \u00fc
+test_get 1.60	{63 e6 b0 b4}										\u6c34												;# \u6c34
+test_get 1.61	{64 f0 90 85 91}									\ud800\udd51										;# \ud800\udd51
+test_get 1.62	80													{}													;# []
+test_get 1.63	{83 01 02 03}										{1 2 3}												;# [1, 2, 3]
+test_get 1.64	{83 01 82 02 03 82 04 05}							{1 {2 3} {4 5}}										;# [1, [2, 3], [4, 5]]
+test_get 1.65	98190102030405060708090a0b0c0d0e0f101112131415161718181819	[lseq 1 25]									;# [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22, 23, 24, 25]
+test_get 1.66	a0													{}													;# {}
+test_get 1.67	{a2 01 02 03 04}									{1 2 3 4}											;# {"a": 1, "b": 2, "c": 3, "d": 4}
+test_get 1.68	{a2 61 61 01 61 62 82 02 03}						{a 1 b {2 3}}										;# {"a": 1, "b": [2, 3]}
+test_get 1.69	{82 61 61 a1 61 62 61 63}							{a {b c}}											;# ["a", {"b": "c"}]
+test_get 1.70	a56161614161626142616361436164614461656145			{a A b B c C d D e E}								;# {"a": "A", "b": "B", "c": "C", "d": "D", "e": "E"}
+test_get 1.71	{5f 42 01 02 43 03 04 05 ff}						[binary decode hex 0102030405]						;# (_ h'0102', h'030405')
+test_get 1.72	{7f 65 73 74 72 65 61 64 6d 69 6e 67 ff}			"streaming"											;# (_ "strea", "ming")
+test_get 1.73	{9f ff}												{}													;# [_ ]
+test_get 1.74	{9f 01 82 02 03 9f 04 05 ff ff}						{1 {2 3} {4 5}}										;# [_ 1, [2, 3], [_ 4, 5]]
+test_get 1.75	{9f 01 82 02 03 82 04 05 ff}						{1 {2 3} {4 5}}										;# [_ 1, [2, 3], [4, 5]]
+test_get 1.76	{83 01 82 02 03 9f 04 05 ff}						{1 {2 3} {4 5}}										;# [1, [2, 3], [_ 4, 5]]
+test_get 1.77	{83 01 9f 02 03 ff 82 04 05}						{1 {2 3} {4 5}}										;# [1, [_ 2, 3], [4, 5]]
+test_get 1.78	9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff	[lseq 1 25]									;# [_ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22, 23, 24, 25]
+test_get 1.79	{bf 61 61 01 61 62 9f 02 03 ff ff}					{a 1 b {2 3}}										;# {_ "a": 1, "b": [_ 2, 3]}
+test_get 1.80	{82 61 61 bf 61 62 61 63 ff}						{a {b c}}											;# ["a", {_ "b": "c"}]
+test_get 1.81	{bf 63 46 75 6e f5 63 41 6d 74 21 ff}				{Fun true Amt -2}									;# {_ "Fun": true, "Amt": -2}
+}
+
+
+test_get 1.1	00															0								;# 0
+test_get 1.2	01															1								;# 1
+test_get 1.3	0a															10								;# 10
+test_get 1.4	17															23								;# 23
+test_get 1.5	1818														24								;# 24
+test_get 1.6	1819														25								;# 25
+test_get 1.7	1864														100								;# 100
+test_get 1.8	1903e8														1000							;# 1000
+test_get 1.9	1a000f4240													1000000							;# 1000000
+test_get 1.10	1b000000e8d4a51000											1000000000000					;# 1000000000000
+test_get 1.11	1bffffffffffffffff											18446744073709551615			;# 18446744073709551615
+#test_get 1.12	c249010000000000000000										18446744073709551616			;# 18446744073709551616
+test_get 1.12	c249010000000000000000										\1\0\0\0\0\0\0\0\0	2			;# 18446744073709551616
+test_get 1.13	3bffffffffffffffff											-18446744073709551616			;# -18446744073709551616
+#test_get 1.14	c349010000000000000000										-18446744073709551617			;# -18446744073709551617
+test_get 1.14	c349010000000000000000										\1\0\0\0\0\0\0\0\0	3			;# -18446744073709551617
+test_get 1.15	20															-1								;# -1
+test_get 1.16	29															-10								;# -10
+test_get 1.17	3863														-100							;# -100
+test_get 1.18	3903e7														-1000							;# -1000
+test_get 1.19	f90000														0.0								;# 0.0
+test_get 1.20	f98000														-0.0							;# -0.0
+test_get 1.21	f93c00														1.0								;# 1.0
+test_get 1.22	fb3ff199999999999a											1.1								;# 1.1
+test_get 1.23	f93e00														1.5								;# 1.5
+test_get 1.24	f97bff														65504.0							;# 65504.0
+test_get 1.25	fa47c35000													100000.0						;# 100000.0
+test_get 1.26	fa7f7fffff													3.4028234663852886e+38			;# 3.4028234663852886e+38
+test_get 1.27	fb7e37e43c8800759c											1e+300							;# 1.0e+300
+#test_get 1.28	f90001														5.960464477539063e-8			;# 5.960464477539063e-8		Known bug - can't represent this value in an IEEE double
+test_get 1.29	f90400														6.103515625e-5					;# 0.00006103515625
+test_get 1.30	f9c400														-4.0							;# -4.0
+test_get 1.31	fbc010666666666666											-4.1							;# -4.1
+test_get 1.32	f97c00														Inf								;# Infinity
+test_get 1.33	f97e00														NaN								;# NaN
+test_get 1.34	f9fc00														-Inf							;# -Infinity
+test_get 1.35	fa7f800000													Inf								;# Infinity
+test_get 1.36	fa7fc00000													NaN								;# NaN
+test_get 1.37	faff800000													-Inf							;# -Infinity
+test_get 1.38	fb7ff0000000000000											Inf								;# Infinity
+test_get 1.39	fb7ff8000000000000											NaN								;# NaN
+test_get 1.40	fbfff0000000000000											-Inf							;# -Infinity
+test_get 1.41	f4															false							;# false
+test_get 1.42	f5															true							;# true
+test_get 1.43	f6															{}								;# null
+test_get 1.44	f7															{}								;# undefined
+test_get 1.45	f0															simple(16)						;# simple(16)
+test_get 1.46	f8ff														simple(255)						;# simple(255)
+test_get 1.47	c074323031332d30332d32315432303a30343a30305a				2013-03-21T20:04:00Z	0		;# 0("2013-03-21T20:04:00Z")
+test_get 1.48	c11a514b67b0												1363896240				1		;# 1(1363896240)
+test_get 1.49	c1fb41d452d9ec200000										1363896240.5			1		;# 1(1363896240.5)
+test_get 1.50	d74401020304												[binary decode hex 01020304]	23	;# 23(h'01020304')
+test_get 1.51	d818456449455446											[binary decode hex 6449455446]	24	;# 24(h'6449455446')
+test_get 1.52	d82076687474703a2f2f7777772e6578616d706c652e636f6d			http://www.example.com			32	;# 32("http://www.example.com")
+test_get 1.53	40															{}								;# h''
+test_get 1.54	4401020304													[binary decode hex 01020304]	;# h'01020304'
+test_get 1.55	60															{}								;# ""
+test_get 1.56	6161														a								;# "a"
+test_get 1.57	6449455446													IETF							;# "IETF"
+test_get 1.58	62225c														\"\\							;# "\"\\"
+test_get 1.59	62c3bc														\u00fc							;# "\u00fc"
+test_get 1.60	63e6b0b4													\u6c34							;# "\u6c34"
+test_get 1.61	64f0908591													\ud800\udd51					;# "\ud800\udd51"
+test_get 1.62	80															{}								;# []
+test_get 1.63	83010203													{1 2 3}							;# [1, 2, 3]
+test_get 1.64	8301820203820405											{1 {2 3} {4 5}}					;# [1, [2, 3], [4, 5]]
+test_get 1.65	98190102030405060708090a0b0c0d0e0f101112131415161718181819	[lseq 1 25]						;# [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+test_get 1.66	a0															{}								;# {}
+test_get 1.67	a201020304													{1 2 3 4}						;# {1: 2, 3: 4}
+test_get 1.68	a26161016162820203											{a 1 b {2 3}}					;# {"a": 1, "b": [2, 3]}
+test_get 1.69	826161a161626163											{a {b c}}						;# ["a", {"b": "c"}]
+test_get 1.70	a56161614161626142616361436164614461656145					{a A b B c C d D e E}			;# {"a": "A", "b": "B", "c": "C", "d": "D", "e": "E"}
+test_get 1.71	5f42010243030405ff											[binary decode hex 0102030405]	;# (_ h'0102', h'030405')
+test_get 1.72	7f657374726561646d696e67ff									streaming						;# (_ "strea", "ming")
+test_get 1.73	9fff														{}								;# [_ ]
+test_get 1.74	9f018202039f0405ffff										{1 {2 3} {4 5}}					;# [_ 1, [2, 3], [_ 4, 5]]
+test_get 1.75	9f01820203820405ff											{1 {2 3} {4 5}}					;# [_ 1, [2, 3], [4, 5]]
+test_get 1.76	83018202039f0405ff											{1 {2 3} {4 5}}					;# [1, [2, 3], [_ 4, 5]]
+test_get 1.77	83019f0203ff820405											{1 {2 3} {4 5}}					;# [1, [_ 2, 3], [4, 5]]
+test_get 1.78	9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff	[lseq 1 25]						;# [_ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+test_get 1.79	bf61610161629f0203ffff										{a 1 b {2 3}}					;# {_ "a": 1, "b": [_ 2, 3]}
+test_get 1.80	826161bf61626163ff											{a {b c}}						;# ["a", {_ "b": "c"}]
+test_get 1.81	bf6346756ef563416d7421ff									{Fun true Amt -2}				;# {_ "Fun": true, "Amt": -2}
+
+test cbor_get-2.1 {fetch first key from map} -body { #<<<
+	cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] fmt
+} -result none
+#>>>
+test cbor_get-2.2 {fetch middle key from map} -body { #<<<
+	cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] attStmt
+} -result {}
+#>>>
+test cbor_get-2.3 {fetch end key from map} -body { #<<<
+	binary encode hex [cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] authData]
+} -result e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463
+#>>>
+test cbor_get-2.4 {fetch non-existent key from map} -body { #<<<
+	cbor get [binary decode hex a363666d74646e6f6e656761747453746d74a068617574684461746158c5e3c501676347d15e0c4216eac4f5584e2ac76ee6ee6fbf71d208171d58fa9faf450000000000000000000000000000000000000000004101cfa291ee6f0bbe7fbe1bea169bcfc6a7d46989c9858f4db9cf5f625a58460a1b1754297a2dca2341e03e532688323edfc79a74c00ebdd7c3df282a3e1f82c7c1a501020326200121582089460c99778261751ee708891682383a88ba6532210186e2c5bbefae830faa65225820d8a19d22a12d456b7827daa49d9ade2af6c0b661c10cd81af3096beb1e030463] nonesuch
+} -returnCodes error -errorCode {CBOR NOTFOUND nonesuch} -result "path not found"
+#>>>
+
+test cbor_x-1.1 {} -body {
+	cbor get [binary decode hex a50102032620012158200c97105f543c7c224e48dd3c0e1d1da2cc64ec368ef4b8eb9ef4d7f266200caa2258204321bef06fbbdad4d3b0e9ccdc81bc6063c1985cba48a73a14e76360063924f3] 3
+} -result -7
+
+test cbor_apply_tag-1.1 {tag: bignum}			-body {cbor apply_tag 2 \1\0\0\0\0\0\0\0\0} -result 18446744073709551616
+test cbor_apply_tag-1.2 {tag: negative bignum}	-body {cbor apply_tag 3 \1\0\0\0\0\0\0\0\0} -result -18446744073709551617
+
+unset -nocomplain done
+coroutine coro_tests apply {{} {
+	global done
+	try {
+	} finally {
+		set done 1
+	}
+}}
+
+if {![info exists done]} {vwait done}
+
+::tcltest::cleanupTests
+return
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

@@ -1,5 +1,7 @@
 #ifndef _RL_JSONINT
 #define _RL_JSONINT
+#define _POSIX_C_SOURCE	200809L
+#define _DEFAULT_SOURCE
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -13,10 +15,15 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <inttypes.h>
+#include <limits.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#include <tclTomMath.h>
+#if CBOR
+#include <endian.h>
+#endif
+#include <tommath.h>
 #include "tip445.h"
 #include "names.h"
 
@@ -29,6 +36,8 @@
 #	define likely(exp)   (exp)
 #	define unlikely(exp) (exp)
 #endif
+
+#define NS	"::rl_json"
 
 enum parse_mode {
 	PARSE,
@@ -196,6 +205,12 @@ struct interp_cx {
 	const Tcl_ObjType*	typeBignum;
 	Tcl_Obj*		apply;
 	Tcl_Obj*		decode_bytes;
+#if CBOR
+	Tcl_Obj*		cbor_true;			// cbor_true/false distinct from tcl_true/false because they have different string reps
+	Tcl_Obj*		cbor_false;
+	Tcl_Obj*		cbor_null;
+	Tcl_Obj*		cbor_undefined;
+#endif
 };
 
 void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
@@ -209,14 +224,6 @@ int is_template(const char* s, int len);
 extern Tcl_ObjType* g_objtype_for_type[];
 extern const char* type_names_int[];
 extern const char* type_names[];
-
-#ifdef TCL_MEM_DEBUG
-#	undef JSON_NewJvalObj
-Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file, int line);
-#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
-#else
-Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val);
-#endif
 
 // Taken from tclInt.h:
 #if !defined(INT2PTR) && !defined(PTR2INT)
@@ -270,5 +277,23 @@ void foreach_state_free(struct foreach_state* state);
 	} else {out = JSON_STRING;}
 
 #include "dedup.h"
+
+#if CBOR
+// CBOR private headers:
+int cbor_init(Tcl_Interp* interp, struct interp_cx* l);
+void cbor_release(Tcl_Interp* interp);
+#endif
+
+// Polyfill
+#ifndef Tcl_GetBytesFromObj
+//#define Tcl_GetBytesFromObj(interp, obj, lenptr) Tcl_GetByteArrayFromObj(obj, lenptr)
+static inline uint8_t* Tcl_GetBytesFromObj(Tcl_Interp* interp, Tcl_Obj* obj, size_t* lenPtr)
+{
+	int	len;
+	uint8_t*	bytes = Tcl_GetByteArrayFromObj(obj, &len);
+	*lenPtr = len;
+	return bytes;
+}
+#endif
 
 #endif
