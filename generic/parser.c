@@ -20,9 +20,12 @@ void throw_parse_error(Tcl_Interp* interp, struct parse_error* details) //{{{
 {
 	char		char_ofs_buf[20];		// 20 bytes allows for 19 bytes of decimal max 64 bit size_t, plus null terminator
 
-	snprintf(char_ofs_buf, 20, "%ld", details->char_ofs);
-
-	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", details->errmsg, details->char_ofs));
+	snprintf(char_ofs_buf, 20, "%llu", (unsigned long long)details->char_ofs);
+#if TCL_MAJOR_VERSION == 8
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %ld", details->errmsg, (unsigned long)details->char_ofs));
+#else
+        Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error parsing JSON value: %s at offset %llu", details->errmsg, (unsigned long long)details->char_ofs));
+#endif
 	Tcl_SetErrorCode(interp, "RL", "JSON", "PARSE", details->errmsg, details->doc, char_ofs_buf, NULL);
 }
 

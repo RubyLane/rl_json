@@ -4,15 +4,15 @@
 '\" See the file "LICENSE" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\"
-.TH json n 0.14.0 rl_json "RubyLane/JSON Package Commands"
+.TH json n 0.15.0 rl_json "RubyLane/JSON Package Commands"
 .so man.macros
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
 .SH NAME
-json \- Parse, manipulate and produce JSON documents 
+json \- Parse, manipulate and produce JSON documents
 .SH SYNOPSIS
 .nf
-\fBpackage require rl_json\fR ?\fB0.14.0\fR? 
+\fBpackage require rl_json\fR ?\fB0.15.0\fR?
 
 \fBjson get\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 \fBjson extract\fR ?\fB-default\fR \fIdefaultValue\fR? \fIjsonValue\fR ?\fIkey ...\fR?
@@ -28,6 +28,7 @@ json \- Parse, manipulate and produce JSON documents
 \fBjson boolean\fR \fIvalue\fR
 \fBjson object\fR \fI?key value ?key value ...??\fR
 \fBjson array\fR \fIelem ...\fR
+\fBjson autoarray\fR \fIvalue ...\fR
 \fBjson bool\fR \fIvalue\fR
 \fBjson normalize\fR \fIjsonValue\fR
 \fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
@@ -170,6 +171,26 @@ Return a JSON array containing each of the elements given.  \fIelem\fR is a list
 of two elements, the first being the type {string, number, boolean, null, object, array, json},
 and the second being the value.
 .TP
+\fBjson autoarray \fI?value ...?\fR
+.
+Return a JSON array containing each of the values given, with automatic type detection.
+Unlike \fBjson array\fR which requires explicit type specification, \fBjson autoarray\fR
+automatically determines the appropriate JSON type for each value:
+.RS
+.IP \(bu 3
+Values exactly matching "true" or "false" (case-sensitive) are converted to JSON booleans.
+.IP \(bu 3
+Values that can be parsed as valid JSON numbers are converted to JSON numbers.
+.IP \(bu 3
+All other values are converted to JSON strings.
+.RE
+.PP
+For example:
+.CS
+ json autoarray 1 2.5 true false "hello world" 42
+ # Returns: [1,2.5,true,false,"hello world",42]
+.CE
+.TP
 \fBjson foreach \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
 .
 Evaluate \fIscript\fR in a loop in a similar way to the \fBforeach\fR command.
@@ -232,12 +253,38 @@ Return a
 version of the input \fIjsonValue\fR, i.e., with all optional whitespace
 trimmed.
 .TP
-\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
+\fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? ?\fB-compact\fR? ?\fB-arrays\fR \fImode\fR? \fIjsonValue\fR ?\fIkey ...\fR?
 .
 Returns a pretty-printed string representation of \fIjsonValue\fR, found by
 following the path of \fIkey\fRs.  Useful for debugging or inspecting the
-structure of JSON data.  If \fB-indent\fR is supplied, use \fIindent\fR for
-each level of indent, otherwise default to four spaces.
+structure of JSON data.
+.RS
+.PP
+The following options control the formatting:
+.TP
+\fB-indent\fR \fIindent\fR
+.
+Use \fIindent\fR for each level of indent.  Defaults to four spaces if not specified.
+.TP
+\fB-compact\fR
+.
+Return a compact, single-line representation with no extra whitespace.  This is equivalent
+to \fBjson normalize\fR but provided for convenience when using other pretty options.
+When this option is used, \fB-indent\fR and \fB-arrays\fR are ignored.
+.TP
+\fB-arrays\fR \fImode\fR
+.
+Control how arrays are formatted.  \fImode\fR must be one of:
+.RS
+.IP \fBinline\fR 10
+All arrays are formatted on a single line: [1,2,3]
+.IP \fBmultiline\fR 10
+All arrays are formatted with one element per line.
+.RE
+.PP
+If not specified, arrays with 3 or fewer elements are formatted inline, while larger
+arrays are formatted with one element per line.
+.RE
 .TP
 \fBjson decode \fIbytes\fR ?\fIencoding\fR?
 .
