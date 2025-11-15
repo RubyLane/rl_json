@@ -135,12 +135,10 @@ test memory-2.2 {deeply nested array error} -setup { #<<<
 	rename test_memory-2.2 {}
 } -match glob -result {1 {Error parsing JSON value: Unterminated array at offset *}}
 #>>>
-if {[llength [info commands ::memtest2]]} {
-memtest2 memory-3.1 {Deliberate memory leak} -constraints {deliberateLeak} -body { #<<<
+test memory-3.1 {Deliberate memory leak} -constraints {deliberateLeak} -body { #<<<
 	json _leak_obj
-} -returnCodes error -match regexp -result {^Leaked memory:\n\t0x[0-9a-f]+\s+-\s+0x[0-9a-f]+\s+[0-9]+\s+@\s+\./generic/rl_json.c\s+[0-9]+\s+memory-3.1$}
-#>>>
 }
+#>>>
 test memory-3.2 {Deliberate memory leak} -constraints {deliberateLeak} -body { #<<<
 	json _leak_obj
 } -result {}

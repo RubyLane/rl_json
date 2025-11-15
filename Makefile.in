@@ -484,7 +484,7 @@ build:
 	cp -a $(srcdir)/build_template/* $(top_builddir)/build/
 
 local/lib/libtommath.a: build
-	+make -C $(top_builddir)/build/libtommath --include-dir=$(abspath $(srcdir)/deps/libtommath) CFLAGS="-fPIC -g" DESTDIR="$(abspath $(top_builddir))" PREFIX=/local SRCDIR=$(abspath $(srcdir)) custom_install
+	+make -C $(top_builddir)/build/libtommath --include-dir=$(abspath $(srcdir)/deps/libtommath) CFLAGS="-fPIC -g -DMP_MALLOC=tommath_malloc -DMP_REALLOC=tommath_realloc -DMP_CALLOC=tommath_calloc -DMP_FREE=tommath_free" DESTDIR="$(abspath $(top_builddir))" PREFIX=/local SRCDIR=$(abspath $(srcdir)) custom_install
 
 .PHONY: all binaries clean depend distclean doc install libraries test
 .PHONY: shell gdb valgrind valgrindshell deps-clean deps
