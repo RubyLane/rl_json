@@ -174,8 +174,6 @@ COMPILE		= $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(C
 
 VALGRIND	= valgrind
 
-.SUFFIXES: .c .$(OBJEXT)
-
 #========================================================================
 # Start of user-definable TARGETS section
 #========================================================================
@@ -279,7 +277,7 @@ depend:
 # source files above.
 #========================================================================
 
-$(PKG_LIB_FILE): deps $(PKG_OBJECTS)
+$(PKG_LIB_FILE): $(PKG_OBJECTS)
 	-rm -f $(PKG_LIB_FILE)
 	${MAKE_LIB}
 	$(RANLIB) $(PKG_LIB_FILE)
@@ -306,7 +304,7 @@ $(PKG_STUB_LIB_FILE): $(PKG_STUB_OBJECTS)
 
 VPATH = $(srcdir):$(srcdir)/generic:$(srcdir)/unix:$(srcdir)/win:$(srcdir)/macosx
 
-.c.@OBJEXT@:
+%.@OBJEXT@: %.c deps
 	$(COMPILE) -c `@CYGPATH@ $<` -o $@
 
 #========================================================================
@@ -486,7 +484,7 @@ build:
 	cp -a $(srcdir)/build_template/* $(top_builddir)/build/
 
 local/lib/libtommath.a: build
-	make -C $(top_builddir)/build/libtommath --include-dir=$(abspath $(srcdir)/deps/libtommath) CFLAGS="-fPIC -g" DESTDIR="$(abspath $(top_builddir))" PREFIX=/local SRCDIR=$(abspath $(srcdir)) -j 12 custom_install
+	+make -C $(top_builddir)/build/libtommath --include-dir=$(abspath $(srcdir)/deps/libtommath) CFLAGS="-fPIC -g" DESTDIR="$(abspath $(top_builddir))" PREFIX=/local SRCDIR=$(abspath $(srcdir)) custom_install
 
 .PHONY: all binaries clean depend distclean doc install libraries test
 .PHONY: shell gdb valgrind valgrindshell deps-clean deps
