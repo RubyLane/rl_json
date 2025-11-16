@@ -937,7 +937,7 @@ int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** normalized) //{{{
 }
 
 //}}}
-int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** prettyString) //{{{
+int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, int nopadding, int compact, int arrays_inline, Tcl_Obj** prettyString) //{{{
 {
 	int					retval = TCL_OK;
 	Tcl_DString			ds;
@@ -945,6 +945,13 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 	Tcl_Obj*			pad = NULL;
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
+	// Handle compact mode - just normalize (remove all whitespace)
+	if (compact) {
+		retval = JSON_Normalize(interp, obj, prettyString);
+		return retval;
+	}
+
+	// Normal pretty printing with formatting options
 	if (indent == NULL) {
 		replace_tclobj(&lindent, get_string(l, "    ", 4));
 		indent = lindent;
@@ -952,7 +959,7 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 
 	replace_tclobj(&pad, l->tcl_empty);
 	Tcl_DStringInit(&ds);
-	retval = json_pretty(interp, obj, indent, pad, &ds);
+	retval = json_pretty(interp, obj, indent, nopadding, pad, arrays_inline, &ds);
 
 	if (retval == TCL_OK)
 		replace_tclobj(prettyString, Tcl_NewStringObj(Tcl_DStringValue(&ds), Tcl_DStringLength(&ds)));
