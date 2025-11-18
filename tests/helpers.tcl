@@ -190,5 +190,14 @@ proc intersect3 {list1 list2} { #<<<
 }
 
 #>>>
+proc in_coroutine script { # Run tests in a coroutine context, waiting for all to finish <<<
+	set ns	[uplevel 1 {namespace current}]
+	variable ${ns}::done
+	unset -nocomplain done
+	coroutine coro_tests namespace eval [namespace current] [list try $script finally {set done 1}]
+	if {![info exists done]} {vwait [namespace which -variable done]}
+}
+
+#>>>
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

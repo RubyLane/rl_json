@@ -1,12 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
-
-source [file join [file dirname [info script]] helpers.tcl]
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test set-1.1 {Update a key in an object with a string} -setup { #<<<
 	set json {
@@ -447,10 +439,11 @@ test set-11.1 {Interaction with var traces: value is always shared} -setup { #<<
 	}
 	set saved	$json
 	set g_ref	{}
-	trace add variable json write [list apply {{n1 n2 op} {
+	trace add variable json write [list apply [list {n1 n2 op} {
 		upvar 1 $n1 v
-		lappend ::g_ref $v	;# Take another ref to the value in the variable
-	}}]
+		variable g_ref
+		lappend g_ref $v	;# Take another ref to the value in the variable
+	} [namespace current]]]
 } -body {
 	list [json set json foo 1 end-1 {"5"}] $g_ref [json normalize $saved]
 } -cleanup {
@@ -464,9 +457,10 @@ test set-11.2 {Interaction with var traces: traces must fire even if value is un
 		}
 	}]
 	set g_ref	{}
-	trace add variable json write [list apply {{n1 n2 op} {
-		set ::g_ref fired
-	}}]
+	trace add variable json write [list apply [list {n1 n2 op} {
+		variable g_ref
+		set g_ref fired
+	} [namespace current]]]
 } -body {
 	list [json set json foo 1 end-1 {"5"}] $g_ref
 } -cleanup {
@@ -479,10 +473,10 @@ test set-11.3 {Interaction with var traces: result of an unset is the value of t
 			"foo": ["~S:a", ["1","2","3"], "c"]
 		}
 	}]
-	trace add variable json write [list apply {{n1 n2 op} {
+	trace add variable json write [list apply [list {n1 n2 op} {
 		upvar 1 $n1 v
 		json set v foo 1 end+1 {"4"}
-	}}]
+	} [namespace current]]]
 } -body {
 	json set json foo 1 end-1 {"5"}
 } -cleanup {
@@ -490,7 +484,9 @@ test set-11.3 {Interaction with var traces: result of an unset is the value of t
 } -result {{"foo":["~S:a",["1","5","3","4"],"c"]}}
 #>>>
 
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

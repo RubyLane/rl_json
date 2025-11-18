@@ -1,12 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-catch {namespace import ::rl_json::json}
-
-source [file join [file dirname [info script]] helpers.tcl]
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test array-1.1 {Create an array from type-value pairs} -setup { #<<<
 	set typevalues [lmap v {a 1 c 2 e 3 g} {
@@ -39,9 +31,7 @@ test array-1.2 {Create an array from JSON values} -setup { #<<<
 } -result {["a",1,"c",2,"e",3,"g"]}
 #>>>
 
-::tcltest::cleanupTests
-return
-
+}
 # Local Variables:
 # mode: tcl
 # tab-width: 4

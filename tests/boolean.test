@@ -1,10 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test boolean-1.1 {Create a json boolean: 1} -body { #<<<
 	json boolean 1
@@ -107,12 +101,9 @@ test boolean-2.4 {Non-truthy string} -body { #<<<
 } -result {1 {expected boolean value but got "maybe"} {TCL VALUE NUMBER}}
 #>>>
 
-::tcltest::cleanupTests
-return
-
+}
 # Local Variables:
 # mode: tcl
 # tab-width: 4
 # End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
-

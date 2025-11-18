@@ -1,10 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test pretty-1.1 {Basic pretty-print} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}}
@@ -101,7 +95,9 @@ test pretty-jsonPretty-5.1 {} -body {json pretty -bad} -returnCodes error -resul
 
 json free_cache
 
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

@@ -1,10 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test get-1.1 {Get a value from an object} -body { #<<<
 	json get {
@@ -1227,7 +1221,9 @@ test get-jsonGet-5.1 {check args} -body {json get -- true} -result 1
 test get-jsonGet-5.2 {check args} -body {json get true} -result 1
 test get-jsonGet-6.1 {default on null} -body {json get -default def null} -result def
 
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

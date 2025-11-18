@@ -1,15 +1,23 @@
 # all.tcl --
 #
 # This file contains a top-level script to run all of the Tcl
-# tests.  Execute it by invoking "source all.test" when running tcltest
+# tests.  Execute it by invoking "source all.tcl" when running tcltest
 # in this directory.
 #
-# Copyright (c) 1998-2000 by Scriptics Corporation.
-# All rights reserved.
+# Copyright © 1998-1999 Scriptics Corporation.
+# Copyright © 2000 Ajuba Solutions
+#
+# See the file "license.terms" for information on usage and redistribution
+# of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-if {[lsearch [namespace children] ::tcltest] == -1} {
-    package require tcltest
-    namespace import ::tcltest::*
+package prefer latest
+package require tcltest 2.5
+namespace import ::tcltest::*
+
+configure -testdir [file normalize [file dirname [info script]]] {*}$argv
+
+if {[singleProcess]} {
+    interp debug {} -frame 1
 }
 
 set checkmem	false
@@ -229,54 +237,15 @@ if {$checkmem && [llength [info commands memory]] == 1} {
 	proc memtest args {tailcall ::tcltest::test {*}$args}
 }
 
-set ::tcltest::testSingleFile false
-set ::tcltest::testsDirectory [file dir [info script]]
-
-# We need to ensure that the testsDirectory is absolute
-if {[catch {::tcltest::normalizePath ::tcltest::testsDirectory}]} {
-    # The version of tcltest we have here does not support
-    # 'normalizePath', so we have to do this on our own.
-
-    set oldpwd [pwd]
-    catch {cd $::tcltest::testsDirectory}
-    set ::tcltest::testsDirectory [pwd]
-    cd $oldpwd
+set ErrorOnFailures [info exists env(ERROR_ON_FAILURES)]
+unset -nocomplain env(ERROR_ON_FAILURES)
+if {[runAllTests] && $ErrorOnFailures} {exit 1}
+# if calling direct only (avoid rewrite exit if inlined or interactive):
+if { [info exists ::argv0] && [file tail $::argv0] eq [file tail [info script]]
+  && !([info exists ::tcl_interactive] && $::tcl_interactive)
+} {
+    proc exit args {}
 }
-
-set chan $::tcltest::outputChannel
-
-puts $chan "Tests running in interp:       [info nameofexecutable]"
-puts $chan "Tests running with pwd:        [pwd]"
-puts $chan "Tests running in working dir:  $::tcltest::testsDirectory"
-if {[llength $::tcltest::skip] > 0} {
-    puts $chan "Skipping tests that match:            $::tcltest::skip"
-}
-if {[llength $::tcltest::match] > 0} {
-    puts $chan "Only running tests that match:        $::tcltest::match"
-}
-
-if {[llength $::tcltest::skipFiles] > 0} {
-    puts $chan "Skipping test files that match:       $::tcltest::skipFiles"
-}
-if {[llength $::tcltest::matchFiles] > 0} {
-    puts $chan "Only sourcing test files that match:  $::tcltest::matchFiles"
-}
-
-set timeCmd {clock format [clock seconds]}
-puts $chan "Tests began at [eval $timeCmd]"
-
-# source each of the specified tests
-foreach file [lsort [::tcltest::getMatchingFiles]] {
-    set tail [file tail $file]
-    puts $chan $tail
-    if {[catch {source -encoding utf-8 $file} msg]} {
-	puts $chan $msg
-    }
-}
-
-# cleanup
-puts $chan "\nTests ended at [eval $timeCmd]"
-::tcltest::cleanupTests 1
 
 if {[llength [info commands memory]] == 1} {
 	memory tag shutdown
@@ -284,6 +253,3 @@ if {[llength [info commands memory]] == 1} {
 	unload -nocomplain {} rl_json
 	memory objs tclobjs_remaining
 }
-
-return
-

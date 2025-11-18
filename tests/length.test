@@ -1,10 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test length-0.1 {too few args} -body { #<<<
 	set code [catch {
@@ -495,8 +489,9 @@ test length-70.1 {Path tail element isn't interpreted as a modifier - no need to
 } -result 7
 #>>>
 
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
-

@@ -1,18 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-tcltest::loadTestedCommands
-namespace path {::rl_json}
-
-proc tclver spec {package vsatisfies [package provide Tcl] $spec}
-proc tcl9? {y n} [expr {[tclver 9.0-] ? {set y} : {set n}}]
-
-# Tcl 9 number format constraints
-tcltest::testConstraint underscore_separators [string is integer -strict 1_000_000]
-tcltest::testConstraint decimal_literals [string is integer -strict 0d11]
-tcltest::testConstraint binary_literals [string is integer -strict 0b11]
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test number-1.1.1 {Create a json number: 1 (was native number} -body { #<<<
 	set n	1
@@ -337,12 +323,9 @@ test number-2.4 {json number, not a number: empty string} -body { #<<<
 } -match regexp -result [list 1 1 [list ARITH DOMAIN [tcl9? {non-numeric string} {empty string}]]]
 #>>>
 
-::tcltest::cleanupTests
-return
-
+}
 # Local Variables:
 # mode: tcl
 # tab-width: 4
 # End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
-

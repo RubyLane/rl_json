@@ -1,10 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 # Stresses the refCount handling for l->tcl_empty.  Must be the first test run
 test parser-1.1 {Test empty string optimization} -body { #<<<
@@ -1316,7 +1310,9 @@ test parser/whitespace-9.6 {Commented object key} -body { #<<<
 } -result "{}"
 #>>>
 
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

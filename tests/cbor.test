@@ -1,15 +1,6 @@
-package require tcltest 2.5.1
-if {[llength [info commands test]] == 0} {
-	namespace import ::tcltest::test
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 if {[llength [info commands ::rl_json::cbor]] == 0} return
-
-proc tclver spec {package vsatisfies [package provide Tcl] $spec}
-proc tcl9? {y n} [expr {[tclver 9.0-] ? {set y} : {set n}}]
 
 if {[llength [info commands lseq]] == 0} { # lseq polyfill #<<<
 	proc lseq {from to} {
@@ -342,18 +333,9 @@ test cbor_x-1.1 {} -body {
 test cbor_apply_tag-1.1 {tag: bignum}			-body {cbor apply_tag 2 \1\0\0\0\0\0\0\0\0} -result 18446744073709551616
 test cbor_apply_tag-1.2 {tag: negative bignum}	-body {cbor apply_tag 3 \1\0\0\0\0\0\0\0\0} -result -18446744073709551617
 
-unset -nocomplain done
-coroutine coro_tests apply {{} {
-	global done
-	try {
-	} finally {
-		set done 1
-	}
-}}
-
-if {![info exists done]} {vwait done}
-
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

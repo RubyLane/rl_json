@@ -1,10 +1,4 @@
-if {"::tcltest" ni [namespace children]} {
-	package require tcltest
-	namespace import ::tcltest::*
-}
-
-::tcltest::loadTestedCommands
-namespace path {::rl_json}
+source [file join [file dirname [info script]] common.tcl]; runtests {
 
 test template-0.1 {Empty action list} -body { #<<<
 	string cat \n [join [lmap {k a b} [json template_actions {
@@ -648,8 +642,9 @@ test template-apply_template_actions-2.1 {bad json subst} -body {json template {
 test template-apply_template_actions-3.1 {bad template subst} -body {json template {"~T:x"} {x bad}} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
 test template-apply_template_actions-4.1 {static stack overflow} -body {json template {[[[[[[[[[["~S:x"]]]]]]]]]]} {x foo}} -result {[[[[[[[[[["foo"]]]]]]]]]]}
 
-
-::tcltest::cleanupTests
-return
-
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4
