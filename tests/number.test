@@ -3,8 +3,16 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
+tcltest::loadTestedCommands
 namespace path {::rl_json}
+
+proc tclver spec {package vsatisfies [package provide Tcl] $spec}
+proc tcl9? {y n} [expr {[tclver 9.0-] ? {set y} : {set n}}]
+
+# Tcl 9 number format constraints
+tcltest::testConstraint underscore_separators [string is integer -strict 1_000_000]
+tcltest::testConstraint decimal_literals [string is integer -strict 0d11]
+tcltest::testConstraint binary_literals [string is integer -strict 0b11]
 
 test number-1.1.1 {Create a json number: 1 (was native number} -body { #<<<
 	set n	1
@@ -38,7 +46,7 @@ test number-1.4.1 {Create a json number: scientific notation, native double} -bo
 test number-1.4.2 {Create a json number: scientific notation, string} -body { #<<<
 	set n	[string trim " 1e6"]
 	list [json number $n] $n
-} -result {1000000.0 1e6}
+} -result [if {[tclver 8.7-]} {list 1e6 1e6} {list 1000000.0 1e6}]
 #>>>
 test number-1.5 {Create a max 32 bit signed int} -body { #<<<
 	json number [expr {2**31-1}]
@@ -82,7 +90,7 @@ test number-1.14.1 {positive octal} -body { #<<<
 	list [json number $n] $n
 } -cleanup {
 	unset -nocomplain n
-} -result {63 077}
+} -result [tcl9? {77 077} {63 077}]
 #>>>
 test number-1.14.2 {negative octal} -body { #<<<
 	set n	-077
@@ -90,7 +98,7 @@ test number-1.14.2 {negative octal} -body { #<<<
 	list [json number $n] $n
 } -cleanup {
 	unset -nocomplain n
-} -result {-63 -077}
+} -result [tcl9? {-77 -077} {-63 -077}]
 #>>>
 test number-1.15.1 {positive hex} -body { #<<<
 	set n	0xA0
@@ -220,6 +228,86 @@ test number-1.18.6 {leading whitespace: '\f'} -body { #<<<
 	unset -nocomplain n
 } -result [list 42 \f42]
 #>>>
+test number-1.19.1 {positive octal with 0o prefix} -body { #<<<
+	set n	0o77
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {63 0o77}
+#>>>
+test number-1.19.2 {negative octal with 0o prefix} -body { #<<<
+	set n	-0o77
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-63 -0o77}
+#>>>
+test number-1.20.1 {positive binary with 0b prefix} -constraints binary_literals -body { #<<<
+	set n	0b1010
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {10 0b1010}
+#>>>
+test number-1.20.2 {negative binary with 0b prefix} -constraints binary_literals -body { #<<<
+	set n	-0b1010
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-10 -0b1010}
+#>>>
+test number-1.21.1 {positive decimal with 0d prefix} -constraints decimal_literals -body { #<<<
+	set n	0d123
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {123 0d123}
+#>>>
+test number-1.21.2 {negative decimal with 0d prefix} -constraints decimal_literals -body { #<<<
+	set n	-0d123
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-123 -0d123}
+#>>>
+test number-1.22.1 {positive integer with underscore separators} -constraints underscore_separators -body { #<<<
+	set n	1_000_000
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {1000000 1_000_000}
+#>>>
+test number-1.22.2 {negative integer with underscore separators} -constraints underscore_separators -body { #<<<
+	set n	-1_000_000
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {-1000000 -1_000_000}
+#>>>
+test number-1.22.3 {hex with underscore separators} -constraints underscore_separators -body { #<<<
+	set n	0xFF_FF
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {65535 0xFF_FF}
+#>>>
+test number-1.22.4 {double with underscore separators} -constraints underscore_separators -body { #<<<
+	set n	1_234.567_89
+	expr {$n+0}	;# Convert to number type
+	list [json number $n] $n
+} -cleanup {
+	unset -nocomplain n
+} -result {1234.56789 1_234.567_89}
+#>>>
 test number-2.1 {Too few args} -body { #<<<
 	set code [catch {
 		json number
@@ -243,10 +331,10 @@ test number-2.3 {json number, not a number} -body { #<<<
 #>>>
 test number-2.4 {json number, not a number: empty string} -body { #<<<
 	set code [catch {json number ""} r o]
-	list $code [regexp {^(can't|cannot) use empty string( "")? as( right)? operand of "\+"$} $r] [dict get $o -errorcode]
+	list $code [regexp {^(can't|cannot) use (empty|non-numeric) string( "")? as( right)? operand of "\+"$} $r] [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o
-} -match regexp -result {1 1 {ARITH DOMAIN {empty string}}}
+} -match regexp -result [list 1 1 [list ARITH DOMAIN [tcl9? {non-numeric string} {empty string}]]]
 #>>>
 
 ::tcltest::cleanupTests

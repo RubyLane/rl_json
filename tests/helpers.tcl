@@ -153,15 +153,9 @@ proc _compare_json {opts j1 j2 {path {}}} { #<<<
 }
 
 #>>>
-proc compare_json args { #<<<
-	parse_args $args {
-		-subset	{-default none}
-		j1		{}
-		j2		{}
-	} opts
-
+proc compare_json {j1 j2} { #<<<
 	try {
-		_compare_json $opts [dict get $opts j1] [dict get $opts j2]
+		_compare_json {} $j1 $j2
 	} trap {RL TEST JSON_MISMATCH} {errmsg options} {
 		return $errmsg
 	} on ok {} {

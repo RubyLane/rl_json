@@ -149,7 +149,8 @@ Return a JSON string with the value \fIvalue\fR.
 .TP
 \fBjson number \fIvalue\fR
 .
-Return a JSON number with the value \fIvalue\fR.
+Return a JSON number with the value \fIvalue\fR.  The value can be in any
+of the forms accepted as a number by Tcl.
 .TP
 \fBjson boolean \fIvalue\fR
 .
@@ -253,9 +254,10 @@ the optional \fIencoding\fR argument is given, that encoding will be used to
 interpret \fIbytes\fR.  The supported encodings are those specified in the RFC:
 utf-8, utf-16le, utf-16be, utf-32le, utf-32be.  If the string starts with a BOM
 (byte order mark (U+FFFE)), and no encoding is given, it will be determined
-from the encoding of the BOM.  All the encodings listed are supported, even if
-Tcl lacks support for the utf-16 and utf-32 encodings natively.  However,
-without native support the conversion will be slow.
+from the encoding of the BOM.  All the encodings listed are supported.  Tcl 9
+provides native support for all these encodings, making conversion fast.  For
+earlier Tcl versions that lack native utf-16 and utf-32 support, fallback
+implementations are provided but conversion will be slower.
 
 This might look something like this in an application:
 

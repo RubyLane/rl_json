@@ -3,9 +3,8 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
-package require parse_args
-namespace path {::rl_json ::parse_args}
+::tcltest::loadTestedCommands
+namespace path {::rl_json}
 
 source [file join [file dirname [info script]] helpers.tcl]
 

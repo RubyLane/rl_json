@@ -3,7 +3,7 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
+::tcltest::loadTestedCommands
 namespace path {::rl_json}
 
 test boolean-1.1 {Create a json boolean: 1} -body { #<<<
@@ -94,7 +94,7 @@ test boolean-2.2 {Too many args} -body { #<<<
 #>>>
 test boolean-2.3 {Empty string} -body { #<<<
 	set code [catch {
-		json boolean ""
+		json boolean [string trim " "]
 	} r o]
 	list $code $r [dict get $o -errorcode]
 } -result {1 {expected boolean value but got ""} {TCL VALUE NUMBER}}

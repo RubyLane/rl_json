@@ -71,6 +71,24 @@ AC_DEFUN([ENABLE_CBOR], [
 
 AC_DEFUN([CygPath],[`${CYGPATH} $1`])
 
+AC_DEFUN([CHECK_TCL_GETNUMBERFROMOBJ], [
+	AC_MSG_CHECKING([for Tcl_GetNumberFromObj])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+		#include <tcl.h>
+	]], [[
+		int type;
+		void* clientData;
+		Tcl_GetNumberFromObj(NULL, NULL, &clientData, &type);
+	]])], [
+		AC_MSG_RESULT([yes])
+		AC_DEFINE([HAVE_TCL_GETNUMBERFROMOBJ], [1], [Define if Tcl has Tcl_GetNumberFromObj])
+		have_tcl_getnumberfromobj=yes
+	], [
+		AC_MSG_RESULT([no])
+		have_tcl_getnumberfromobj=no
+	])
+])
+
 AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [
 	eval "$1=\"-I[]CygPath($2)\""
 	AC_SUBST($1)

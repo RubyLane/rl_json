@@ -4,8 +4,6 @@ if {"::tcltest" ni [namespace children]} {
 }
 
 ::tcltest::loadTestedCommands
-
-package require rl_json
 catch {namespace import ::rl_json::json}
 
 source [file join [file dirname [info script]] helpers.tcl]

@@ -7,7 +7,7 @@ const Rl_jsonStubs* Rl_jsonStubsPtr = NULL;
 
 #undef rl_jsonInitStubs
 
-EXTERN CONST char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* version, int exact)
+EXTERN const char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* version, int exact)
 {
 	const char*		packageName = "rl_json";
 	const char* 	errMsg = NULL;

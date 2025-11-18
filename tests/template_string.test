@@ -3,7 +3,7 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
+::tcltest::loadTestedCommands
 namespace path {::rl_json}
 
 test template_string-1.1 {Produce a JSON doc with interpolated values, no dict} -setup { #<<<

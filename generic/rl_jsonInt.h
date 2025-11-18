@@ -18,8 +18,8 @@
 #endif
 #if CBOR
 #include <endian.h>
-#endif
 #include <tommath.h>
+#endif
 #include "tip445.h"
 #include "names.h"
 
@@ -55,11 +55,11 @@ struct parse_context {
 };
 
 struct foreach_iterator {
-	int				data_c;
+	Tcl_Size		data_c;
 	Tcl_Obj**		data_v;
-	int				data_i;
+	Tcl_Size		data_i;
 	Tcl_Obj*		varlist;
-	int				var_c;
+	Tcl_Size		var_c;
 	Tcl_Obj**		var_v;
 	int				is_array;
 
@@ -254,7 +254,7 @@ Tcl_Obj* get_unshared_val(Tcl_ObjInternalRep* ir);
 int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actions, Tcl_Obj* dict, Tcl_Obj** res);
 int build_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj** actions);
 int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out);
-int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def);
+int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], Tcl_Size pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def);
 int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds);
 void foreach_state_free(struct foreach_state* state);
 
@@ -291,5 +291,7 @@ static inline uint8_t* Tcl_GetBytesFromObj(Tcl_Interp* interp, Tcl_Obj* obj, siz
 	return bytes;
 }
 #endif
+
+Tcl_ObjCmdProc BuildInfoObjCmd;
 
 #endif

@@ -4,11 +4,12 @@ if {[llength [info commands test]] == 0} {
 }
 
 ::tcltest::loadTestedCommands
-
-package require rl_json
 namespace path {::rl_json}
 
 if {[llength [info commands ::rl_json::cbor]] == 0} return
+
+proc tclver spec {package vsatisfies [package provide Tcl] $spec}
+proc tcl9? {y n} [expr {[tclver 9.0-] ? {set y} : {set n}}]
 
 if {[llength [info commands lseq]] == 0} { # lseq polyfill #<<<
 	proc lseq {from to} {
@@ -295,7 +296,7 @@ test_get 1.57	6449455446													IETF							;# "IETF"
 test_get 1.58	62225c														\"\\							;# "\"\\"
 test_get 1.59	62c3bc														\u00fc							;# "\u00fc"
 test_get 1.60	63e6b0b4													\u6c34							;# "\u6c34"
-test_get 1.61	64f0908591													\ud800\udd51					;# "\ud800\udd51"
+test_get 1.61	64f0908591													[tcl9? \U00010151 \ud800\udd51]	;# "\ud800\udd51"
 test_get 1.62	80															{}								;# []
 test_get 1.63	83010203													{1 2 3}							;# [1, 2, 3]
 test_get 1.64	8301820203820405											{1 {2 3} {4 5}}					;# [1, [2, 3], [4, 5]]

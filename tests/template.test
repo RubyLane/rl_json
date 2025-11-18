@@ -3,7 +3,7 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
+::tcltest::loadTestedCommands
 namespace path {::rl_json}
 
 test template-0.1 {Empty action list} -body { #<<<

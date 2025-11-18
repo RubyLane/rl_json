@@ -30,3 +30,5 @@ last
 rundata
 /local
 /build
+/manifest.uuid
+/rl_jsonUuid.h

@@ -20,7 +20,7 @@ declare 5 generic {
 	int JSON_NewJObjectObj(Tcl_Interp* interp, Tcl_Obj** new)
 }
 declare 6 generic {
-	int JSON_NewJArrayObj(Tcl_Interp* interp, int objc, Tcl_Obj* objv[], Tcl_Obj** new)
+	int JSON_NewJArrayObj(Tcl_Interp* interp, Tcl_Size objc, Tcl_Obj* objv[], Tcl_Obj** new)
 }
 # type is one of the DYN types, key is the variable name the template is replaced with
 declare 7 generic {
@@ -52,16 +52,16 @@ declare 14 generic {
 	int JSON_JArrayObjAppendList(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Obj* elems /* a JArrayObj or ListObj */ )
 }
 declare 15 generic {
-	int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, int objc, Tcl_Obj* objv[])
+	int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Size objc, Tcl_Obj* objv[])
 }
 declare 16 generic {
-	int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, int* objc, Tcl_Obj*** objv)
+	int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Size* objc, Tcl_Obj*** objv)
 }
 declare 17 generic {
-	int JSON_JArrayObjIndex(Tcl_Interp* interp, Tcl_Obj* arrayObj, int index, Tcl_Obj** elem)
+	int JSON_JArrayObjIndex(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Size index, Tcl_Obj** elem)
 }
 declare 18 generic {
-	int JSON_JArrayObjReplace(Tcl_Interp* interp, Tcl_Obj* arrayObj, int first, int count, int objc, Tcl_Obj* objv[])
+	int JSON_JArrayObjReplace(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Size first, Tcl_Size count, Tcl_Size objc, Tcl_Obj* objv[])
 }
 
 # TODO: JObject interface, similar to DictObj
@@ -100,7 +100,7 @@ declare 28 generic {
 	int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, enum json_types* type)
 }
 declare 29 generic {
-	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, int* length)
+	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Size* length)
 }
 declare 30 generic {
 	int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj** keyslist)

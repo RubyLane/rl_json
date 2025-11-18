@@ -3,7 +3,7 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
+::tcltest::loadTestedCommands
 namespace path {::rl_json}
 
 source [file join [file dirname [info script]] helpers.tcl]
@@ -149,7 +149,7 @@ test new-4.4 {json boolean, invalid string} -body { #<<<
 } -result [list 1 {expected boolean value but got "foo"} {TCL VALUE NUMBER}]
 #>>>
 test new-4.5 {json boolean, empty string} -body { #<<<
-	set code [catch {json boolean ""} r o]
+	set code [catch {json boolean [string trim " "]} r o]
 	list $code $r [dict get $o -errorcode]
 } -cleanup {
 	unset -nocomplain code r o

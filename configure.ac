@@ -19,7 +19,7 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([rl_json],[0.15.7])
+AC_INIT([rl_json],[0.15.8])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -61,6 +61,8 @@ TEA_PREFIX
 
 TEA_SETUP_COMPILER
 
+TEABASE_INIT
+
 # Check for feature toggles
 ENABLE_ENSEMBLE
 ENABLE_DEDUP
@@ -86,11 +88,11 @@ AC_SUBST(CBOR_SOURCES)
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c ${CBOR_SOURCES}])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c ${CBOR_SOURCES} rl_jsonBuildInfo.c])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h generic/rl_json.h])
 TEA_ADD_INCLUDES([-Igeneric -Ilocal/include])
 TEA_ADD_LIBS([-Llocal/lib -ltommath -lm])
-TEA_ADD_CFLAGS([-std=c11 -Wall -Werror -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers])
+TEA_ADD_CFLAGS([-std=c11 -Wall -Werror -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -Wno-error=unused-function])
 TEA_ADD_STUB_SOURCES([rl_jsonStubLib.c])
 TEA_ADD_TCL_SOURCES([])
 
@@ -157,12 +159,6 @@ TEA_ENABLE_SHARED
 
 TEA_CONFIG_CFLAGS
 
-# Check for required polyfill
-TIP445
-AC_CHECK_FUNCS_ONCE([ffsll])
-AX_GCC_BUILTIN(__builtin_ffsll)
-TEABASE_INIT()
-
 #--------------------------------------------------------------------
 # Set the default compiler switches based on the --enable-symbols option.
 #--------------------------------------------------------------------
@@ -187,6 +183,23 @@ TEA_MAKE_LIB
 
 TEA_PROG_TCLSH
 #TEA_PROG_WISH
+
+hold_CFLAGS=$CFLAGS
+hold_LIBS=$LIBS
+eval "EXPANDED_CFLAGS=\"${CFLAGS}\""
+CFLAGS="$TCL_INCLUDE_SPEC $EXPANDED_CFLAGS $PKG_INCLUDES ${PKG_CFLAGS} -Wno-error"
+LIBS="$LIBS $PKG_LIBS $TCL_STUB_LIB_SPEC"
+
+# Check for Tcl 9 features
+CHECK_TCL_GETNUMBERFROMOBJ
+
+# Check for required polyfill
+TIP445
+AC_CHECK_FUNCS_ONCE([ffsll])
+AX_GCC_BUILTIN(__builtin_ffsll)
+
+CFLAGS=$hold_CFLAGS
+LIBS=$hold_LIBS
 
 #--------------------------------------------------------------------
 # Setup a *Config.sh.in configuration file.

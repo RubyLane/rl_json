@@ -3,7 +3,7 @@ if {"::tcltest" ni [namespace children]} {
 	namespace import ::tcltest::*
 }
 
-package require rl_json
+::tcltest::loadTestedCommands
 namespace path {::rl_json}
 
 test amap-1.0 {Single iterator, no vars, over array} -body { #<<<

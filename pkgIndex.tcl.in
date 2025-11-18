@@ -1,8 +1,10 @@
+# -*- tcl -*-
+# Tcl package index file, version 1.1
 #
-# Tcl package index file
-#
-package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ [list apply {
-	dir {
-    	load [file join $dir @PKG_LIB_FILE@] @PACKAGE_NAME@
-	}
-} $dir]
+if {[package vsatisfies [package provide Tcl] 9.0-]} {
+    package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ \
+	    [list apply {dir {load [file join $dir @PKG_LIB_FILE9@] [string totitle @PACKAGE_NAME@]}} $dir]
+} else {
+    package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ \
+	    [list apply {dir {load [file join $dir @PKG_LIB_FILE8@] [string totitle @PACKAGE_NAME@]}} $dir]
+}
