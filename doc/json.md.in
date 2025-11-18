@@ -1,0 +1,746 @@
+% json(n) @PACKAGE_VERSION@ | rl_json Tcl JSON Package
+% Cyan Ogilvie
+
+# NAME
+
+json - Parse, manipulate and produce JSON documents
+
+## SYNOPSIS
+
+**package require rl_json** ?**@PACKAGE_VERSION@**?
+
+**json get** ?**-default** *defaultValue*? *jsonValue* ?*key ...*?\
+**json extract** ?**-default** *defaultValue*? *jsonValue* ?*key ...*?\
+**json exists** *jsonValue* ?*key ...*?\
+**json set** *jsonVariableName* ?*key ...*? *value*\
+**json unset** *jsonVariableName* ?*key ...*?\
+**json foreach** *varlist1 jsonValue1* ?*varlist2 jsonValue2 ...*? *script*\
+**json lmap** *varlist1 jsonValue1* ?*varlist2 jsonValue2 ...*? *script*\
+**json amap** *varlist1 jsonValue1* ?*varlist2 jsonValue2 ...*? *script*\
+**json omap** *varlist1 jsonValue1* ?*varlist2 jsonValue2 ...*? *script*\
+**json string** *value*\
+**json number** *value*\
+**json boolean** *value*\
+**json object** ?*key value* ?*key value ...*??\
+**json array** *elem ...*\
+**json bool** *value*\
+**json normalize** *jsonValue*\
+**json pretty** ?**-indent** *indent*? *jsonValue* ?*key ...*?\
+**json template** *jsonValue* ?*dictionary*?\
+**json isnull** *jsonValue* ?*key ...*?\
+**json type** *jsonValue* ?*key ...*?\
+**json length** *jsonValue* ?*key ...*?\
+**json keys** *jsonValue* ?*key ...*?\
+**json decode** *bytes* ?*encoding*?\
+**json valid** ?**-extensions** *extensionlist*? ?**-details** *detailsvar*? *jsonValue*
+
+## DESCRIPTION
+
+This package adds a command **json** to the interpreter, and defines a new
+Tcl_Obj type to store the parsed JSON document.  The **json** command
+directly manipulates values whose string representation is valid JSON, in a
+similar way to how the **dict** command directly manipulates values whose
+string representation is a valid dictionary.  It is similar to **dict** in
+performance.
+
+The package uses a custom-built parser and string quoter (older versions used
+the yajl library, but that dependency has been removed). JSON values are parsed
+to an internal format using Tcl_Objs and stored as the internal representation
+for a new type of Tcl_Obj. Subsequent manipulation of that value uses the
+internal representation directly, providing efficient access and modification.
+
+**json get** ?**-default** *defaultValue*? *jsonValue* ?*key ...*?
+
+:   Extract the value of a portion of the *jsonValue*, returns the closest
+    native Tcl type (other than JSON) for the extracted portion. The *key ...*
+    arguments are a path, as described in **PATHS** below.  If the fragment
+    named by the path doesn't exist, return *defaultValue* in its place.
+
+**json extract** ?**-default** *defaultValue*? *jsonValue* ?*key ...*?
+
+:   Extract the value of a portion of the *jsonValue*, returns the JSON
+    fragment. The *key ...* arguments are a path, as described in **PATHS**
+    below.  If the fragment named by the path doesn't exist, return
+    *defaultValue* in its place.
+
+**json exists** *jsonValue* ?*key ...*?
+
+:   Tests whether the supplied key path (see **PATHS** below) resolves to
+    something that exists in *jsonValue* (i.e., that it can be used with
+    **json get** without error) and is not null.  Returns false if the value
+    named by the path *key ...* is null.
+
+**json set** *jsonVariableName* ?*key ...*? *value*
+
+:   Updates the JSON value stored in the variable *jsonVariableName*,
+    replacing the value referenced by *key ...* (a path as described in
+    **PATHS** below) with the JSON value *value*.  If *value* is
+    a valid JSON as given by the JSON grammar, it is added as that JSON type,
+    otherwise it is converted to a JSON string.  Thus the following are equivalent
+    (modulo efficiency):
+
+    ~~~tcl
+    json set doc foo [json string baz]
+    json set doc bar [json number 123]
+    json set doc baz [json boolean true]
+
+    #------------------------------------------
+    json set doc foo baz
+    json set doc bar 123
+    json set doc baz true
+    ~~~
+
+    Watch out for unintended behaviour if the value might look like a boolean or
+    number but not meet the JSON grammar for those types, in which case the value
+    is converted to a JSON string:
+
+    ~~~tcl
+    json set doc foo [json boolean yes]
+    # Key "foo" contains the JSON boolean value "true"
+
+    json set doc foo yes
+    # Key "foo" contains the JSON string value "yes"
+    ~~~
+
+    Constructing the values using [**json** *type*] forces the conversion to
+    the specified JSON type, or throws an exception if that can't be done.
+    Which is more efficent will depend on the situation:
+
+    ~~~tcl
+    set doc {[]}
+    for {set i 0} {$i < 100} {incr i} {
+        json set doc end+1 [json boolean true]    ;# 1
+        json set doc end+1 true                   ;# 2
+    }
+    # 2 will be faster since "true" will be stored as a literal, and converted
+    # to a JSON boolean.  Each loop iteration will just append another reference
+    # to this static value to the array, whereas 1 will call [json boolean] each
+    # iteration.
+
+    set doc {[]}
+    for {set i 0} {$i < 100} {incr i} {
+        json set doc end+1 [json string false$i]  ;# 1
+        json set doc end+1 false$i                ;# 2
+    }
+    # 1 will be faster since [json string] knows what the type is and directly
+    # creates the new element as that type.  2 Needs to parse the string to
+    # determine the type.
+    ~~~
+
+**json unset** *jsonVariableName* ?*key ...*?
+
+:   Updates the JSON value stored in the variable *jsonVariableName*, removing
+    the value referenced by *key ...*, a path as described in **PATHS**
+    below.  If the path names a entry in an object then that key is removed from the
+    object.  If the path names an element in an array, that element is removed
+    and all later elements are moved up.
+
+**json template** *jsonValue* ?*dictionary*?
+
+:   Return a JSON value by interpolating the values from *dictionary* into the
+    template, or from variables in the current scope if *dictionary* is not
+    supplied, in the manner described in the section **TEMPLATES**.
+
+**json string** *value*
+
+:   Return a JSON string with the value *value*.
+
+**json number** *value*
+
+:   Return a JSON number with the value *value*.  The value can be in any
+    of the forms accepted as a number by Tcl.
+
+**json boolean** *value*
+
+:   Return a JSON boolean with the value *value*.  Any of the forms accepted by
+    Tcl_GetBooleanFromObj are accepted and normalized.
+
+**json object** ?*key value* ?*key value ...*?? -or- **json object** *packed_value*
+
+:   Return a JSON object with the each of the keys and values given.  *value* is a list
+    of two elements, the first being the type {string, number, boolean, null, object, array, json},
+    and the second being the value.  The alternate syntax **json object** *packed_value*
+    takes the list of keys and values as a single arg instead of a list of args, but is
+    otherwise the same.
+
+**json array** ?*elem ...*?
+
+:   Return a JSON array containing each of the elements given.  *elem* is a list
+    of two elements, the first being the type {string, number, boolean, null, object, array, json},
+    and the second being the value.
+
+**json foreach** *varList1 jsonValue1* ?*varList2 jsonValue2 ...*? *script*
+
+:   Evaluate *script* in a loop in a similar way to the **foreach** command.
+    In each iteration, the values stored in the iterator variables in each
+    *varList* are the JSON fragments from *jsonValue*. This command
+    supports iterating over JSON arrays and JSON objects.  In the JSON object
+    case, the corresponding *varList* must be a two element list, with the
+    first specifiying the variable to hold the key and the second the value.  In
+    the JSON array case, the rules are the same as the **foreach** command.
+
+**json lmap** *varList1 jsonValue1* ?*varList2 jsonValue2 ...*? *script*
+
+:   As for **json foreach**, except that it is collecting: the result from each
+    evaluation of *script* is added to a Tcl list and returned as the result
+    of the **json lmap** command.  If the *script* results in a TCL_CONTINUE
+    code (e.g., the script does **continue**), that iteration is skipped and no
+    element is added to the result list.  If it results in TCL_BREAK (e.g., the
+    script does **break**) the iterations are stopped and the results
+    accumulated so far are returned.
+
+**json amap** *varList1 jsonValue1* ?*varList2 jsonValue2 ...*? *script*
+
+:   As for **json lmap**, but the result is a JSON array rather than a list.  If
+    the result of each iteration is a JSON value it is added to the array as-is,
+    otherwise it is converted to a JSON string.
+
+**json omap** *varList1 jsonValue1* ?*varList2 jsonValue2 ...*? *script*
+
+:   As for **json lmap**, but the result is a JSON object rather than a list.
+    The result of each iteration must be a dictionary (or a list of 2n elements,
+    including n = 0).  Tcl_ObjType snooping is done to ensure that the iteration
+    over the result is efficient for both dict and list cases.
+    Each entry in the dictionary will be added to the result object.  If the value
+    for each key in the iteration result is a JSON value it is added to the array
+    as-is, otherwise it is converted to a JSON string.
+
+**json isnull** *jsonValue* ?*key ...*?
+
+:   Return a boolean indicating whether the named JSON value is null.
+
+**json type** *jsonValue* ?*key ...*?
+
+:   Return the type of the named JSON value, one of "object", "array", "string",
+    "number", "boolean" or "null".
+
+**json length** *jsonValue* ?*key ...*?
+
+:   Return the length of the of the named JSON array, number of entries in the
+    named JSON object, or number of characters in the named JSON string.  Other
+    value types aren't supported.
+
+**json keys** *jsonValue* ?*key ...*?
+
+:   Return the keys in the of the named JSON object, found by following the path of *key*s.
+
+**json normalize** *jsonValue*
+
+:   Return a "normalized" version of the input *jsonValue*, i.e., with all optional whitespace
+    trimmed.
+
+**json pretty** ?**-indent** *indent*? *jsonValue* ?*key ...*?
+
+:   Returns a pretty-printed string representation of *jsonValue*, found by
+    following the path of *key*s.  Useful for debugging or inspecting the
+    structure of JSON data.  If **-indent** is supplied, use *indent* for
+    each level of indent, otherwise default to four spaces.
+
+**json decode** *bytes* ?*encoding*?
+
+:   Rl_json operates on characters, as returned from Tcl's Tcl_GetStringFromObj,
+    not raw bytes, so considerations of encoding are strictly outside of its scope
+    (other than ignoring a byte order mark if the string starts with one).  However,
+    interoperating properly with other systems in a way that conforms to the JSON
+    standards is not straightforward, and requires support for encodings Tcl doesn't
+    always natively support (like utf-32be in earlier versions). To ease this burden
+    and properly handle things like BOM detection and broken encoding sequences, this
+    utility subcommand is provided.
+
+    The JSON RFC lays out some behaviour for conforming implementations regarding
+    character encoding, and ensuring that an application using rl_json meets that
+    standard would be up to the application.  Some aspects are not straightforward,
+    so rl_json provides this utility subcommand that takes binary data in *bytes*
+    and returns a character string according to the RFC specified behaviour.  If
+    the optional *encoding* argument is given, that encoding will be used to
+    interpret *bytes*.  The supported encodings are those specified in the RFC are:
+    utf-8 (the default), utf-16le, utf-16be, utf-32le, utf-32be.  If the string starts with a BOM
+    (byte order mark (U+FFFE)), and no encoding is given, it will be determined
+    from the encoding of the BOM.  All the encodings listed are supported.  Tcl 9
+    provides native support for all these encodings, making conversion fast.  For
+    earlier Tcl versions that lack native utf-16 and utf-32 support, fallback
+    implementations are provided but conversion will be slower.
+
+    If the encoding is known via some out-of-band channel (like headers in an
+    HTTP response), it can be supplied to override the BOM-based detection.
+
+    This might look something like this in an application:
+
+    ~~~tcl
+    proc readjson file {
+        set h [open $file rb]  ;# Note that the file is opened in binary mode - no encoding
+        try {
+            json decode [read $h]
+        } finally {
+            close $h
+        }
+    }
+    ~~~
+
+**json valid** ?**-extensions** *extensionlist*? ?**-details** *details*? *jsonValue*
+
+:   Validate *jsonValue* against the JSON grammar, returning true if it
+    conforms and false otherwise.  A list of extensions to accept can be supplied
+    with **-extensions**, with only one currently supported extension:
+    **comments**, which accepts JSON documents containing **// foo** and **/\*
+    foo \*/** style comments anywhere whitespace would be valid.  To reject
+    documents containing comments, set *extensionlist* to {}.
+
+    Validation using this subcommand is about 3 times faster than parsing and
+    catching a parsing exception, and it allows strict validation against the RFC
+    without comments.
+
+    If validation fails and **-details** *detailsvar* is supplied, the variable
+    *detailsvar* is set to a dictionary containing the keys:
+
+    **errmsg**
+    :   A reason for the failure.
+
+    **doc**
+    :   The document that failed validation
+
+    **char_ofs**
+    :   The character offset into **doc** that caused validation to fail.
+
+## PATHS
+
+Several of the commands (e.g., **json get**, **json exists**, **json
+set** and **json unset**) accept a path specification that names some
+subset of the supplied *jsonValue*.  The rules are similar to the
+equivalent concept in the **dict** command, except that the paths used by
+**json** allow indexing into JSON arrays by the integer key (or a string
+matching the regex "^end(-[0-9]+)?$").
+
+If a path to **json set** includes a key within an object that doesn't exist, it and all later elements of
+the path are created as nested keys into (new) objects.  If a path element into
+an array is outside the current bounds of the array, it resolves to a JSON null
+(for **json get**, **json extract**, **json exists**), or appends or prepends null
+elements to resolve the path (for **json set**), or does nothing (**json unset**).
+
+For example, navigating through nested objects and arrays:
+
+~~~tcl
+json get {
+    {
+        "foo": [
+            { "name": "first" },
+            { "name": "second" },
+            { "name": "third" }
+        ]
+    }
+} foo end-1 name
+~~~
+
+Returns "second".
+
+## TEMPLATES
+
+The command **json template** generates JSON documents by interpolating
+values into a template from a supplied dictionary or variables in the current
+call frame, a flexible mechanism for generating complex documents.  The
+templates are themselves valid JSON documents containing string values which match the
+regex "^~[SNBJTL]:.+$". The second
+character determines what the resulting type of the substituted value will be:
+
+**S**
+:   A string.
+
+**N**
+:   A number.
+
+**B**
+:   A boolean.
+
+**J**
+:   A JSON fragment.
+
+**T**
+:   A JSON template (substitutions are performed on the inserted fragment).
+
+**L**
+:   A literal. The resulting string is simply everything from the fourth character
+    onwards (this allows literal strings to be included in the template that would
+    otherwise be interpreted as the substitutions above).
+
+None of the first three characters for a template may be escaped.
+
+The value inserted is determined by the characters following the substitution
+type prefix.  When interpolating values from a dictionary they name keys in the
+dictionary which hold the values to interpolate.  When interpolating from
+variables in the current scope, they name scalar or array variables which hold
+the values to interpolate.  In either case if the named key or variable doesn't
+exist, a JSON null is interpolated in its place.
+
+## EXCEPTIONS
+
+Exceptions are thrown when attempting to parse a string which isn't valid JSON,
+or when a named path is invalid or doesn't exist:
+
+**RL JSON PARSE** *errormessage* *string* *charOfs*
+
+:   Thrown when trying to parse a string that isn't valid JSON.  The *string*
+    element contains the string that failed to parse, and the first invalid character
+    is at offset *charOfs* within that string, using 0 based offsets.
+
+**RL JSON BAD_PATH** *path*
+
+:   Thrown when indexing into a JSON value and the specified path isn't valid.
+    *path* is the left subset of the path up to first element that caused the
+    failure.
+
+## EXAMPLES
+
+Produce a JSON value from a template:
+
+~~~tcl
+json template {
+    {
+        "thing1": "~S:val1",
+        "thing2": ["a", "~N:val2", "~S:val2", "~B:val2",
+                   "~S:val3", "~L:~S:val1"],
+        "subdoc1": "~J:subdoc",
+        "subdoc2": "~T:subdoc"
+    }
+} {
+    val1   hello
+    val2   1e6
+    subdoc {
+        { "thing3": "~S:val1" }
+    }
+}
+~~~
+
+The result (with formatting for readability):
+
+~~~tcl
+{
+    "thing1":"hello",
+    "thing2":["a",1000000.0,"1e6",true,null,"~S:val1"],
+    "subdoc1":{"thing3":"~S:val1"},
+    "subdoc2":{"thing3":"hello"}
+}
+~~~
+
+Construct a JSON array from a SQL result set:
+
+~~~tcl
+# Given:
+# sqlite> select * from languages;
+# 'Tcl',1,'http://core.tcl-lang.org/'
+# 'Node.js',1,'https://nodejs.org/'
+# 'Python',1,'https://www.python.org/'
+# 'INTERCAL',0,'http://www.catb.org/~esr/intercal/'
+# 'Unlambda',0,NULL
+
+set langs {[]}
+sqlite3 db languages.sqlite3
+db eval {
+    select
+        rowid,
+        name,
+        active,
+        url
+    from
+        languages
+} {
+    if {$url eq ""} {unset url}
+
+    json set langs end+1 [json template {
+        {
+            "id":       "~N:rowid",
+            "name":     "~S:name",
+            "details": {
+                "active":   "~B:active",  // Template values can be nested anywhere
+                "url":      "~S:url"      /* Both types of comments are
+                                             allowed but stripped at parse-time */
+            }
+        }
+    }]
+}
+
+puts [json pretty $langs]
+~~~
+
+Result:
+
+~~~json
+[
+    {
+        "id":      1,
+        "name":    "Tcl",
+        "details": {
+            "active": true,
+            "url":    "http://core.tcl-lang.org/"
+        }
+    },
+    {
+        "id":      2,
+        "name":    "Node.js",
+        "details": {
+            "active": true,
+            "url":    "https://nodejs.org/"
+        }
+    },
+    {
+        "id":      3,
+        "name":    "Python",
+        "details": {
+            "active": true,
+            "url":    "https://www.python.org/"
+        }
+    },
+    {
+        "id":      4,
+        "name":    "INTERCAL",
+        "details": {
+            "active": false,
+            "url":    "http://www.catb.org/~esr/intercal/"
+        }
+    },
+    {
+        "id":      5,
+        "name":    "Unlambda",
+        "details": {
+            "active": false,
+            "url":    null
+        }
+    }
+]
+~~~
+
+Incrementally append an element to an array (similar to **dict lappend**):
+
+~~~tcl
+set doc {{"foo":[]}}
+for {set i 0} {$i < 4} {incr i} {
+    json set doc foo end+1 [json string "elem: $i"]
+}
+# $doc is {"foo":["elem 0","elem 1","elem 2","elem 3"]}
+~~~
+
+Similar to the above, but prepend the elements instead:
+
+~~~tcl
+set doc {{"foo":[]}}
+for {set i 0} {$i < 4} {incr i} {
+    json set doc foo -1 [json string "elem: $i"]
+}
+# $doc is {"foo":["elem 3","elem 2","elem 1","elem 0"]}
+~~~
+
+Trim an element out of an array:
+
+~~~tcl
+set doc {["a","b","c"]}
+json unset doc 1
+# $doc is {["a","c"]}
+~~~
+
+Implicitly create objects when setting a path that doesn't exist:
+
+~~~tcl
+set doc {{"foo":1}}
+json set doc bar baz {"hello, new obj"}
+# $doc is {"foo":1,"bar":{"baz":"hello, new obj"}}
+~~~
+
+Index through objects and arrays (the path elements are unambiguous because the
+json types they index into are known at resolve time):
+
+~~~tcl
+set doc {{"foo":["a",{"primes":[2,3,5,7,11,13,17,19]},"c"]}}
+json get $doc foo 1 primes end-1
+# returns 17
+~~~
+
+Handle a parse error and display a helpful message indicating the character
+that caused the failure:
+
+~~~tcl
+try {
+    json get {
+        {
+            "foo": {
+                "bar": true,
+            }
+        }
+    } foo bar
+} trap {RL JSON PARSE} {errmsg options} {
+    lassign [lrange [dict get $options -errorcode] 4 5] doc char_ofs
+    puts stderr "$errmsg\n[string range $doc 0 $char_ofs-1](here -->)[string range $doc $char_ofs end]"
+}
+~~~
+
+Produces:
+
+~~~
+Error parsing JSON value: Illegal character at offset 37
+
+        {
+            "foo": {
+                "bar": true,
+            (here -->)}
+        }
+~~~
+
+## PERFORMANCE
+
+Good performance was a requirement for rl_json, because it is used to handle
+large volumes of data flowing to and from various JSON based REST APIs.  It's
+generally the fastest option for working with JSON values in Tcl from the
+options available, with the next closest being yajltcl.  These benchmarks
+report the median times in microseconds, and produce quite stable results
+between runs.  Benchmarking was done on a MacBook Air running Ubuntu
+14.04 64bit, Tcl 8.6.3 built with -O3 optimization turned on, and using
+an Intel i5 3427U CPU.
+
+### Parsing
+
+This benchmark compares the relative performance of extracting the field
+containing the string "obj" from the JSON doc:
+
+~~~json
+{
+    "foo": "bar",
+    "baz": ["str", 123, 123.4, true, false, null, {"inner": "obj"}]
+}
+~~~
+
+The compared methods are:
+
+| Name | Notes | Code |
+|------|-------|------|
+| old_json_parse | Pure Tcl parser | `dict get [lindex [dict get [json_old parse [string trim $json]] baz] end] inner` |
+| rl_json_parse | | `dict get [lindex [dict get [json parse [string trim $json]] baz] end] inner` |
+| rl_json_get | Using the built-in accessor method | `json get [string trim $json] baz end inner` |
+| yajltcl | | `dict get [lindex [dict get [yajl::json2dict [string trim $json]] baz] end] inner` |
+| rl_json_get_native | | `json get $json baz end inner` |
+
+The use of `[string trim $json]` is to defeat the caching of the parsed
+representation, forcing it to reparse the string each time since we're
+measuring the parse performance here.  The exception is the rl_json_get_native
+test which demonstrates the performance of the cached case.
+
+~~~
+-- parse-1.1: "Parse a small JSON doc and extract a field" --------------------
+                    | This run
+     old_json_parse |  241.595
+      rl_json_parse |    5.540
+        rl_json_get |    4.950
+            yajltcl |    8.800
+ rl_json_get_native |    0.800
+~~~
+
+### Validating
+
+If the requirement is to validate a JSON value, the **json valid** command is a
+light-weight version of the parsing engine that skips allocating values from
+the document and only returns whether the parsing succeeded or failed, and
+optionally a description of the failure.  It takes about a third of the time
+to validate a document as parsing it, so the performance win is substantial.
+On a relatively modern CPU validation takes about 11 cycles per byte, or around
+200MB of JSON per second on a 2.3 GHz Intel i7.
+
+### Generating
+
+This benchmark compares the relative performance of various ways of
+dynamically generating a JSON document.  Although all the methods produce the
+same string, only the "template" and "template_dict" variants handle nulls in
+the general case - the others manually test for null only for the one field
+that is known to be null, so the performance of these variants would be worse
+in a real-world scenario where all fields would need to be tested for null.
+
+The JSON doc generated in each case is the one produced by the following JSON
+template (where a(not_defined) does not exist and results in a null value in the produced document):
+
+~~~json
+{
+    "foo": "~S:bar",
+    "baz": [
+        "~S:a(x)",
+        "~N:a(y)",
+        123.4,
+        "~B:a(on)",
+        "~B:a(off)",
+        "~S:a(not_defined)",
+        "~L:~S:not a subst",
+        "~T:a(subdoc)",
+        "~T:a(subdoc2)"
+    ]
+}
+~~~
+
+The produced JSON doc is:
+
+~~~json
+{"foo":"Bar","baz":["str\"foo\nbar",123,123.4,true,false,null,"~S:not a subst",{"inner":"Bar"},{"inner2":"Bar"}]}
+~~~
+
+The compared methods are:
+
+| Name | Notes |
+|------|-------|
+| old_json_fmt | Pure Tcl implementation, builds JSON from type-annotated Tcl values |
+| rl_json_new | rl_json's **json new**, API compatible with the pure Tcl version used in old_json_fmt |
+| template | rl_json's **json template** |
+| yajltcl | yajltcl's type-annotated Tcl value approach |
+| template_dict | As for template, but using a dict containing the values to substitute |
+| yajltcl_dict | As for yajltcl, but extracting the values from the same dict used by template_dict |
+
+~~~
+-- new-1.1: "Various ways of dynamically assembling a JSON doc" ---------------
+                 | This run
+    old_json_fmt |   49.450
+     rl_json_new |   10.240
+        template |    4.520
+         yajltcl |    7.700
+   template_dict |    2.500
+    yajltcl_dict |    7.530
+~~~
+
+## DEPRECATIONS
+
+Version 0.10.0 deprecates various subcommands and features, which will be removed in a near future version:
+
+**json get_type** *json_val* ?*key ...*?
+:   Removed. Use **json type** instead.
+    Migration: `lassign [json get_type` *json_val* ?*key ...*?`] val type` →
+    `set val [json get` *json_val* ?*key ...*?`]; set type [json type` *json_val* ?*key ...*?`]`
+
+**json parse** *json_val*
+:   A deprecated synonym for **json get** *json_val*.
+
+**json fmt** *type* *value*
+:   A deprecated synonym for **json new** *type* *value*, which is itself deprecated (see below).
+
+**json new** *type* *value*
+:   Use direct subcommands of **json**:
+
+    - `json new string` *value* → `json string` *value*
+    - `json new number` *value* → `json number` *value*
+    - `json new boolean` *value* → `json boolean` *value*
+    - `json new true` → `true`
+    - `json new false` → `false`
+    - `json new null` → `null`
+    - `json new json` *value* → *value*
+    - `json new object ...` → `json object ...` (but consider **json template**)
+    - `json new array ...` → `json array ...` (but consider **json template**)
+
+**Path modifiers**
+:   Modifiers like `json get` *json_val* `foo ?type` are deprecated.  Replacements are:
+
+    - `?type` - use **json type** *json_val* ?*key ...*?
+    - `?length` - use **json length** *json_val* ?*key ...*?
+    - `?size` - use **json length** *json_val* ?*key ...*?
+    - `?keys` - use **json keys** *json_val* ?*key ...*?
+
+## KEYWORDS
+
+json, parsing, formatting
+
+## LICENSE
+
+Copyright (c) 2015-2025 Ruby Lane
+
+See the file "LICENSE" for information on usage and redistribution
+of this file, and for a DISCLAIMER OF ALL WARRANTIES.

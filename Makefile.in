@@ -213,10 +213,19 @@ libraries:
 # end user machine when building from source.
 #========================================================================
 
-doc:
+doc: doc/json.n README.md
 
-doc/json.html:
-	cd doc && man2html -r json.n > json.html
+doc/.build/json.md: $(srcdir)/doc/json.md.in $(top_builddir)/config.status
+	cd $(top_builddir) \
+	  && mkdir -p doc/.build \
+	  && ln -sf ../json.md.in doc/.build/json.md.in \
+	  && CONFIG_FILES=$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+doc/json.n: doc/.build/json.md
+	pandoc --standalone --from markdown --to man doc/.build/json.md --output doc/json.n
+
+README.md: doc/.build/json.md
+	pandoc --standalone --from markdown --to gfm doc/.build/json.md --output README.md
 
 install: all install-binaries install-libraries install-doc
 
@@ -343,7 +352,7 @@ DIST_INSTALL_ASIS	= cp -a
 dist-clean:
 	rm -rf $(DIST_DIR) $(DIST_ROOT)/$(PKG_DIR).tar.*
 
-dist: dist-clean $(srcdir)/manifest.uuid
+dist: dist-clean doc $(srcdir)/manifest.uuid
 	$(INSTALL_DATA_DIR) $(DIST_DIR)
 
 	# TEA files
@@ -367,15 +376,19 @@ dist: dist-clean $(srcdir)/manifest.uuid
 
 	# Extension files
 	$(DIST_INSTALL_DATA) \
-	    $(srcdir)/README.md \
 	    $(srcdir)/LICENSE \
 	    $(srcdir)/pkgIndex.tcl.in \
 	    $(srcdir)/rl_jsonConfig.sh.in \
 	    $(srcdir)/suppressions \
 	    $(DIST_DIR)/
 
+	# Generated doc files
+	$(DIST_INSTALL_DATA) README.md $(DIST_DIR)/
+	$(INSTALL_DATA_DIR) $(DIST_DIR)/doc
+	$(DIST_INSTALL_DATA) doc/json.n $(DIST_DIR)/doc/
+	$(DIST_INSTALL_DATA) $(srcdir)/doc/json.md.in $(DIST_DIR)/doc/
 
-	list='bench tools demos doc generic library macos tests unix win'; \
+	list='bench tools demos generic library macos tests unix win'; \
 	for p in $$list; do \
 	    if test -d $(srcdir)/$$p ; then \
 		$(INSTALL_DATA_DIR) $(DIST_DIR)/$$p; \

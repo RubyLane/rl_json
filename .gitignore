@@ -32,3 +32,5 @@ rundata
 /build
 /manifest.uuid
 /rl_jsonUuid.h
+/doc/.build
+/doc/json.n
