@@ -3058,6 +3058,68 @@ finally:
 }
 
 //}}}
+static int jsonAutoObject(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+	int			i, retval = TCL_OK;
+	Tcl_Obj*	key = NULL;
+	Tcl_Obj*	elem = NULL;
+	Tcl_Obj*	dict = NULL;
+	Tcl_Obj*	forced = NULL;
+	const char*	str;
+	int			len;
+
+	// Validate argument count - must have even number of arguments (key-value pairs)
+	if ((objc - 1) % 2 != 0) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf("wrong # args: should be \"json autoobject ?key value ...?\""));
+		Tcl_SetErrorCode(interp, "TCL", "WRONGARGS", NULL);
+		retval = TCL_ERROR;
+		goto finally;
+	}
+
+	replace_tclobj(&dict, Tcl_NewDictObj());
+
+	for (i=1; i<objc; i+=2) {
+		// Key is always treated as a string (JSON object keys must be strings)
+		replace_tclobj(&key, objv[i]);
+
+		// Value gets type detection (same as autoarray)
+		str = Tcl_GetStringFromObj(objv[i+1], &len);
+
+		// Check for boolean values (exact match, case-sensitive)
+		if (len == 4 && strcmp(str, "true") == 0) {
+			replace_tclobj(&elem, JSON_NewJvalObj(JSON_BOOL, l->json_true));
+		} else if (len == 5 && strcmp(str, "false") == 0) {
+			replace_tclobj(&elem, JSON_NewJvalObj(JSON_BOOL, l->json_false));
+		} else {
+			// Try to parse as a number
+			int is_number = (force_json_number(interp, l, objv[i+1], &forced) == TCL_OK);
+
+			if (is_number) {
+				// It's a valid JSON number
+				replace_tclobj(&elem, JSON_NewJvalObj(JSON_NUMBER, forced));
+				release_tclobj(&forced);
+			} else {
+				// Default to string
+				// Clear any error message from failed number conversion
+				Tcl_ResetResult(interp);
+				replace_tclobj(&elem, JSON_NewJvalObj(JSON_STRING, objv[i+1]));
+			}
+		}
+
+		TEST_OK_LABEL(finally, retval, Tcl_DictObjPut(interp, dict, key, elem));
+	}
+	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_OBJECT, dict));
+
+finally:
+	release_tclobj(&key);
+	release_tclobj(&elem);
+	release_tclobj(&dict);
+	release_tclobj(&forced);
+	return retval;
+}
+
+//}}}
 static int jsonDecode(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	Tcl_Obj*	encoding = NULL;
@@ -3684,6 +3746,7 @@ collect_interp_result:
 }
 
 //}}}
+#if !ENSEMBLE
 static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int subcommand;
@@ -3719,6 +3782,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		"object",
 		"array",
 		"autoarray",
+		"autoobject",
 
 		"decode",
 
@@ -3761,6 +3825,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		M_OBJECT,
 		M_ARRAY,
 		M_AUTOARRAY,
+		M_AUTOOBJECT,
 		M_DECODE,
 		// Debugging
 		M_FREE_CACHE,
@@ -3797,6 +3862,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_OBJECT:		return jsonObject(cdata, interp, objc-1, objv+1);
 		case M_ARRAY:		return jsonArray(cdata, interp, objc-1, objv+1);
 		case M_AUTOARRAY:	return jsonAutoArray(cdata, interp, objc-1, objv+1);
+		case M_AUTOOBJECT:	return jsonAutoObject(cdata, interp, objc-1, objv+1);
 		case M_DECODE:		return jsonDecode(cdata, interp, objc-1, objv+1);
 		case M_ISNULL:		return jsonIsNull(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE:	return jsonTemplate(cdata, interp, objc-1, objv+1);
@@ -3864,12 +3930,16 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 
 	return TCL_OK;
 }
+#endif
 
 //}}}
+
+#if !ENSEMBLE
 static int jsonObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRObj, cdata, objc, objv);
 }
+#endif
 
 //}}}
 
@@ -4224,6 +4294,8 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("boolean",    -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("object",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("array",      -1));
+            Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("autoarray",  -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("autoobject", -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("decode",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("isnull",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template",   -1));
@@ -4261,6 +4333,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, ENS "object",     jsonObject, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "array",      jsonArray, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "autoarray",  jsonAutoArray, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "autoobject", jsonAutoObject, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "decode",     jsonDecode, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "isnull",     jsonIsNull, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "template",   jsonTemplate, l, NULL);

@@ -191,6 +191,29 @@ For example:
  # Returns: [1,2.5,true,false,"hello world",42]
 .CE
 .TP
+\fBjson autoobject \fI?key value ...?\fR
+.
+Return a JSON object containing the key-value pairs given, with automatic type detection
+for values. Keys are always treated as strings (as required by JSON), while values undergo
+the same automatic type detection as \fBjson autoarray\fR:
+.RS
+.IP \(bu 3
+Values exactly matching "true" or "false" (case-sensitive) are converted to JSON booleans.
+.IP \(bu 3
+Values that can be parsed as valid JSON numbers are converted to JSON numbers.
+.IP \(bu 3
+All other values are converted to JSON strings.
+.RE
+.PP
+The command requires an even number of arguments (key-value pairs). If duplicate keys
+are provided, the last value wins.
+.PP
+For example:
+.CS
+ json autoobject name "Alice" age 30 active true score 95.5
+ # Returns: {"name":"Alice","age":30,"active":true,"score":95.5}
+.CE
+.TP
 \fBjson foreach \fIvarList1 jsonValue1\fR ?\fIvarList2 jsonValue2 ...\fR? \fIscript\fR
 .
 Evaluate \fIscript\fR in a loop in a similar way to the \fBforeach\fR command.
