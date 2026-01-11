@@ -1,0 +1,257 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace import ::rl_json::*
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+# Basic functionality tests
+test autoobject-1.1 {Empty autoobject} -body { #<<<
+	json autoobject
+} -result {{}}
+#>>>
+test autoobject-1.2 {Single key-value pair - string} -body { #<<<
+	json autoobject name "Alice"
+} -result {{"name":"Alice"}}
+#>>>
+test autoobject-1.3 {Single key-value pair - number} -body { #<<<
+	json autoobject age 30
+} -result {{"age":30}}
+#>>>
+test autoobject-1.4 {Single key-value pair - boolean true} -body { #<<<
+	json autoobject active true
+} -result {{"active":true}}
+#>>>
+test autoobject-1.5 {Single key-value pair - boolean false} -body { #<<<
+	json autoobject enabled false
+} -result {{"enabled":false}}
+#>>>
+test autoobject-1.6 {Multiple key-value pairs - mixed types} -body { #<<<
+	json autoobject name "Bob" age 25 active true score 95.5
+} -result {{"name":"Bob","age":25,"active":true,"score":95.5}}
+#>>>
+
+# Argument validation tests
+test autoobject-2.1 {Odd number of arguments - single arg} -body { #<<<
+	json autoobject key
+} -returnCodes error -match glob -result {wrong # args: should be "json autoobject ?key value ...?"}
+#>>>
+test autoobject-2.2 {Odd number of arguments - three args} -body { #<<<
+	json autoobject key1 value1 key2
+} -returnCodes error -match glob -result {wrong # args: should be "json autoobject ?key value ...?"}
+#>>>
+test autoobject-2.3 {Odd number of arguments - five args} -body { #<<<
+	json autoobject a 1 b 2 c
+} -returnCodes error -match glob -result {wrong # args: should be "json autoobject ?key value ...?"}
+#>>>
+
+# Value type detection tests
+test autoobject-3.1 {String values} -body { #<<<
+	json autoobject key1 "hello" key2 "world"
+} -result {{"key1":"hello","key2":"world"}}
+#>>>
+test autoobject-3.2 {Integer values} -body { #<<<
+	json autoobject a 1 b 42 c -100
+} -result {{"a":1,"b":42,"c":-100}}
+#>>>
+test autoobject-3.3 {Float values} -body { #<<<
+	json autoobject pi 3.14159 e 2.71828
+} -result {{"pi":3.14159,"e":2.71828}}
+#>>>
+test autoobject-3.4 {Scientific notation} -body { #<<<
+	set obj [json autoobject large 1.5e10 small 1.5e-10]
+	# Verify both values are correct numerically (format may vary)
+	expr {[json get $obj large] == 1.5e10 && [json get $obj small] == 1.5e-10}
+} -result {1}
+#>>>
+test autoobject-3.5 {Boolean true (exact match)} -body { #<<<
+	json autoobject flag true
+} -result {{"flag":true}}
+#>>>
+test autoobject-3.6 {Boolean false (exact match)} -body { #<<<
+	json autoobject flag false
+} -result {{"flag":false}}
+#>>>
+test autoobject-3.7 {Boolean case sensitivity - True is a string} -body { #<<<
+	json autoobject flag True
+} -result {{"flag":"True"}}
+#>>>
+test autoobject-3.8 {Boolean case sensitivity - TRUE is a string} -body { #<<<
+	json autoobject flag TRUE
+} -result {{"flag":"TRUE"}}
+#>>>
+test autoobject-3.9 {Boolean case sensitivity - False is a string} -body { #<<<
+	json autoobject flag False
+} -result {{"flag":"False"}}
+#>>>
+test autoobject-3.10 {Boolean case sensitivity - FALSE is a string} -body { #<<<
+	json autoobject flag FALSE
+} -result {{"flag":"FALSE"}}
+#>>>
+
+# Key handling tests
+test autoobject-4.1 {String keys} -body { #<<<
+	json autoobject name "Alice" city "Paris"
+} -result {{"name":"Alice","city":"Paris"}}
+#>>>
+test autoobject-4.2 {Numeric-looking keys are strings} -body { #<<<
+	json autoobject 123 "value1" 456 "value2"
+} -result {{"123":"value1","456":"value2"}}
+#>>>
+test autoobject-4.3 {Empty string key} -body { #<<<
+	json autoobject "" "empty key"
+} -result {{"":"empty key"}}
+#>>>
+test autoobject-4.4 {Duplicate keys - last value wins} -body { #<<<
+	json autoobject name "Alice" age 25 name "Bob"
+} -result {{"name":"Bob","age":25}}
+#>>>
+test autoobject-4.5 {Keys with special characters} -body { #<<<
+	json autoobject "first-name" "Alice" "last.name" "Smith" "user@email" "test"
+} -result {{"first-name":"Alice","last.name":"Smith","user@email":"test"}}
+#>>>
+test autoobject-4.6 {Keys with spaces} -body { #<<<
+	json autoobject "full name" "Alice Smith"
+} -result {{"full name":"Alice Smith"}}
+#>>>
+
+# Mixed type tests
+test autoobject-5.1 {Mixed strings, numbers, booleans} -body { #<<<
+	json autoobject name "Alice" age 30 active true score 95.5 city "Paris" verified false count 10
+} -result {{"name":"Alice","age":30,"active":true,"score":95.5,"city":"Paris","verified":false,"count":10}}
+#>>>
+test autoobject-5.2 {Complex strings with whitespace} -body { #<<<
+	json autoobject text "  leading and trailing  " multiline "line1\nline2"
+} -result {{"text":"  leading and trailing  ","multiline":"line1\nline2"}}
+#>>>
+test autoobject-5.3 {Special JSON-like strings (not parsed)} -body { #<<<
+	json autoobject null_str "null" array_str "[]" object_str "{}"
+	# Note: "[]" converts to empty string when passed through json string
+} -result {{"null_str":"null","array_str":"","object_str":"{}"}}
+#>>>
+
+# Equivalence tests
+test autoobject-6.1 {Compare autoobject vs manual object - strings} -body { #<<<
+	set auto [json autoobject name "Alice" city "Paris"]
+	set manual [json object name {string "Alice"} city {string "Paris"}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+test autoobject-6.2 {Compare autoobject vs manual object - numbers} -body { #<<<
+	set auto [json autoobject age 30 score 95.5]
+	set manual [json object age {number 30} score {number 95.5}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+test autoobject-6.3 {Compare autoobject vs manual object - booleans} -body { #<<<
+	set auto [json autoobject active true verified false]
+	set manual [json object active {boolean true} verified {boolean false}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+test autoobject-6.4 {Compare autoobject vs manual object - mixed} -body { #<<<
+	set auto [json autoobject name "Bob" age 25 active true]
+	set manual [json object name {string "Bob"} age {number 25} active {boolean true}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+
+# Edge cases
+test autoobject-7.1 {Empty string value} -body { #<<<
+	json autoobject key ""
+} -result {{"key":""}}
+#>>>
+test autoobject-7.2 {Whitespace-only value} -body { #<<<
+	json autoobject key "   "
+} -result {{"key":"   "}}
+#>>>
+test autoobject-7.3 {Zero value} -body { #<<<
+	json autoobject count 0 score 0.0
+} -result {{"count":0,"score":0.0}}
+#>>>
+test autoobject-7.4 {Negative numbers} -body { #<<<
+	set obj [json autoobject temp -5 balance -100.50]
+	# Verify values are correct (trailing zeros may be normalized)
+	expr {[json get $obj temp] == -5 && [json get $obj balance] == -100.50}
+} -result {1}
+#>>>
+test autoobject-7.5 {Values with quotes} -body { #<<<
+	json autoobject quote "He said \"hello\""
+} -result {{"quote":"He said \"hello\""}}
+#>>>
+test autoobject-7.6 {Values with backslashes} -body { #<<<
+	json autoobject path "C:\\Windows\\System32"
+} -result {{"path":"C:\\Windows\\System32"}}
+#>>>
+test autoobject-7.7 {Tab and newline characters} -body { #<<<
+	json autoobject tab "a\tb" newline "x\ny"
+} -result {{"tab":"a\tb","newline":"x\ny"}}
+#>>>
+
+# Tcl number format handling (should convert to JSON numbers)
+test autoobject-8.1 {Octal format converts to decimal} -body { #<<<
+	json autoobject val 007
+} -result {{"val":7}}
+#>>>
+test autoobject-8.2 {Hex format converts to decimal} -body { #<<<
+	json autoobject val 0x1F
+} -result {{"val":31}}
+#>>>
+test autoobject-8.3 {Binary format converts to decimal} -body { #<<<
+	json autoobject val 0b1010
+} -result {{"val":10}}
+#>>>
+
+# Type verification
+test autoobject-9.1 {Result is JSON object type} -body { #<<<
+	json type [json autoobject name "Alice"]
+} -result {object}
+#>>>
+test autoobject-10.2 {Empty result is JSON object type} -body { #<<<
+	json type [json autoobject]
+} -result {object}
+#>>>
+
+# Key extraction
+test autoobject-11.1 {Extract value by key} -body { #<<<
+	set obj [json autoobject name "Alice" age 30]
+	json get $obj name
+} -cleanup {
+	unset -nocomplain obj
+} -result {Alice}
+#>>>
+test autoobject-11.2 {Get all keys} -body { #<<<
+	set obj [json autoobject name "Alice" age 30 active true]
+	lsort [json get $obj ?keys]
+} -cleanup {
+	unset -nocomplain obj
+} -result {active age name}
+#>>>
+
+# Large object
+test autoobject-12.1 {Large object with many keys} -body { #<<<
+	set pairs {}
+	for {set i 0} {$i < 50} {incr i} {
+		lappend pairs "key$i" $i
+	}
+	set obj [json autoobject {*}$pairs]
+	json get $obj ?size
+} -cleanup {
+	unset -nocomplain pairs obj i
+} -result {50}
+#>>>
+
+cleanupTests
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

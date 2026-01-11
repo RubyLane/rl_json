@@ -56,7 +56,36 @@ json autoarray 1 2.5 true false "hello world" 42
 - `doc/json.n`: Documentation added
 - `tests/autoarray.test`: Comprehensive test suite (322 new lines)
 
-### 2. Enhanced `json pretty` Command
+### 2. New `json autoobject` Command
+
+A new command that creates JSON objects from key-value pairs with automatic type detection for values, complementing the `json autoarray` command.
+
+**Syntax:**
+```tcl
+json autoobject ?key value ...?
+```
+
+**Features:**
+- Keys are always treated as strings (as required by JSON specification)
+- Values undergo automatic type detection:
+  - Exact "true" or "false" (case-sensitive) → JSON booleans
+  - Valid JSON numbers → JSON numbers
+  - All other values → JSON strings
+- Requires even number of arguments (key-value pairs)
+- Duplicate keys allowed (last value wins)
+
+**Example:**
+```tcl
+json autoobject name "Alice" age 30 active true score 95.5
+# Returns: {"name":"Alice","age":30,"active":true,"score":95.5}
+```
+
+**Files:**
+- `generic/rl_json.c`: Implementation of `jsonAutoObject()` function
+- `doc/json.n`: Documentation added
+- `tests/autoobject.test`: Comprehensive test suite (260+ new lines)
+
+### 3. Enhanced `json pretty` Command
 
 Significant enhancements to the pretty-printing functionality with three new options.
 
@@ -190,6 +219,7 @@ int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent,
 
 ### New Tcl Commands
 - `json autoarray ?value ...?`
+- `json autoobject ?key value ...?`
 
 ### Enhanced Tcl Commands
 - `json pretty ?-indent indent? ?-compact? ?-nopadding? ?-arrays inline|multiline? jsonValue ?key ...?`
