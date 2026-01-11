@@ -3684,6 +3684,7 @@ collect_interp_result:
 }
 
 //}}}
+#ifndef ENSEMBLE
 static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int subcommand;
@@ -3864,12 +3865,16 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 
 	return TCL_OK;
 }
+#endif
 
 //}}}
+
+#ifndef ENSEMBLE
 static int jsonObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRObj, cdata, objc, objv);
 }
+#endif
 
 //}}}
 
@@ -4224,6 +4229,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("boolean",    -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("object",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("array",      -1));
+            Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("autoarray",  -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("decode",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("isnull",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template",   -1));
