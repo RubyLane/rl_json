@@ -4,6 +4,15 @@
 #include <tcl.h>
 #include <stdint.h>		// Stubs API uses stdint types
 
+/* Tcl 8 compatibility shim for Tcl_Size */
+#ifndef TCL_SIZE_MAX
+#include <limits.h>
+typedef int Tcl_Size;
+#define TCL_SIZE_MAX INT_MAX
+#define TCL_SIZE_MODIFIER ""
+#define Tcl_GetSizeIntFromObj Tcl_GetIntFromObj
+#endif
+
 #ifdef BUILD_rl_json
 #undef TCL_STORAGE_CLASS
 #define TCL_STORAGE_CLASS DLLEXPORT
