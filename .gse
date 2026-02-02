@@ -1,0 +1,23 @@
+{
+    "sync": {
+        "enable": true,
+        "pull": [
+            {
+                "origin": "origin",
+                "branch": "main"
+            }
+        ],
+        "push": [
+            {
+                "origin": "origin",
+                "branch": "main"
+            }
+        ]
+    },
+    "pull": {
+        "enable": true
+    },
+    "push": {
+        "enable": true
+    }
+}
