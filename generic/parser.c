@@ -228,7 +228,7 @@ err_illegal_char:
 }
 
 //}}}
-int is_template(const char* s, int len) //{{{
+int is_template(const char* s, Tcl_Size len) //{{{
 {
 	if (
 		len >= 3 &&
