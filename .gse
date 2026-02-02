@@ -4,13 +4,13 @@
         "pull": [
             {
                 "origin": "origin",
-                "branch": "main"
+                "branch": "wip"
             }
         ],
         "push": [
             {
                 "origin": "origin",
-                "branch": "main"
+                "branch": "wip"
             }
         ]
     },
