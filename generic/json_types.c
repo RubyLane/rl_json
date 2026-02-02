@@ -298,7 +298,7 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 	replace_tclobj(&rep, replacement);
 
 	if (type == JSON_STRING && rep) { // Check for template values
-		int					len;
+		Tcl_Size			len;
 		const char*			str = Tcl_GetStringFromObj(replacement, &len);
 		const char*const	strend = str + len;
 		enum json_types		template_type;
@@ -437,7 +437,7 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 		Tcl_Panic("dup_internal_rep asked to duplicate for type, but that type wasn't available on the src object");
 
 	if (src == srcir->twoPtrValue.ptr1) {
-		int			len;
+		Tcl_Size	len;
 		const char*	str = Tcl_GetStringFromObj((Tcl_Obj*)srcir->twoPtrValue.ptr1, &len);
 		// Don't know how this happens yet, but it's bad news - we get into an endless recursion of duplicateobj calls until the stack blows up
 
@@ -446,7 +446,7 @@ static void dup_internal_rep(Tcl_Obj* src, Tcl_Obj* dest, Tcl_ObjType* objtype) 
 	} else {
 		if (objtype == &json_array) {
 			Tcl_Obj**	ov = NULL;
-			int			oc;
+			Tcl_Size	oc;
 			// The list type's internal structure sharing on duplicates messes up our sharing,
 			// rather recreate a fresh list referencing the original element objects instead
 			if (TCL_OK != Tcl_ListObjGetElements(NULL, srcir->twoPtrValue.ptr1, &oc, &ov))
@@ -516,7 +516,7 @@ static void update_string_rep_number(Tcl_Obj* obj) //{{{
 {
 	Tcl_ObjInternalRep*	ir = Tcl_FetchInternalRep(obj, &json_number);
 	const char*			str;
-	int					len;
+	Tcl_Size			len;
 
 	if (ir->twoPtrValue.ptr1 == obj)
 		Tcl_Panic("Turtles all the way down!");
@@ -590,7 +590,7 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	const unsigned char*	p;
 	const unsigned char*	e;
 	const unsigned char*	val_start;
-	int						len;
+	Tcl_Size				len;
 	struct parse_context	cx[CX_STACK_SIZE];
 	enum extensions			extensions = EXT_COMMENTS;
 	struct parse_error		details = {0};

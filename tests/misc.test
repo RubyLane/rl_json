@@ -42,23 +42,43 @@ test misc-2.6 {isnull, path, out of array bounds} -body { #<<<
 	json isnull {["a",null,"c"]} -1
 } -result 1
 #>>>
-test misc-3.1 {interp free} -body { #<<<
+if {[string match "9.*" $tcl_version]} {
+    test misc-3.1 {interp free} -body { #<<<
 	set slave [interp create]
-	$slave eval {load {} Rl_json; rl_json::json get {["hello","slave"]}}
-} -cleanup {
+	$slave eval {load {} rl_json; rl_json::json get {["hello","slave"]}}
+    } -cleanup {
 	interp delete $slave
 	unset -nocomplain slave
-} -result {hello slave}
-#>>>
-test misc-3.2 {interp free, safe interp} -body { #<<<
+    } -result {hello slave}
+    #>>>
+    test misc-3.2 {interp free, safe interp} -body { #<<<
+	set slave [interp create -safe]
+	$slave invokehidden load {} rl_json
+	$slave eval {rl_json::json get {["hello","slave"]}}
+    } -cleanup {
+	interp delete $slave
+	unset -nocomplain slave
+    } -result {hello slave}
+    #>>>
+} else {
+    test misc-3.1 {interp free} -body { #<<<
+	set slave [interp create]
+	$slave eval {load {} Rl_json; rl_json::json get {["hello","slave"]}}
+    } -cleanup {
+	interp delete $slave
+	unset -nocomplain slave
+    } -result {hello slave}
+    #>>>
+    test misc-3.2 {interp free, safe interp} -body { #<<<
 	set slave [interp create -safe]
 	$slave invokehidden load {} Rl_json
 	$slave eval {rl_json::json get {["hello","slave"]}}
-} -cleanup {
+    } -cleanup {
 	interp delete $slave
 	unset -nocomplain slave
-} -result {hello slave}
-#>>>
+    } -result {hello slave}
+    #>>>
+}
 
 ::tcltest::cleanupTests
 return

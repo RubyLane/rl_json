@@ -55,7 +55,7 @@ declare 15 generic {
 	int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, int objc, Tcl_Obj* objv[])
 }
 declare 16 generic {
-	int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, int* objc, Tcl_Obj*** objv)
+	int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Size* objc, Tcl_Obj*** objv)
 }
 declare 17 generic {
 	int JSON_JArrayObjIndex(Tcl_Interp* interp, Tcl_Obj* arrayObj, int index, Tcl_Obj** elem)
@@ -100,7 +100,7 @@ declare 28 generic {
 	int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, enum json_types* type)
 }
 declare 29 generic {
-	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, int* length)
+	int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Size* length)
 }
 declare 30 generic {
 	int JSON_Keys(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj** keyslist)
