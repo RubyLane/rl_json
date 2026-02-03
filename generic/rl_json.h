@@ -4,6 +4,15 @@
 #include <tcl.h>
 #include <stdint.h>		// Stubs API uses stdint types
 
+/* Tcl 8 compatibility shim for Tcl_Size */
+#ifndef TCL_SIZE_MAX
+#include <limits.h>
+typedef int Tcl_Size;
+#define TCL_SIZE_MAX INT_MAX
+#define TCL_SIZE_MODIFIER ""
+#define Tcl_GetSizeIntFromObj Tcl_GetIntFromObj
+#endif
+
 #ifdef BUILD_rl_json
 #undef TCL_STORAGE_CLASS
 #define TCL_STORAGE_CLASS DLLEXPORT
@@ -71,13 +80,13 @@ enum cbor_mt {
 // Stubs exported API
 
 #ifdef USE_RL_JSON_STUBS
-EXTERN CONST char* Rl_jsonInitStubs _ANSI_ARGS_((Tcl_Interp* interp, CONST char* version, int exact));
+EXTERN const char* Rl_jsonInitStubs(Tcl_Interp* interp, const char* version, int exact);
 #else
 #	define Rl_jsonInitStubs(interp, version, exact) Tcl_PkgRequire(interp, "rl_json", version, exact)
 #endif
 #include "rl_jsonDecls.h"
 
-EXTERN int Rl_json_Init _ANSI_ARGS_((Tcl_Interp* interp));
-EXTERN int Rl_json_SafeInit _ANSI_ARGS_((Tcl_Interp* interp));
+EXTERN int Rl_json_Init(Tcl_Interp* interp);
+EXTERN int Rl_json_SafeInit(Tcl_Interp* interp);
 
 #endif

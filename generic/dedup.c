@@ -87,7 +87,7 @@ static void age_cache(struct interp_cx* l) //{{{
 }
 
 //}}}
-Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, int length) //{{{
+Tcl_Obj* new_stringobj_dedup(struct interp_cx* l, const char* bytes, Tcl_Size length) //{{{
 {
 	char				buf[STRING_DEDUP_MAX + 1];
 	const char			*keyname;
