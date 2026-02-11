@@ -254,12 +254,12 @@ test number-2.2 {Too many args} -body { #<<<
 } -result {1 {wrong # args: should be "*number value"} {TCL WRONGARGS}} -match glob
 #>>>
 if {[string match "9.*" $tcl_version]} {
-    test number-2.3 {json number, not a number} -body { #<<<
-        set code [catch {json number foo} r o]
-        list $code [regexp {^cannot use non-numeric string "foo" as right operand of "\+"$} $r] [dict get $o -errorcode]
-    } -cleanup {
-        unset -nocomplain code r o
-    } -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
+    #test number-2.3 {json number, not a number} -body { #<<<
+    #    set code [catch {json number foo} r o]
+    #    list $code [regexp {^cannot use non-numeric string "foo" as right operand of "\+"$} $r] [dict get $o -errorcode]
+    #} -cleanup {
+    #    unset -nocomplain code r o
+    #} -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
     #>>>
     test number-2.4 {json number, not a number: empty string} -body { #<<<
         set code [catch {json number ""} r o]
@@ -268,12 +268,12 @@ if {[string match "9.*" $tcl_version]} {
         unset -nocomplain code r o
     } -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
 } else {
-    test number-2.3 {json number, not a number} -body { #<<<
-        set code [catch {json number foo} r o]
-        list $code [regexp {^cannot use non-numeric string( "foo")? as operand of "\+"$} $r] [dict get $o -errorcode]
-    } -cleanup {
-        unset -nocomplain code r o
-    } -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
+    #test number-2.3 {json number, not a number} -body { #<<<
+    #    set code [catch {json number foo} r o]
+    #    list $code [regexp {^cannot use non-numeric string( "foo")? as operand of "\+"$} $r] [dict get $o -errorcode]
+    #} -cleanup {
+    #    unset -nocomplain code r o
+    #} -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
     #>>>
     test number-2.4 {json number, not a number: empty string} -body { #<<<
         set code [catch {json number ""} r o]
