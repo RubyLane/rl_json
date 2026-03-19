@@ -63,11 +63,6 @@ enum cbor_mt {
 #endif
 
 
-#ifdef TCL_MEM_DEBUG
-#	undef JSON_NewJvalObj
-#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
-#endif
-
 // Stubs exported API
 
 #ifdef USE_RL_JSON_STUBS
@@ -79,5 +74,11 @@ EXTERN CONST char* Rl_jsonInitStubs _ANSI_ARGS_((Tcl_Interp* interp, CONST char*
 
 EXTERN int Rl_json_Init _ANSI_ARGS_((Tcl_Interp* interp));
 EXTERN int Rl_json_SafeInit _ANSI_ARGS_((Tcl_Interp* interp));
+
+// Must be after the actual declaration of JSON_NewJvalObj by rl_jsonDecls.h above
+#ifdef TCL_MEM_DEBUG
+#	undef JSON_NewJvalObj
+#	define JSON_NewJvalObj(type, val) JSON_DbNewJvalObj(type, val, __FILE__ " (JVAL)", __LINE__)
+#endif
 
 #endif

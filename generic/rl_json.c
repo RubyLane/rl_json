@@ -1,5 +1,13 @@
 #include "rl_jsonInt.h"
 
+// shims to connect tommath's memory management to Tcl's (otherwise Tcl frees
+// the mp_int's we hand to it in bignum Tcl_Objs with a different allocator
+// than tommath used)
+void* tommath_malloc(size_t size)                                {return ckalloc(size);}
+void* tommath_realloc(void* mem, size_t oldsize, size_t newsize) {return ckrealloc(mem, newsize);}
+void* tommath_calloc(size_t nmemb, size_t size)                  {void* m=ckalloc(nmemb*size); memset(m, 0, nmemb*size); return m;}
+void  tommath_free(void* mem, size_t size)                       {ckfree(mem);}
+
 TCL_DECLARE_MUTEX(g_config_mutex);
 Tcl_Obj*		g_packagedir = NULL;
 Tcl_Obj*		g_includedir = NULL;
@@ -3808,15 +3816,11 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 }
 
 //}}}
+static Tcl_NRPostProc NRcheckmem_bottom;
 static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	int					retcode = TCL_OK;
 	FILE*				h_before = NULL;
-	FILE*				h_after = NULL;
-	char				linebuf[1024];
-	char*				line = NULL;
-	Tcl_HashTable		seen;
-	Tcl_Obj*			res = NULL;
 #define TEMP_TEMPLATE	"/tmp/rl_json_XXXXXX"
 	char				temp[sizeof(TEMP_TEMPLATE)];
 	int					fd;
@@ -3841,7 +3845,29 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 		goto finally;
 	}
 
-	retcode = Tcl_EvalEx(interp, Tcl_GetString(objv[1]), -1, TCL_EVAL_DIRECT);
+	Tcl_IncrRefCount(objv[2]);
+	intptr_t wrap_fd = fd;
+	Tcl_NRAddCallback(interp, NRcheckmem_bottom, NULL, (ClientData)wrap_fd, h_before, objv[2]);
+	return Tcl_NREvalObj(interp, objv[1], 0);
+finally:
+	return retcode;
+}
+
+static int NRcheckmem_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode) //{{{
+{
+	char				temp[sizeof(TEMP_TEMPLATE)];
+	int					fd = (int)(intptr_t)cdata[1];
+	FILE*				h_before = (FILE*)cdata[2];
+	Tcl_Obj*			varname = (Tcl_Obj*)cdata[3];
+	FILE*				h_after = NULL;
+	Tcl_HashTable		seen;
+	char				linebuf[1024];
+	char*				line = NULL;
+	Tcl_Obj*			res = NULL;
+#if DEDUP
+	struct interp_cx*	l = (struct interp_cx*)cdata;
+#endif
+
 #if DEDUP
 	free_cache(l);
 #endif
@@ -3885,11 +3911,12 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	fclose(h_after); h_after = NULL;
 
 	if (retcode == TCL_OK)
-		if (Tcl_ObjSetVar2(interp, objv[2], NULL, res, TCL_LEAVE_ERR_MSG) == NULL)
+		if (Tcl_ObjSetVar2(interp, varname, NULL, res, TCL_LEAVE_ERR_MSG) == NULL)
 			retcode = TCL_ERROR;
 
 finally:
 	release_tclobj(&res);
+	release_tclobj(&varname);
 	if (h_before) {fclose(h_before); h_before = NULL;}
 	if (h_after)  {fclose(h_after);  h_after = NULL;}
 	Tcl_DeleteHashTable(&seen);

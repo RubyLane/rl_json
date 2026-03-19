@@ -359,6 +359,10 @@ Tcl_Obj* JSON_DbNewJvalObj(enum json_types type, Tcl_Obj* val, const char* file,
 }
 
 //}}}
+#ifdef JSON_NewJvalObj
+// TCL_MEM_DEBUG is defined so rl_json.h has redefined JSON_NewJvalObj to JSON_DbNewJvalObj.  Undef here to actually define the function
+#undef JSON_NewJvalObj
+#endif
 Tcl_Obj* JSON_NewJvalObj(enum json_types type, Tcl_Obj* val) //{{{
 {
 	Tcl_Obj*	res = Tcl_NewObj();
