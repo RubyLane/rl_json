@@ -12,7 +12,16 @@ if {[lsearch [namespace children] ::tcltest] == -1} {
     namespace import ::tcltest::*
 }
 
-if {[llength [info commands memory]] == 1} {
+set checkmem	false
+set argv [lmap e $argv {
+	if {$e eq "-checkmem"} {
+		set checkmem	true
+		continue
+	}
+	set e
+}]
+
+if {$checkmem && [llength [info commands memory]] == 1} {
 	memory init on
 	#memory onexit memdebug
 	#memory validate on
@@ -200,9 +209,7 @@ if {[llength [info commands memory]] == 1} {
 		}
 
 		::rl_json::checkmem {
-			apply {{name args} {
-				::tcltest::test $name {*}$args
-			}} $name {*}$args
+			uplevel 1 [list ::tcltest::test $name {*}$args]
 		} newactive
 
 		::tcltest::test "$name-mem" "Memory test for $name" -body {
