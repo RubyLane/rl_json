@@ -76,21 +76,23 @@ test number-1.13 {string} -body { #<<<
 	json number [string cat 4 2]
 } -result 42
 #>>>
-test number-1.14.1 {positive octal} -body { #<<<
-	set n	077
-	expr {$n+0}	;# Convert to number type
-	list [json number $n] $n
-} -cleanup {
-	unset -nocomplain n
-} -result {63 077}
-#>>>
-test number-1.14.2 {negative octal} -body { #<<<
-	set n	-077
-	expr {$n+0}	;# Convert to number type
-	list [json number $n] $n
-} -cleanup {
-	unset -nocomplain n
-} -result {-63 -077}
+if {$::tcl_version == "8.6"} {
+    test number-1.14.1 {positive octal} -body { #<<<
+        set n	077
+        expr {$n+0}	;# Convert to number type
+        list [json number $n] $n
+    } -cleanup {
+        unset -nocomplain n
+    } -result {63 077}
+    #>>>
+    test number-1.14.2 {negative octal} -body { #<<<
+        set n	-077
+        expr {$n+0}	;# Convert to number type
+        list [json number $n] $n
+    } -cleanup {
+        unset -nocomplain n
+    } -result {-63 -077}
+}
 #>>>
 test number-1.15.1 {positive hex} -body { #<<<
 	set n	0xA0
@@ -241,12 +243,14 @@ test number-2.3 {json number, not a number} -body { #<<<
 	unset -nocomplain code r o
 } -match regexp -result {1 1 {ARITH DOMAIN {non-numeric string}}}
 #>>>
-test number-2.4 {json number, not a number: empty string} -body { #<<<
-	set code [catch {json number ""} r o]
-	list $code [regexp {^(can't|cannot) use empty string( "")? as( right)? operand of "\+"$} $r] [dict get $o -errorcode]
-} -cleanup {
-	unset -nocomplain code r o
-} -match regexp -result {1 1 {ARITH DOMAIN {empty string}}}
+if {$::tcl_version == "8.6"} {
+    test number-2.4 {json number, not a number: empty string} -body { #<<<
+        set code [catch {json number ""} r o]
+        list $code [regexp {^(can't|cannot) use empty string( "")? as( right)? operand of "\+"$} $r] [dict get $o -errorcode]
+    } -cleanup {
+        unset -nocomplain code r o
+    } -match regexp -result {1 1 {ARITH DOMAIN {empty string}}}
+}
 #>>>
 
 ::tcltest::cleanupTests
