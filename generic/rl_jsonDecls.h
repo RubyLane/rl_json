@@ -56,7 +56,7 @@ EXTERN int		JSON_SetJArrayObj(Tcl_Interp*interp, Tcl_Obj*obj,
 				int objc, Tcl_Obj*objv[]);
 /* 16 */
 EXTERN int		JSON_JArrayObjGetElements(Tcl_Interp*interp,
-				Tcl_Obj*arrayObj, int*objc, Tcl_Obj***objv);
+				Tcl_Obj*arrayObj, Tcl_Size*objc, Tcl_Obj***objv);
 /* 17 */
 EXTERN int		JSON_JArrayObjIndex(Tcl_Interp*interp,
 				Tcl_Obj*arrayObj, int index, Tcl_Obj**elem);
@@ -87,7 +87,8 @@ EXTERN int		JSON_Normalize(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Obj**normalized);
 /* 25 */
 EXTERN int		JSON_Pretty(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj*indent, Tcl_Obj**prettyString);
+                                Tcl_Obj*indent, int nopadding, int compact,
+				int arrays_inline, Tcl_Obj**prettyString);
 /* 26 */
 EXTERN int		JSON_Template(Tcl_Interp*interp, Tcl_Obj*template,
 				Tcl_Obj*dict, Tcl_Obj**res);
@@ -100,7 +101,7 @@ EXTERN int		JSON_Type(Tcl_Interp*interp, Tcl_Obj*obj,
 				enum json_types*type);
 /* 29 */
 EXTERN int		JSON_Length(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj* path /* can be NULL */, int*length);
+				Tcl_Obj* path /* can be NULL */, Tcl_Size*length);
 /* 30 */
 EXTERN int		JSON_Keys(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Obj* path /* can be NULL */,
@@ -123,7 +124,7 @@ EXTERN Tcl_Obj*		JSON_NewJvalObj(enum json_types type, Tcl_Obj*val);
 EXTERN Tcl_Obj*		JSON_DbNewJvalObj(enum json_types type, Tcl_Obj*val,
 				const char*file, int line);
 
-typedef struct Rl_jsonStubs {
+typedef struct TcljsonStubs {
     int magic;
     void *hooks;
 
@@ -143,7 +144,7 @@ typedef struct Rl_jsonStubs {
     int (*jSON_JArrayObjAppendElement) (Tcl_Interp*interp, Tcl_Obj*arrayObj, Tcl_Obj*elem); /* 13 */
     int (*jSON_JArrayObjAppendList) (Tcl_Interp*interp, Tcl_Obj*arrayObj, Tcl_Obj* elems /* a JArrayObj or ListObj */); /* 14 */
     int (*jSON_SetJArrayObj) (Tcl_Interp*interp, Tcl_Obj*obj, int objc, Tcl_Obj*objv[]); /* 15 */
-    int (*jSON_JArrayObjGetElements) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int*objc, Tcl_Obj***objv); /* 16 */
+    int (*jSON_JArrayObjGetElements) (Tcl_Interp*interp, Tcl_Obj*arrayObj, Tcl_Size*objc, Tcl_Obj***objv); /* 16 */
     int (*jSON_JArrayObjIndex) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int index, Tcl_Obj**elem); /* 17 */
     int (*jSON_JArrayObjReplace) (Tcl_Interp*interp, Tcl_Obj*arrayObj, int first, int count, int objc, Tcl_Obj*objv[]); /* 18 */
     int (*jSON_Get) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj**res); /* 19 */
@@ -152,11 +153,11 @@ typedef struct Rl_jsonStubs {
     int (*jSON_Set) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj*replacement); /* 22 */
     int (*jSON_Unset) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */); /* 23 */
     int (*jSON_Normalize) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj**normalized); /* 24 */
-    int (*jSON_Pretty) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*indent, Tcl_Obj**prettyString); /* 25 */
+    int (*jSON_Pretty) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj*indent, int nopadding, int compact, int arrays_inline, Tcl_Obj**prettyString); /* 25 */
     int (*jSON_Template) (Tcl_Interp*interp, Tcl_Obj*template, Tcl_Obj*dict, Tcl_Obj**res); /* 26 */
     int (*jSON_IsNULL) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, int*isnull); /* 27 */
     int (*jSON_Type) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, enum json_types*type); /* 28 */
-    int (*jSON_Length) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, int*length); /* 29 */
+    int (*jSON_Length) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Size*length); /* 29 */
     int (*jSON_Keys) (Tcl_Interp*interp, Tcl_Obj*obj, Tcl_Obj* path /* can be NULL */, Tcl_Obj**keyslist); /* 30 */
     int (*jSON_Decode) (Tcl_Interp*interp, Tcl_Obj*bytes, Tcl_Obj*encoding, Tcl_Obj**decodedstring); /* 31 */
     int (*jSON_Foreach) (Tcl_Interp*interp, Tcl_Obj*iterators, JSON_ForeachBody*body, enum collecting_mode collect, Tcl_Obj**res, ClientData cdata); /* 32 */

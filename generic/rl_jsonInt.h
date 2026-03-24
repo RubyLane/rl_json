@@ -3,6 +3,10 @@
 #define _POSIX_C_SOURCE	200809L
 #define _DEFAULT_SOURCE
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "rl_json.h"
 #include "tclstuff.h"
 #include <string.h>
@@ -18,8 +22,8 @@
 #endif
 #if CBOR
 #include <endian.h>
-#endif
 #include <tommath.h>
+#endif
 #include "tip445.h"
 #include "names.h"
 
@@ -55,11 +59,11 @@ struct parse_context {
 };
 
 struct foreach_iterator {
-	int				data_c;
+	Tcl_Size		data_c;
 	Tcl_Obj**		data_v;
-	int				data_i;
+	Tcl_Size		data_i;
 	Tcl_Obj*		varlist;
-	int				var_c;
+	Tcl_Size		var_c;
 	Tcl_Obj**		var_v;
 	int				is_array;
 
@@ -71,9 +75,9 @@ struct foreach_iterator {
 };
 
 struct foreach_state {
-	unsigned int				loop_num;
-	unsigned int				max_loops;
-	unsigned int				iterators;
+	Tcl_Size					loop_num;
+	Tcl_Size					max_loops;
+	Tcl_Size					iterators;
 	struct foreach_iterator*	it;
 	Tcl_Obj*					script;
 	Tcl_Obj*					res;
@@ -213,9 +217,9 @@ void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
 int serialize(Tcl_Interp* interp, struct serialize_context* scx, Tcl_Obj* obj);
 void release_instances(void);
 int init_types(Tcl_Interp* interp);
-Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, int length);
+Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, Tcl_Size length);
 int lookup_type(Tcl_Interp* interp, Tcl_Obj* typeobj, int* type);
-int is_template(const char* s, int len);
+int is_template(const char* s, Tcl_Size len);
 
 extern Tcl_ObjType* g_objtype_for_type[];
 extern const char* type_names_int[];
@@ -254,8 +258,8 @@ Tcl_Obj* get_unshared_val(Tcl_ObjInternalRep* ir);
 int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actions, Tcl_Obj* dict, Tcl_Obj** res);
 int build_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj** actions);
 int convert_to_tcl(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** out);
-int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], int pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def);
-int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, Tcl_Obj* pad, Tcl_DString* ds);
+int resolve_path(Tcl_Interp* interp, Tcl_Obj* src, Tcl_Obj *const pathv[], Tcl_Size pathc, Tcl_Obj** target, const int exists, const int modifiers, Tcl_Obj* def);
+int json_pretty(Tcl_Interp* interp, Tcl_Obj* json, Tcl_Obj* indent, int nopadding, Tcl_Obj* pad, int arrays_inline, Tcl_DString* ds);
 void foreach_state_free(struct foreach_state* state);
 
 #define TEMPLATE_TYPE(s, len, out) \
@@ -285,7 +289,7 @@ void cbor_release(Tcl_Interp* interp);
 //#define Tcl_GetBytesFromObj(interp, obj, lenptr) Tcl_GetByteArrayFromObj(obj, lenptr)
 static inline uint8_t* Tcl_GetBytesFromObj(Tcl_Interp* interp, Tcl_Obj* obj, size_t* lenPtr)
 {
-	int	len;
+	Tcl_Size	len;
 	uint8_t*	bytes = Tcl_GetByteArrayFromObj(obj, &len);
 	*lenPtr = len;
 	return bytes;

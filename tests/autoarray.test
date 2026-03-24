@@ -1,0 +1,322 @@
+if {"::tcltest" ni [namespace children]} {
+	package require tcltest
+	namespace import ::tcltest::*
+}
+
+package require rl_json
+namespace import ::rl_json::*
+
+source [file join [file dirname [info script]] helpers.tcl]
+
+# Basic functionality tests
+test autoarray-1.1 {Empty autoarray} -body { #<<<
+	json autoarray
+} -result {[]}
+#>>>
+test autoarray-1.2 {Single string} -body { #<<<
+	json autoarray "hello"
+} -result {["hello"]}
+#>>>
+test autoarray-1.3 {Single number - integer} -body { #<<<
+	json autoarray 42
+} -result {[42]}
+#>>>
+test autoarray-1.4 {Single number - float} -body { #<<<
+	json autoarray 3.14
+} -result {[3.14]}
+#>>>
+test autoarray-1.5 {Single boolean - true} -body { #<<<
+	json autoarray true
+} -result {[true]}
+#>>>
+test autoarray-1.6 {Single boolean - false} -body { #<<<
+	json autoarray false
+} -result {[false]}
+#>>>
+
+# Mixed type arrays
+test autoarray-2.1 {Mixed types - numbers and strings} -body { #<<<
+	json autoarray 1 "hello" 2 "world"
+} -result {[1,"hello",2,"world"]}
+#>>>
+test autoarray-2.2 {Mixed types - all types} -body { #<<<
+	json autoarray 42 "hello" true 3.14 false "world"
+} -result {[42,"hello",true,3.14,false,"world"]}
+#>>>
+test autoarray-2.3 {Mixed types with spaces in strings} -body { #<<<
+	json autoarray 1 "hello world" 2 "foo bar"
+} -result {[1,"hello world",2,"foo bar"]}
+#>>>
+
+# Number format tests
+test autoarray-3.1 {Negative integer} -body { #<<<
+	json autoarray -42
+} -result {[-42]}
+#>>>
+test autoarray-3.2 {Negative float} -body { #<<<
+	json autoarray -3.14
+} -result {[-3.14]}
+#>>>
+test autoarray-3.3 {Zero} -body { #<<<
+	json autoarray 0
+} -result {[0]}
+#>>>
+test autoarray-3.4 {Scientific notation - positive exponent} -body { #<<<
+	json autoarray 1.5e10
+} -result {[15000000000.0]}
+#>>>
+test autoarray-3.5 {Scientific notation - negative exponent} -body { #<<<
+	json autoarray 1.5e-10
+} -result {[1.5e-10]}
+#>>>
+test autoarray-3.6 {Large integer} -body { #<<<
+	json autoarray 9223372036854775807
+} -result {[9223372036854775807]}
+#>>>
+test autoarray-3.7 {Very small float} -body { #<<<
+	json autoarray 0.000001
+} -result {[1e-6]}
+#>>>
+
+# Boolean case sensitivity tests
+test autoarray-4.1 {Boolean false case - True (not a boolean)} -body { #<<<
+	json autoarray True
+} -result {["True"]}
+#>>>
+test autoarray-4.2 {Boolean false case - TRUE (not a boolean)} -body { #<<<
+	json autoarray TRUE
+} -result {["TRUE"]}
+#>>>
+test autoarray-4.3 {Boolean false case - False (not a boolean)} -body { #<<<
+	json autoarray False
+} -result {["False"]}
+#>>>
+test autoarray-4.4 {Boolean false case - FALSE (not a boolean)} -body { #<<<
+	json autoarray FALSE
+} -result {["FALSE"]}
+#>>>
+test autoarray-4.5 {Exact boolean - true} -body { #<<<
+	json autoarray true
+} -result {[true]}
+#>>>
+test autoarray-4.6 {Exact boolean - false} -body { #<<<
+	json autoarray false
+} -result {[false]}
+#>>>
+
+# Edge cases for numbers in different formats (Tcl interprets these)
+test autoarray-5.1 {Octal number with leading zeros} -body { #<<<
+	json autoarray 007
+} -result {[7]}
+#>>>
+test autoarray-5.2 {Number with plus sign} -body { #<<<
+	json autoarray +42
+} -result {[42]}
+#>>>
+test autoarray-5.3 {Hex number format} -body { #<<<
+	json autoarray 0x1F
+} -result {[31]}
+#>>>
+test autoarray-5.4 {Octal number format} -body { #<<<
+	json autoarray 0o17
+} -result {[15]}
+#>>>
+test autoarray-5.5 {Binary number format} -body { #<<<
+	json autoarray 0b1010
+} -result {[10]}
+#>>>
+
+# Empty and whitespace strings
+test autoarray-6.1 {Empty string} -body { #<<<
+	json autoarray ""
+} -result {[""]}
+#>>>
+test autoarray-6.2 {String with only spaces} -body { #<<<
+	json autoarray "   "
+} -result {["   "]}
+#>>>
+test autoarray-6.3 {String "true" with spaces} -body { #<<<
+	json autoarray " true"
+} -result {[" true"]}
+#>>>
+test autoarray-6.4 {String "false" with spaces} -body { #<<<
+	json autoarray "false "
+} -result {["false "]}
+#>>>
+
+# Special string values
+test autoarray-7.1 {String "null"} -body { #<<<
+	json autoarray null
+} -result {["null"]}
+#>>>
+test autoarray-7.2 {String "undefined"} -body { #<<<
+	json autoarray undefined
+} -result {["undefined"]}
+#>>>
+test autoarray-7.3 {String that looks like object} -body { #<<<
+	json autoarray {{}}
+} -result {["{}"]}
+#>>>
+test autoarray-7.4 {String that looks like array} -body { #<<<
+	json autoarray "[]"
+} -result {[""]}
+#>>>
+
+# Multiple identical values
+test autoarray-8.1 {Multiple true values} -body { #<<<
+	json autoarray true true true
+} -result {[true,true,true]}
+#>>>
+test autoarray-8.2 {Multiple false values} -body { #<<<
+	json autoarray false false false
+} -result {[false,false,false]}
+#>>>
+test autoarray-8.3 {Multiple same numbers} -body { #<<<
+	json autoarray 42 42 42
+} -result {[42,42,42]}
+#>>>
+test autoarray-8.4 {Multiple same strings} -body { #<<<
+	json autoarray "test" "test" "test"
+} -result {["test","test","test"]}
+#>>>
+
+# Real-world usage examples
+test autoarray-9.1 {Array of coordinates} -body { #<<<
+	json autoarray 10.5 20.3 30.1 40.9
+} -result {[10.5,20.3,30.1,40.9]}
+#>>>
+test autoarray-9.2 {Array of names} -body { #<<<
+	json autoarray "Alice" "Bob" "Charlie"
+} -result {["Alice","Bob","Charlie"]}
+#>>>
+test autoarray-9.3 {Array of flags} -body { #<<<
+	json autoarray true false true true false
+} -result {[true,false,true,true,false]}
+#>>>
+test autoarray-9.4 {Mixed data record} -body { #<<<
+	json autoarray "John Doe" 30 true "john@example.com" 5.5
+} -result {["John Doe",30,true,"john@example.com",5.5]}
+#>>>
+
+# Comparison with json array command
+test autoarray-10.1 {Compare autoarray vs array - strings} -body { #<<<
+	set auto [json autoarray "hello" "world"]
+	set manual [json array {string hello} {string world}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+test autoarray-10.2 {Compare autoarray vs array - numbers} -body { #<<<
+	set auto [json autoarray 1 2 3]
+	set manual [json array {number 1} {number 2} {number 3}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+test autoarray-10.3 {Compare autoarray vs array - booleans} -body { #<<<
+	set auto [json autoarray true false]
+	set manual [json array {boolean true} {boolean false}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+test autoarray-10.4 {Compare autoarray vs array - mixed} -body { #<<<
+	set auto [json autoarray 42 "hello" true 3.14]
+	set manual [json array {number 42} {string hello} {boolean true} {number 3.14}]
+	expr {$auto eq $manual}
+} -cleanup {
+	unset -nocomplain auto manual
+} -result {1}
+#>>>
+
+# Type preservation after parsing
+test autoarray-11.1 {Number type preserved} -body { #<<<
+	set arr [json autoarray 42]
+	json get $arr 0
+} -cleanup {
+	unset -nocomplain arr
+} -result {42}
+#>>>
+test autoarray-11.2 {String type preserved} -body { #<<<
+	set arr [json autoarray "hello"]
+	json get $arr 0
+} -cleanup {
+	unset -nocomplain arr
+} -result {hello}
+#>>>
+test autoarray-11.3 {Boolean type preserved} -body { #<<<
+	set arr [json autoarray true]
+	json get $arr 0
+} -cleanup {
+	unset -nocomplain arr
+} -result {true}
+#>>>
+test autoarray-11.4 {Type query for number} -body { #<<<
+	set arr [json autoarray 42]
+	json type $arr 0
+} -cleanup {
+	unset -nocomplain arr
+} -result {number}
+#>>>
+test autoarray-11.5 {Type query for string} -body { #<<<
+	set arr [json autoarray "hello"]
+	json type $arr 0
+} -cleanup {
+	unset -nocomplain arr
+} -result {string}
+#>>>
+test autoarray-11.6 {Type query for boolean} -body { #<<<
+	set arr [json autoarray true]
+	json type $arr 0
+} -cleanup {
+	unset -nocomplain arr
+} -result {boolean}
+#>>>
+
+# String escaping
+test autoarray-12.1 {String with quotes} -body { #<<<
+	json autoarray {He said "hello"}
+} -result {["He said \"hello\""]}
+#>>>
+test autoarray-12.2 {String with backslashes} -body { #<<<
+	json autoarray {C:\path\to\file}
+} -result {["C:\\path\\to\\file"]}
+#>>>
+test autoarray-12.3 {String with newline} -body { #<<<
+	json autoarray "line1\nline2"
+} -result {["line1\nline2"]}
+#>>>
+test autoarray-12.4 {String with tab} -body { #<<<
+	json autoarray "col1\tcol2"
+} -result {["col1\tcol2"]}
+#>>>
+
+# Large arrays
+test autoarray-13.1 {Array with 100 numbers} -body { #<<<
+	set nums [lmap i [lrepeat 100 0] {expr {int(rand() * 1000)}}]
+	set result [json autoarray {*}$nums]
+	json length $result
+} -cleanup {
+	unset -nocomplain nums result i
+} -result {100}
+#>>>
+test autoarray-13.2 {Array with 50 strings} -body { #<<<
+	set strings [lmap i [lrepeat 50 0] {format "string_%d" $i}]
+	set result [json autoarray {*}$strings]
+	json length $result
+} -cleanup {
+	unset -nocomplain strings result i
+} -result {50}
+#>>>
+
+::tcltest::cleanupTests
+return
+
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

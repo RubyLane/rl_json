@@ -6,3 +6,4 @@ package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ [list apply {
     	load [file join $dir @PKG_LIB_FILE@] @PACKAGE_NAME@
 	}
 } $dir]
+interp alias {} rljson {} rl_json::json

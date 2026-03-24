@@ -302,7 +302,7 @@ int JSON_SetJArrayObj(Tcl_Interp* interp, Tcl_Obj* obj, const int objc, Tcl_Obj*
 }
 
 //}}}
-int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, int* objc, Tcl_Obj*** objv) //{{{
+int JSON_JArrayObjGetElements(Tcl_Interp* interp, Tcl_Obj* arrayObj, Tcl_Size* objc, Tcl_Obj*** objv) //{{{
 {
 	enum json_types	type;
 	Tcl_Obj*		val = NULL;
@@ -392,7 +392,7 @@ int JSON_Extract(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Obj** res)
 	Tcl_Obj*	target = NULL;
 	Tcl_Obj**	pathv = NULL;
 	Tcl_Obj*	def = NULL;
-	int			pathc = 0;
+	Tcl_Size	pathc = 0;
 
 	if (path)
 		TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
@@ -418,7 +418,7 @@ int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //
 {
 	Tcl_Obj*			target = NULL;
 	Tcl_Obj**			pathv = NULL;
-	int					pathc = 0;
+	Tcl_Size			pathc = 0;
 
 	if (path)
 		TEST_OK(Tcl_ListObjGetElements(interp, path, &pathc, &pathv));
@@ -441,7 +441,7 @@ int JSON_Exists(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* exists) //
 int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replacement) //{{{
 {
 	int					code = TCL_OK;
-	int					i;
+	Tcl_Size			i;
 	enum json_types		type, newtype;
 	Tcl_ObjInternalRep*	ir = NULL;
 	Tcl_Obj*			val = NULL;
@@ -451,7 +451,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 	Tcl_Obj*			newval;
 	Tcl_Obj*			rep = NULL;
 	Tcl_Obj**			pathv = NULL;
-	int					pathc = 0;
+	Tcl_Size			pathc = 0;
 
 	if (Tcl_IsShared(obj))
 		THROW_ERROR_LABEL(finally, code, "JSON_Set called with shared object");
@@ -498,7 +498,8 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 				//}}}
 			case JSON_ARRAY: //{{{
 				{
-					int			ac, index_str_len, ok=1;
+					Tcl_Size	ac, index_str_len;
+					int			ok=1;
 					long		index;
 					const char*	index_str;
 					char*		end;
@@ -653,12 +654,12 @@ finally:
 int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 {
 	enum json_types	type;
-	int				i;
+	Tcl_Size		i;
 	Tcl_Obj*		val = NULL;
 	Tcl_Obj*		step = NULL;
 	Tcl_Obj*		src = NULL;
 	Tcl_Obj*		target = NULL;
-	int				pathc = 0;
+	Tcl_Size		pathc = 0;
 	Tcl_Obj**		pathv = NULL;
 	int				retval = TCL_OK;
 
@@ -711,7 +712,8 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 				//}}}
 			case JSON_ARRAY: //{{{
 				{
-					int			ac, index_str_len, ok=1;
+					Tcl_Size	ac, index_str_len;
+					int			ok=1;
 					long		index;
 					const char*	index_str;
 					char*		end;
@@ -809,7 +811,8 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 			//}}}
 		case JSON_ARRAY: //{{{
 			{
-				int			ac, index_str_len, ok=1;
+				Tcl_Size	ac, index_str_len;
+				int			ok=1;
 				long		index;
 				const char*	index_str;
 				char*		end;
@@ -937,7 +940,7 @@ int JSON_Normalize(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj** normalized) //{{{
 }
 
 //}}}
-int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** prettyString) //{{{
+int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, int nopadding, int compact, int arrays_inline, Tcl_Obj** prettyString) //{{{
 {
 	int					retval = TCL_OK;
 	Tcl_DString			ds;
@@ -945,6 +948,13 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 	Tcl_Obj*			pad = NULL;
 	struct interp_cx*	l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
+	// Handle compact mode - just normalize (remove all whitespace)
+	if (compact) {
+		retval = JSON_Normalize(interp, obj, prettyString);
+		return retval;
+	}
+
+	// Normal pretty printing with formatting options
 	if (indent == NULL) {
 		replace_tclobj(&lindent, get_string(l, "    ", 4));
 		indent = lindent;
@@ -952,7 +962,7 @@ int JSON_Pretty(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* indent, Tcl_Obj** pre
 
 	replace_tclobj(&pad, l->tcl_empty);
 	Tcl_DStringInit(&ds);
-	retval = json_pretty(interp, obj, indent, pad, &ds);
+	retval = json_pretty(interp, obj, indent, nopadding, pad, arrays_inline, &ds);
 
 	if (retval == TCL_OK)
 		replace_tclobj(prettyString, Tcl_NewStringObj(Tcl_DStringValue(&ds), Tcl_DStringLength(&ds)));
@@ -1024,7 +1034,7 @@ int JSON_Type(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, enum json_types* 
 }
 
 //}}}
-int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, int* length) //{{{
+int JSON_Length(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj* path, Tcl_Size* length) //{{{
 {
 	enum json_types	type;
 	int				retval = TCL_OK;
@@ -1126,7 +1136,7 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 	unsigned int			i;
 	int						retcode=TCL_OK;
 	struct foreach_state*	state = NULL;
-	int						objc;
+	Tcl_Size				objc;
 	Tcl_Obj**				objv = NULL;
 	Tcl_Obj*				it_res = NULL;
 	struct interp_cx*		l = Tcl_GetAssocData(interp, "rl_json", NULL);
@@ -1173,7 +1183,7 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 	}
 
 	for (i=0; i<state->iterators; i++) {
-		int				loops, j;
+		Tcl_Size		loops, j;
 		enum json_types	type;
 		Tcl_Obj*		val = NULL;
 		Tcl_Obj*		varlist = objv[i*2];
@@ -1318,7 +1328,7 @@ cleanup_search:
 											break;
 											//}}}
 										} else { // Iterate over it_res as a list {{{
-											int			oc, i;
+											Tcl_Size	oc, i;
 											Tcl_Obj**	ov = NULL;
 
 											TEST_OK_LABEL(done, retcode, Tcl_ListObjGetElements(interp, it_res, &oc, &ov));
@@ -1387,7 +1397,7 @@ int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions ex
 	const unsigned char*	p;
 	const unsigned char*	e;
 	const unsigned char*	val_start;
-	int						len;
+	Tcl_Size				len;
 	struct parse_context	cx[CX_STACK_SIZE];
 
 	if (interp)
