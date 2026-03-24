@@ -29,6 +29,7 @@ json \- Parse, manipulate and produce JSON documents
 \fBjson object\fR \fI?key value ?key value ...??\fR
 \fBjson array\fR \fIelem ...\fR
 \fBjson autoarray\fR \fIvalue ...\fR
+\fBjson autoobject \fI?key value ...?\fR
 \fBjson bool\fR \fIvalue\fR
 \fBjson normalize\fR \fIjsonValue\fR
 \fBjson pretty\fR ?\fB-indent\fR \fIindent\fR? \fIjsonValue\fR ?\fIkey ...\fR?
