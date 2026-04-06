@@ -77,20 +77,39 @@ proc main {} {
 	}]
 	#>>>
 	bench template-2.1 {Test templated doc creation, including numbers} -setup { #<<<
-		set foo		1
-		set bar		42.5
-		set baz		1e6
-		set quux	0x42
-		set octal	077
-		set space	" 42"
+		if {[package vsatisfies [package require Tcl] 9-]} {
+			# Octal literal format changed in version 9
+			set foo		1
+			set bar		42.5
+			set baz		1e6
+			set quux	0x42
+			set octal	0o77
+			set space	" 42"
 
-		set d {
-			foo		1
-			bar		42.5
-			baz		1e6
-			quux	0x42
-			octal	077
-			space	" 42"
+			set d {
+				foo		1
+				bar		42.5
+				baz		1e6
+				quux	0x42
+				octal	0o77
+				space	" 42"
+			}
+		} else {
+			set foo		1
+			set bar		42.5
+			set baz		1e6
+			set quux	0x42
+			set octal	077
+			set space	" 42"
+
+			set d {
+				foo		1
+				bar		42.5
+				baz		1e6
+				quux	0x42
+				octal	077
+				space	" 42"
+			}
 		}
 	} -compare {
 		template_string {
@@ -158,20 +177,39 @@ proc main {} {
 	}]
 	#>>>
 	bench template-3.1 {Test templated doc creation, including numbers, json set on result} -setup { #<<<
-		set foo		1
-		set bar		42.5
-		set baz		1e6
-		set quux	0x42
-		set octal	077
-		set space	" 42"
+		if {[package vsatisfies [package require Tcl] 9-]} {
+			# Octal literal format changed in version 9
+			set foo		1
+			set bar		42.5
+			set baz		1e6
+			set quux	0x42
+			set octal	0o77
+			set space	" 42"
 
-		set d {
-			foo		1
-			bar		42.5
-			baz		1e6
-			quux	0x42
-			octal	077
-			space	" 42"
+			set d {
+				foo		1
+				bar		42.5
+				baz		1e6
+				quux	0x42
+				octal	0o77
+				space	" 42"
+			}
+		} else {
+			set foo		1
+			set bar		42.5
+			set baz		1e6
+			set quux	0x42
+			set octal	077
+			set space	" 42"
+
+			set d {
+				foo		1
+				bar		42.5
+				baz		1e6
+				quux	0x42
+				octal	077
+				space	" 42"
+			}
 		}
 	} -compare {
 		template_string {
