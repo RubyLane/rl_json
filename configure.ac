@@ -256,7 +256,7 @@ AC_SUBST(RL_JSON_LIBRARY)
 AC_SUBST(RL_JSON_STUBLIB)
 AC_SUBST(RL_JSON_HEADER)
 
-AC_CONFIG_FILES([Makefile teabase/Makefile pkgIndex.tcl doc/.build/json.md])
+AC_CONFIG_FILES([Makefile teabase/Makefile pkgIndex.tcl])
 
 #--------------------------------------------------------------------
 # Finally, substitute all of the various values into the files
