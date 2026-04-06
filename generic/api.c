@@ -9,6 +9,7 @@ Tcl_Obj* JSON_NewJSONObj(Tcl_Interp* interp, Tcl_Obj* from) //{{{
 //}}}
 int JSON_NewJStringObj(Tcl_Interp* interp, Tcl_Obj* string, Tcl_Obj** new) //{{{
 {
+	(void)interp;
 	replace_tclobj(new, JSON_NewJvalObj(JSON_STRING, string));
 
 	return TCL_OK;
@@ -1128,7 +1129,7 @@ int JSON_Decode(Tcl_Interp* interp, Tcl_Obj* bytes, Tcl_Obj* encoding, Tcl_Obj**
 int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body, enum collecting_mode collect, Tcl_Obj** res, ClientData cdata) //{{{
 {
 #if 1
-	unsigned int			i;
+	Tcl_Size				i;
 	int						retcode=TCL_OK;
 	struct foreach_state*	state = NULL;
 	Tcl_Size				objc;
@@ -1228,7 +1229,7 @@ int JSON_Foreach(Tcl_Interp* interp, Tcl_Obj* iterators, JSON_ForeachBody* body,
 	}
 
 	while (state->loop_num < state->max_loops) {
-		unsigned int		j, k;
+		Tcl_Size		j, k;
 
 		replace_tclobj(&loopvars, Tcl_NewDictObj());
 

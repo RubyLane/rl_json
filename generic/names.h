@@ -1,1 +1,0 @@
-../teabase/names.h

@@ -1,6 +1,10 @@
 #ifndef _JSON_MAIN_H
 #define _JSON_MAIN_H
 
+#if HAVE_CONFIG_H
+#	include "config.h"
+#endif
+
 #include <tcl.h>
 #include <stdint.h>		// Stubs API uses stdint types
 

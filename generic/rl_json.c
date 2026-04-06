@@ -4,11 +4,11 @@
 // the mp_int's we hand to it in bignum Tcl_Objs with a different allocator
 // than tommath used)
 void* tommath_malloc(size_t size)                                {return ckalloc(size);}
-void* tommath_realloc(void* mem, size_t oldsize, size_t newsize) {return ckrealloc(mem, newsize);}
+void* tommath_realloc(void* mem, size_t oldsize, size_t newsize) {(void)oldsize; return ckrealloc(mem, newsize);}
 void* tommath_calloc(size_t nmemb, size_t size)                  {void* m=ckalloc(nmemb*size); memset(m, 0, nmemb*size); return m;}
-void  tommath_free(void* mem, size_t size)                       {ckfree(mem);}
+void  tommath_free(void* mem, size_t size)                       {(void)size; ckfree(mem);}
 
-TCL_DECLARE_MUTEX(g_config_mutex);
+TCL_DECLARE_MUTEX(g_config_mutex)
 Tcl_Obj*		g_packagedir = NULL;
 Tcl_Obj*		g_includedir = NULL;
 int				g_config_refcount = 0;
@@ -1059,7 +1059,7 @@ end:
 //}}}
 void foreach_state_free(struct foreach_state* state) //{{{
 {
-	unsigned int i, j;
+	Tcl_Size i, j;
 
 	release_tclobj(&state->script);
 
@@ -1086,7 +1086,7 @@ void foreach_state_free(struct foreach_state* state) //{{{
 static int NRforeach_next_loop_top(Tcl_Interp* interp, struct foreach_state* state) //{{{
 {
 	struct interp_cx* l = Tcl_GetAssocData(interp, "rl_json", NULL);
-	unsigned int j, k;
+	Tcl_Size j, k;
 
 	//fprintf(stderr, "Starting iteration %d/%d\n", i, max_loops);
 	// Set the iterator variables
@@ -1256,7 +1256,7 @@ done:
 static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], enum collecting_mode collecting) //{{{
 {
 	// Caller must ensure that objc is valid
-	unsigned int			i;
+	Tcl_Size				i;
 	int						retcode=TCL_OK;
 	struct foreach_state*	state = NULL;
 
@@ -1296,7 +1296,7 @@ static int foreach(Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], enum col
 
 	for (i=0; i<state->iterators; i++) {
 		Tcl_Size		loops;
-		int				j;
+		Tcl_Size		j;
 		enum json_types	type;
 		Tcl_Obj*		val;
 		Tcl_Obj*		varlist = objv[i*2];
@@ -1837,6 +1837,7 @@ done:
 //}}}
 static int get_subst_slot(struct template_cx* cx, Tcl_Obj* elem, Tcl_Obj* type, int subst_type, Tcl_Obj** slot) //{{{
 {
+	(void)subst_type;
 	int			retcode = TCL_OK;
 	Tcl_Obj*	keydict = NULL;
 	Tcl_Obj*	slotobj = NULL;
@@ -2474,6 +2475,7 @@ finally:
 // Ensemble subcommands
 static int jsonParse(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int				retval = TCL_OK;
 	Tcl_Obj*		res = NULL;
 
@@ -2491,6 +2493,7 @@ finally:
 //}}}
 static int jsonNormalize(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Obj*		json = NULL;
 	int				retval = TCL_OK;
 
@@ -2605,6 +2608,7 @@ finally:
 //}}}
 static int jsonExists(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Obj*		target = NULL;
 	int				retval = TCL_OK;
 
@@ -2630,6 +2634,7 @@ finally:
 //}}}
 static int jsonGet(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int			code = TCL_OK;
 	Tcl_Obj*	target = NULL;
 	Tcl_Obj*	res = NULL;
@@ -2729,6 +2734,7 @@ finally:
 //}}}
 static int jsonExtract(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int				code = TCL_OK;
 	Tcl_Obj*		target = NULL;
 	Tcl_Obj*		def = NULL;
@@ -2813,6 +2819,7 @@ finally:
 //}}}
 static int jsonSet(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Obj*	path = NULL;
 	Tcl_Obj*	src = NULL;		// ref is borrowed from either the variable or newval
 	int			retval = TCL_OK;
@@ -2851,6 +2858,7 @@ finally:
 //}}}
 static int jsonUnset(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Obj*	path = NULL;
 	Tcl_Obj*	src = NULL;		// ref is borrowed from either the variable or newval
 	Tcl_Obj*	newval = NULL;
@@ -2892,6 +2900,7 @@ finally:
 //}}}
 static int jsonNew(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int			retval = TCL_OK;
 	Tcl_Obj*	res = NULL;
 
@@ -2954,6 +2963,7 @@ finally:
 //}}}
 static int jsonBoolean(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int			retval = TCL_OK;
 
 	enum {A_cmd, A_VAL, A_objc};
@@ -2970,6 +2980,7 @@ finally:
 //}}}
 static int jsonObject(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int			retval = TCL_OK;
 	Tcl_Size	oc;
 	Tcl_Obj**	ov;
@@ -2991,6 +3002,7 @@ finally:
 //}}}
 static int jsonArray(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Size	ac;
 	int			i, retval = TCL_OK;
 	Tcl_Obj**	av;
@@ -3015,6 +3027,7 @@ finally:
 //}}}
 static int jsonDecode(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Obj*	encoding = NULL;
 	Tcl_Obj*	res = NULL;
 	int			retval = TCL_OK;
@@ -3038,6 +3051,7 @@ finally:
 //}}}
 static int jsonIsNull(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	Tcl_Obj*		target = NULL;
 	Tcl_Obj*		val;
 	enum json_types	type;
@@ -3095,6 +3109,7 @@ finally:
 //}}}
 static int jsonTemplate(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int			retval = TCL_OK;
 	Tcl_Obj*	res = NULL;
 
@@ -3113,6 +3128,7 @@ finally:
 //}}}
 static int _foreach(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[], enum collecting_mode mode) //{{{
 {
+	(void)cdata;
 	if (objc < 4 || (objc-4) % 2 != 0) {
 		Tcl_WrongNumArgs(interp, 1, objv, "?varlist datalist ...? script");
 		return TCL_ERROR;
@@ -3128,60 +3144,60 @@ static int jsonNRForeach(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj
 }
 
 //}}}
-_Pragma("GCC diagnostic push");
-_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static int jsonForeach(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRForeach, cdata, objc, objv);
 }
 
 //}}}
-_Pragma("GCC diagnostic pop");
+#pragma GCC diagnostic pop
 static int jsonNRLmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return _foreach(cdata, interp, objc, objv, COLLECT_LIST);
 }
 
 //}}}
-_Pragma("GCC diagnostic push");
-_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static int jsonLmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRLmap, cdata, objc, objv);
 }
 
 //}}}
-_Pragma("GCC diagnostic pop");
+#pragma GCC diagnostic pop
 static int jsonNRAmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return _foreach(cdata, interp, objc, objv, COLLECT_ARRAY);
 }
 
 //}}}
-_Pragma("GCC diagnostic push");
-_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static int jsonAmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNRAmap, cdata, objc, objv);
 }
 
 //}}}
-_Pragma("GCC diagnostic pop");
+#pragma GCC diagnostic pop
 static int jsonNROmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return _foreach(cdata, interp, objc, objv, COLLECT_OBJECT);
 }
 
 //}}}
-_Pragma("GCC diagnostic push");
-_Pragma("GCC diagnostic ignored \"-Wunused-function\"");
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static int jsonOmap(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	return Tcl_NRCallObjProc(interp, jsonNROmap, cdata, objc, objv);
 }
 
 //}}}
-_Pragma("GCC diagnostic pop");
+#pragma GCC diagnostic pop
 static int jsonFreeCache(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 #if DEDUP
@@ -3201,12 +3217,14 @@ finally:
 //}}}
 static int jsonNop(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata; (void)interp; (void)objc; (void)objv;
 	return TCL_OK;
 }
 
 //}}}
 static int jsonPretty(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int			code = TCL_OK;
 	Tcl_Obj*	pretty = NULL;
 	Tcl_Obj*	indent = NULL;
@@ -3422,6 +3440,7 @@ finally:
 //}}}
 static int jsonTemplateActions(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
+	(void)cdata;
 	int					retval = TCL_OK;
 	Tcl_Obj*			actions = NULL;
 	Tcl_ObjInternalRep*	ir;
@@ -3787,6 +3806,7 @@ static int jsonObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *cons
 
 void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 {
+	(void)interp;
 	struct interp_cx* l = cdata;
 	int					i;
 
@@ -4016,9 +4036,11 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 	if (l->typeDict == NULL) THROW_ERROR("Can't retrieve objType for dict");
 
 	Tcl_IncrRefCount(l->apply = Tcl_NewStringObj("apply", 5));
-	Tcl_IncrRefCount(l->decode_bytes = Tcl_NewStringObj( // Tcl lambda to decode raw bytes to a unicode string {{{
-		"{bytes {encoding auto}} {\n"
+
+	{ // Tcl lambda to decode raw bytes to a unicode string {{{
 #if TCL_MAJOR_VERSION < 9
+	static const char decode_bytes_script[] =
+		"{bytes {encoding auto}} {\n"
 		//"		puts \"Decoding using $encoding: [regexp -all -inline .. [binary encode hex $bytes]]\"\n"
 		"	set decode_utf16 {{bytes encoding} {\n"
 		//"		puts \"Decoding using $encoding: [regexp -all -inline .. [binary encode hex $bytes]]\"\n"
@@ -4114,8 +4136,11 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		"		}\n"
 		"	}\n"
 		"}\n"
-#else // TCL_MAJOR_VERSION >= 9
-		// Tcl 9+: All required encodings are natively supported
+	;
+#else
+	// Tcl 9+: All required encodings are natively supported
+	static const char decode_bytes_script[] =
+		"{bytes {encoding auto}} {\n"
 		"	if {$encoding eq {auto}} {\n"
 		"		set bom	[binary encode hex [string range $bytes 0 3]]\n"
 		"		switch -glob -- $bom {\n"
@@ -4135,9 +4160,10 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		"\n"
 		"	encoding convertfrom -profile replace $encoding $bytes\n"
 		"}\n"
+	;
 #endif
-		, -1));
-	//}}}
+	Tcl_IncrRefCount(l->decode_bytes = Tcl_NewStringObj(decode_bytes_script, -1));
+	} //}}}
 
 #if CBOR
 	replace_tclobj(&l->cbor_true,      Tcl_NewStringObj("true",  4));
@@ -4269,6 +4295,7 @@ DLLEXPORT int Rl_json_SafeInit(Tcl_Interp* interp) //{{{
 #if UNLOAD
 DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 {
+	(void)flags;
 	Tcl_Namespace*		ns;
 
 	release_instances();
@@ -4298,8 +4325,9 @@ DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 	}
 	Tcl_MutexUnlock(&g_config_mutex); //>>>
 
-	if (g_config_refcount <= 0)
+	if (g_config_refcount <= 0) {
 		Tcl_MutexFinalize(&g_config_mutex);
+	}
 
 	return TCL_OK;
 }

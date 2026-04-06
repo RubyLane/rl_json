@@ -19,7 +19,7 @@ dnl	to configure the system for the local environment.
 # so that we create the export library with the dll.
 #-----------------------------------------------------------------------
 
-AC_INIT([rl_json],[0.15.8])
+AC_INIT([rl_json],[0.16])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -72,7 +72,7 @@ ENABLE_CBOR
 
 # Set CBOR source files conditionally
 if test "$CBOR" = "1"; then
-	CBOR_SOURCES="cbor.c"
+	CBOR_SOURCES="cbor.c bignum_ops.c"
 else
 	CBOR_SOURCES=""
 fi
@@ -184,6 +184,12 @@ TEA_MAKE_LIB
 TEA_PROG_TCLSH
 #TEA_PROG_WISH
 
+# Generate stubs files if they don't exist (they are no longer checked in)
+if test ! -f "${srcdir}/generic/rl_jsonStubInit.c"; then
+    AC_MSG_NOTICE([Generating stubs files...])
+    ${TCLSH_PROG} ${srcdir}/teabase/tools/genStubs.tcl ${srcdir}/generic ${srcdir}/generic/rl_json.decls
+fi
+
 hold_CFLAGS=$CFLAGS
 hold_LIBS=$LIBS
 eval "EXPANDED_CFLAGS=\"${CFLAGS}\""
@@ -193,8 +199,23 @@ LIBS="$LIBS $PKG_LIBS $TCL_STUB_LIB_SPEC"
 # Check for Tcl 9 features
 CHECK_TCL_GETNUMBERFROMOBJ
 
-# Check for required polyfill
+# Check for required polyfills
 TIP445
+CHECK_TCL_GETBYTESFROMOBJ
+
+# Detect mp_digit size for libtommath compatibility
+AC_CHECK_SIZEOF([mp_digit], [], [#include <tcl.h>
+#include <tclTomMath.h>])
+if test "$ac_cv_sizeof_mp_digit" = "4"; then
+	TOMMATH_CFLAGS="-DMP_32BIT"
+elif test "$ac_cv_sizeof_mp_digit" = "2"; then
+	TOMMATH_CFLAGS="-DMP_16BIT"
+elif test "$ac_cv_sizeof_mp_digit" = "1"; then
+	TOMMATH_CFLAGS="-DMP_8BIT"
+else
+	TOMMATH_CFLAGS=""
+fi
+AC_SUBST(TOMMATH_CFLAGS)
 AC_CHECK_FUNCS_ONCE([ffsll])
 AX_GCC_BUILTIN(__builtin_ffsll)
 
@@ -258,7 +279,7 @@ AC_SUBST(RL_JSON_LIBRARY)
 AC_SUBST(RL_JSON_STUBLIB)
 AC_SUBST(RL_JSON_HEADER)
 
-AC_CONFIG_FILES([Makefile teabase/Makefile pkgIndex.tcl])
+AC_CONFIG_FILES([Makefile teabase/Makefile pkgIndex.tcl doc/.build/json.md])
 
 #--------------------------------------------------------------------
 # Finally, substitute all of the various values into the files

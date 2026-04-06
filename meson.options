@@ -1,0 +1,41 @@
+option('ensemble',
+	type: 'boolean',
+	value: false,
+	description: 'Provide the json command using a proper ensemble, otherwise handle the subcommand dispatch internally'
+)
+
+option('dedup',
+	type: 'boolean',
+	value: true,
+	description: 'Parsing JSON involves allocating a lot of small string Tcl_Objs, many of which are duplicates. This mechanism helps reduce that duplication'
+)
+
+option('debugmode',
+	type: 'boolean',
+	value: false,
+	description: 'Enable debug mode (not symbols, but portions of the code that are only used in debug builds)'
+)
+
+option('testmode',
+	type: 'boolean',
+	value: false,
+	description: 'Build with whitebox testing hooks exposed'
+)
+
+option('unload',
+	type: 'boolean',
+	value: true,
+	description: 'Add support for unloading this shared library'
+)
+
+option('cbor',
+	type: 'boolean',
+	value: false,
+	description: 'Enable CBOR (Concise Binary Object Representation) encoding/decoding functionality'
+)
+
+option('stubs',
+	type: 'boolean',
+	value: true,
+	description: 'Use Tcl stubs library for dynamic loading'
+)

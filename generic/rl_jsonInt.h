@@ -17,11 +17,13 @@
 #include <unistd.h>
 #endif
 #if CBOR
-#include <endian.h>
-#include <tommath.h>
+#	include <endian.h>
+#	include <tclTomMath.h>
+#	include <bignum_ops.h>
 #endif
-#include "tip445.h"
-#include "names.h"
+#include <tip445.h>
+#include <getbytes.h>
+#include <names.h>
 
 #define CX_STACK_SIZE	6
 
@@ -71,9 +73,9 @@ struct foreach_iterator {
 };
 
 struct foreach_state {
-	unsigned int				loop_num;
-	unsigned int				max_loops;
-	unsigned int				iterators;
+	Tcl_Size					loop_num;
+	Tcl_Size					max_loops;
+	Tcl_Size					iterators;
 	struct foreach_iterator*	it;
 	Tcl_Obj*					script;
 	Tcl_Obj*					res;
@@ -280,17 +282,6 @@ int cbor_init(Tcl_Interp* interp, struct interp_cx* l);
 void cbor_release(Tcl_Interp* interp);
 #endif
 
-// Polyfill
-#ifndef Tcl_GetBytesFromObj
-//#define Tcl_GetBytesFromObj(interp, obj, lenptr) Tcl_GetByteArrayFromObj(obj, lenptr)
-static inline uint8_t* Tcl_GetBytesFromObj(Tcl_Interp* interp, Tcl_Obj* obj, size_t* lenPtr)
-{
-	int	len;
-	uint8_t*	bytes = Tcl_GetByteArrayFromObj(obj, &len);
-	*lenPtr = len;
-	return bytes;
-}
-#endif
 
 Tcl_ObjCmdProc BuildInfoObjCmd;
 

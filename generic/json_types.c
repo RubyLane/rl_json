@@ -2,22 +2,22 @@
 #include "parser.h"
 
 #if UNLOAD
-TCL_DECLARE_MUTEX(g_instances_mutex);
+TCL_DECLARE_MUTEX(g_instances_mutex)
 Tcl_HashTable	g_instances;
 int				g_instances_refcount = 0;
 
 static void record_instance(Tcl_Obj* obj) //{{{
 {
-_Pragma("GCC diagnostic push");
-_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"");
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 	Tcl_HashEntry*	he;
-_Pragma("GCC diagnostic pop");
+#pragma GCC diagnostic pop
 	int				isnew;
 
 	//DBG("Recording instance %s: %p\n", name(obj), obj);
 	Tcl_MutexLock(&g_instances_mutex);
 	he = Tcl_CreateHashEntry(&g_instances, obj, &isnew);
-	if (!isnew) Tcl_Panic("Obj %p already registered", obj);
+	if (!isnew) Tcl_Panic("Obj %p already registered", (void*)obj);
 	Tcl_MutexUnlock(&g_instances_mutex);
 }
 
@@ -29,7 +29,7 @@ static void release_instance(Tcl_Obj* obj) //{{{
 	//DBG("--> Releasing instance %s: %p\n", name(obj), obj);
 	Tcl_MutexLock(&g_instances_mutex);
 	he = Tcl_FindHashEntry(&g_instances, obj);
-	if (!he) Tcl_Panic("rl_json release_instance: No record found for instance %p", obj);
+	if (!he) Tcl_Panic("rl_json release_instance: No record found for instance %p", (void*)obj);
 	Tcl_DeleteHashEntry(he);
 	Tcl_MutexUnlock(&g_instances_mutex);
 	//DBG("<-- Releasing instance %s: %p\n", name(obj), obj);
@@ -61,8 +61,9 @@ void release_instances(void) // transmute all remaining json objtypes to pure st
 	}
 	Tcl_MutexUnlock(&g_instances_mutex);
 
-	if (g_instances_refcount <= 0)
+	if (g_instances_refcount <= 0) {
 		Tcl_MutexFinalize(&g_instances_mutex);
+	}
 }
 
 //}}}
@@ -288,7 +289,7 @@ int JSON_GetJvalFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* type,
 //}}}
 int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) //{{{
 {
-	Tcl_ObjInternalRep	intrep = {0};
+	Tcl_ObjInternalRep	intrep = {.twoPtrValue = {0}};
 	Tcl_ObjType*		objtype = NULL;
 	Tcl_Obj*			rep = NULL;
 
@@ -885,6 +886,7 @@ Tcl_Obj* get_unshared_val(Tcl_ObjInternalRep* ir) //{{{
 
 int init_types(Tcl_Interp* interp) //{{{
 {
+	(void)interp;
 	init_instances();
 
 	// We don't define set_from_any callbacks for our types, so they must not be Tcl_RegisterObjType'ed

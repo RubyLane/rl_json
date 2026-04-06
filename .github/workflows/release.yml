@@ -1,0 +1,147 @@
+name: Build and Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build pandoc mingw-w64 wine64 zip
+        pip3 install --user meson
+
+    - name: Cache Tcl 9.0 build
+      id: cache-tcl9
+      uses: actions/cache@v4
+      with:
+        path: /opt/tcl9
+        key: ${{ runner.os }}-tcl9.0.3
+
+    - name: Build Tcl 9.0.3
+      if: steps.cache-tcl9.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p /tmp/src/tcl
+        cd /tmp/src/tcl
+        sudo mkdir -p /opt/tcl9
+        sudo chown -R $(id -u) /opt/tcl9
+        wget https://core.tcl-lang.org/tcl/tarball/core-9-0-3/tcl.tar.gz -O - | tar xz --strip-components=1
+        cd unix
+        ./configure CFLAGS="-DPURIFY" --prefix=/opt/tcl9
+        make -j $(nproc)
+        make install
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Build and test (autotools, Tcl 9)
+      run: |
+        autoconf
+        PKG_CONFIG_PATH=/opt/tcl9/lib/pkgconfig ./configure --with-tcl=/opt/tcl9/lib
+        make
+        make test
+
+    - name: Build and test (meson, Tcl 9)
+      run: |
+        PKG_CONFIG_PATH=/opt/tcl9/lib/pkgconfig meson setup builddir
+        meson compile -C builddir
+        meson test -C builddir --print-errorlogs
+
+    - name: Build and test (meson, fallback Tcl)
+      run: |
+        meson setup build
+        meson compile -C build
+        meson test -C build --print-errorlogs
+
+    - name: Cross-compile for Windows
+      run: |
+        cat > /tmp/cross-mingw64.ini <<'EOF'
+        [binaries]
+        c = 'x86_64-w64-mingw32-gcc'
+        cpp = 'x86_64-w64-mingw32-g++'
+        ar = 'x86_64-w64-mingw32-ar'
+        strip = 'x86_64-w64-mingw32-strip'
+        windres = 'x86_64-w64-mingw32-windres'
+        exe_wrapper = 'wine'
+        pkg-config = 'pkg-config'
+
+        [built-in options]
+        default_library = 'shared'
+
+        [properties]
+        sys_root = '/usr/x86_64-w64-mingw32'
+        pkg_config_libdir = '/nonexistent'
+
+        [host_machine]
+        system = 'windows'
+        kernel = 'nt'
+        cpu_family = 'x86_64'
+        cpu = 'x86_64'
+        endian = 'little'
+        EOF
+        meson setup buildwin --cross-file /tmp/cross-mingw64.ini
+        meson compile -C buildwin
+
+    - name: Test Windows build under wine
+      run: meson test -C buildwin --print-errorlogs
+
+    - name: Extract version
+      id: version
+      run: |
+        ver=$(meson introspect build --projectinfo | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])')
+        echo "version=${ver}" >> "$GITHUB_OUTPUT"
+        echo "project=rl_json-${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+    - name: Create source tarball
+      run: |
+        project="${{ steps.version.outputs.project }}"
+        meson compile -C build readme
+        cp build/doc/README.md README.md
+        cp -aL . "/tmp/${project}"
+        find "/tmp/${project}" -name '.git' -exec rm -rf {} +
+        rm -rf "/tmp/${project}/.github"
+        rm -rf "/tmp/${project}/build" "/tmp/${project}/builddir" "/tmp/${project}/buildwin"
+        rm -rf "/tmp/${project}/subprojects/packagecache"
+        rm -rf "/tmp/${project}/subprojects/tcl"
+        rm -rf "/tmp/${project}/subprojects/libtommath-"*
+        rm -rf "/tmp/${project}/subprojects/.wraplock"
+        tar czf "/tmp/${project}.tar.gz" -C /tmp "${project}"
+        cd /tmp && zip -rq "${project}-source.zip" "${project}"
+
+    - name: Package Windows binaries
+      run: |
+        pkg_dir="rl_json-${{ steps.version.outputs.version }}"
+        mkdir -p "/tmp/win/${pkg_dir}"
+        cp buildwin/teabase/librl_json.dll "/tmp/win/${pkg_dir}/"
+        cp buildwin/teabase/pkgIndex.tcl "/tmp/win/${pkg_dir}/"
+        if [ -f buildwin/doc/rl_json.html ]; then
+          cp buildwin/doc/rl_json.html "/tmp/win/${pkg_dir}/"
+        fi
+        cd /tmp/win
+        zip -r "/tmp/${{ steps.version.outputs.project }}-windows-x86_64.zip" "${pkg_dir}"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifacts
+        path: |
+          /tmp/${{ steps.version.outputs.project }}.tar.gz
+          /tmp/${{ steps.version.outputs.project }}-source.zip
+          /tmp/${{ steps.version.outputs.project }}-windows-x86_64.zip
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          /tmp/${{ steps.version.outputs.project }}.tar.gz
+          /tmp/${{ steps.version.outputs.project }}-source.zip
+          /tmp/${{ steps.version.outputs.project }}-windows-x86_64.zip

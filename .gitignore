@@ -34,3 +34,11 @@ rundata
 /rl_jsonUuid.h
 /doc/.build
 /doc/json.n
+/builddir
+generic/rl_jsonDecls.h
+generic/rl_jsonStubInit.c
+subprojects/tcl
+subprojects/libtommath-*
+subprojects/hedley-*
+subprojects/packagecache
+subprojects/.wraplock

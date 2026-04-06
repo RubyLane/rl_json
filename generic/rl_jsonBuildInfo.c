@@ -90,6 +90,7 @@ BuildInfoObjCmd(
     int objc,		/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
+    (void)clientData;
     char buf[80];
     const char *arg, *p, *q;
     Tcl_Size len;

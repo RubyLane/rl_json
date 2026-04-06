@@ -1,0 +1,8 @@
+pkg_dir=${pcfiledir}/../@PKG_DIR_BASENAME@
+
+Name: @PACKAGE_NAME@
+Description: Tcl extension for high-performance JSON parsing and manipulation
+Version: @PACKAGE_VERSION@
+Requires: tcl >= 8.6
+Cflags: -I${pkg_dir} -DUSE_RL_JSON_STUBS=1
+Libs: -L${pkg_dir} -l@STUBLIB@
