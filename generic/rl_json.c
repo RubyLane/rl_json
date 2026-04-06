@@ -1,13 +1,5 @@
 #include "rl_jsonInt.h"
 
-// shims to connect tommath's memory management to Tcl's (otherwise Tcl frees
-// the mp_int's we hand to it in bignum Tcl_Objs with a different allocator
-// than tommath used)
-void* tommath_malloc(size_t size)                                {return ckalloc(size);}
-void* tommath_realloc(void* mem, size_t oldsize, size_t newsize) {(void)oldsize; return ckrealloc(mem, newsize);}
-void* tommath_calloc(size_t nmemb, size_t size)                  {void* m=ckalloc(nmemb*size); memset(m, 0, nmemb*size); return m;}
-void  tommath_free(void* mem, size_t size)                       {(void)size; ckfree(mem);}
-
 TCL_DECLARE_MUTEX(g_config_mutex)
 Tcl_Obj*		g_packagedir = NULL;
 Tcl_Obj*		g_includedir = NULL;
@@ -3846,13 +3838,6 @@ void free_interp_cx(ClientData cdata, Tcl_Interp* interp) //{{{
 	release_tclobj(&l->apply);
 	release_tclobj(&l->decode_bytes);
 
-#if CBOR
-	release_tclobj(&l->cbor_true);
-	release_tclobj(&l->cbor_false);
-	release_tclobj(&l->cbor_null);
-	release_tclobj(&l->cbor_undefined);
-#endif
-
 	free(l); l = NULL;
 }
 
@@ -4165,12 +4150,6 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 	Tcl_IncrRefCount(l->decode_bytes = Tcl_NewStringObj(decode_bytes_script, -1));
 	} //}}}
 
-#if CBOR
-	replace_tclobj(&l->cbor_true,      Tcl_NewStringObj("true",  4));
-	replace_tclobj(&l->cbor_false,     Tcl_NewStringObj("false", 5));
-	replace_tclobj(&l->cbor_null,      Tcl_NewStringObj("", 0));
-	replace_tclobj(&l->cbor_undefined, Tcl_NewStringObj("", 0));
-#endif
 
 	Tcl_SetAssocData(interp, "rl_json", free_interp_cx, l);
 
@@ -4267,10 +4246,6 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, NS "::checkmem", checkmem, l, NULL);
 	}
 
-#if CBOR
-	if (TCL_OK != cbor_init(interp, l)) return TCL_ERROR;
-#endif
-
 	Tcl_CreateObjCommand(interp, NS "::build-info",	BuildInfoObjCmd, NULL, NULL);
 
 	if (TCL_OK != _setdir(interp)) return TCL_ERROR;
@@ -4299,10 +4274,6 @@ DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 	Tcl_Namespace*		ns;
 
 	release_instances();
-
-#if CBOR
-	cbor_release(interp);
-#endif
 
 	Tcl_DeleteAssocData(interp, "rl_json");
 

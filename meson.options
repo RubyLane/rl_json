@@ -27,15 +27,3 @@ option('unload',
 	value: true,
 	description: 'Add support for unloading this shared library'
 )
-
-option('cbor',
-	type: 'boolean',
-	value: false,
-	description: 'Enable CBOR (Concise Binary Object Representation) encoding/decoding functionality'
-)
-
-option('stubs',
-	type: 'boolean',
-	value: true,
-	description: 'Use Tcl stubs library for dynamic loading'
-)

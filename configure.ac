@@ -68,15 +68,6 @@ ENABLE_ENSEMBLE
 ENABLE_DEDUP
 ENABLE_DEBUG
 ENABLE_UNLOAD
-ENABLE_CBOR
-
-# Set CBOR source files conditionally
-if test "$CBOR" = "1"; then
-	CBOR_SOURCES="cbor.c bignum_ops.c"
-else
-	CBOR_SOURCES=""
-fi
-AC_SUBST(CBOR_SOURCES)
 
 #-----------------------------------------------------------------------
 # __CHANGE__
@@ -88,10 +79,10 @@ AC_SUBST(CBOR_SOURCES)
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c ${CBOR_SOURCES} rl_jsonBuildInfo.c])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c rl_jsonBuildInfo.c])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h generic/rl_json.h])
-TEA_ADD_INCLUDES([-Igeneric -Ilocal/include])
-TEA_ADD_LIBS([-Llocal/lib -ltommath -lm])
+TEA_ADD_INCLUDES([-Igeneric -Iteabase])
+TEA_ADD_LIBS([-lm])
 TEA_ADD_CFLAGS([-std=c11 -Wall -Werror -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -Wno-error=unused-function])
 TEA_ADD_STUB_SOURCES([rl_jsonStubLib.c])
 TEA_ADD_TCL_SOURCES([])
@@ -202,20 +193,6 @@ CHECK_TCL_GETNUMBERFROMOBJ
 # Check for required polyfills
 TIP445
 CHECK_TCL_GETBYTESFROMOBJ
-
-# Detect mp_digit size for libtommath compatibility
-AC_CHECK_SIZEOF([mp_digit], [], [#include <tcl.h>
-#include <tclTomMath.h>])
-if test "$ac_cv_sizeof_mp_digit" = "4"; then
-	TOMMATH_CFLAGS="-DMP_32BIT"
-elif test "$ac_cv_sizeof_mp_digit" = "2"; then
-	TOMMATH_CFLAGS="-DMP_16BIT"
-elif test "$ac_cv_sizeof_mp_digit" = "1"; then
-	TOMMATH_CFLAGS="-DMP_8BIT"
-else
-	TOMMATH_CFLAGS=""
-fi
-AC_SUBST(TOMMATH_CFLAGS)
 AC_CHECK_FUNCS_ONCE([ffsll])
 AX_GCC_BUILTIN(__builtin_ffsll)
 

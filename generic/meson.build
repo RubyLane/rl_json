@@ -8,11 +8,3 @@ pkg_sources += files(
   'rl_jsonBuildInfo.c',
   'rl_json.c',
 )
-
-if get_option('cbor')
-  pkg_sources += files(
-    'cbor.c',
-    'bignum_ops.c'
-  )
-endif
-

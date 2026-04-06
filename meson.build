@@ -23,12 +23,11 @@ conf.set10('DEDUP',    get_option('dedup'))
 conf.set10('ENSEMBLE', get_option('ensemble'))
 conf.set10('TESTMODE', get_option('testmode'))
 conf.set10('UNLOAD',   get_option('unload'))
-conf.set10('CBOR',     get_option('cbor'))
 # Options >>>
 
 tea_want_shims = [
   'tip445',
-  'Tcl_GetBytesFromObj'
+  'Tcl_GetBytesFromObj',
 ]
 
 deps = []
@@ -42,37 +41,6 @@ conf.set10('HAVE_FFSLL',                cc.has_function('ffsll', prefix: '#inclu
 conf.set10('HAVE_TCL_GETNUMBERFROMOBJ', cc.has_function('Tcl_GetNumberFromObj', dependencies: tcl_dep))
 conf.set10('HAVE_UNISTD_H',             cc.has_header('unistd.h'))
 # Feature detection >>>
-
-# When Tcl uses its bundled libtommath (the default for both 8.x and 9.x),
-# FreeBignum frees digit arrays with Tcl_Free, so we MUST use a private
-# libtommath compiled with ckalloc shims.  A system libtommath would use
-# malloc, causing an allocator mismatch crash in non-PURIFY builds.
-# The target Tcl may also have been built in a different environment than
-# this one, so we can't assume a system libtommath here matches what Tcl
-# was built against.
-if tcl_has_internal_tommath
-  tommath_proj = subproject('libtommath', default_options: [
-    'tcl_alloc=true',
-    'mp_digit_size=@0@'.format(tcl_mp_digit_size),
-  ])
-  tommath_dep = tommath_proj.get_variable('libtommath_dep')
-else
-  # Tcl was built with --with-system-libtommath: its mp_clear uses free(),
-  # so the extension should also use the system libtommath (no shims).
-  tommath_dep = dependency('libtommath', version: '>=1.3.0')
-endif
-deps += tommath_dep
-
-# bignum_ops.c includes <tommath.h> from the subproject and needs the mp_digit
-# width to match Tcl's.  Applied project-wide because meson doesn't support
-# per-file flags, but harmless for Tcl-side code (which uses <tclTomMath.h>).
-if tcl_mp_digit_size == 4
-  add_project_arguments('-DMP_32BIT', language: 'c')
-elif tcl_mp_digit_size == 2
-  add_project_arguments('-DMP_16BIT', language: 'c')
-elif tcl_mp_digit_size == 1
-  add_project_arguments('-DMP_8BIT', language: 'c')
-endif
 
 # Package config values compiled into binary
 conf.set_quoted('RL_JSON_INCLUDE_PATH_INSTALL', pkg_dir)

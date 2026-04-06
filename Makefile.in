@@ -318,14 +318,8 @@ $(PKG_STUB_LIB_FILE): $(PKG_STUB_OBJECTS)
 
 VPATH = $(srcdir):$(srcdir)/generic:$(srcdir)/unix:$(srcdir)/win:$(srcdir)/macosx
 
-%.@OBJEXT@: %.c deps generic/rl_jsonDecls.h $(srcdir)/generic/rl_jsonInt.h $(srcdir)/generic/rl_json.h
+%.@OBJEXT@: %.c generic/rl_jsonDecls.h $(srcdir)/generic/rl_jsonInt.h $(srcdir)/generic/rl_json.h
 	$(COMPILE) -c `@CYGPATH@ $<` -o $@
-
-# bignum_ops.c includes <tommath.h> from our private libtommath and must NOT
-# see tcl.h (header conflict on Tcl 8.6).  Compile with local/include instead
-# of TCL_INCLUDES, and add TOMMATH_CFLAGS for the correct mp_digit width.
-bignum_ops.@OBJEXT@: $(srcdir)/generic/bignum_ops.c deps $(srcdir)/generic/bignum_ops.h
-	$(CC) $(DEFS) -Igeneric -Ilocal/include $(TOMMATH_CFLAGS) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c `@CYGPATH@ $<` -o $@
 
 rl_jsonBuildInfo.@OBJEXT@:	rl_jsonUuid.h
 
@@ -411,8 +405,6 @@ dist: dist-clean doc $(srcdir)/manifest.uuid
 	    fi; \
 	done
 
-	$(DIST_INSTALL_ASIS) $(srcdir)/deps $(DIST_DIR)/deps/
-
 	(cd $(DIST_ROOT); $(COMPRESS);)
 
 #========================================================================
@@ -442,7 +434,6 @@ clean:
 	-rm -f *.gcda *.gcno *.gcov
 
 deps-clean:
-	-rm -rf local build
 
 distclean: clean
 	-rm -f *.tab.c
@@ -530,19 +521,8 @@ uninstall-binaries:
 	  rm -f "$(DESTDIR)$(bindir)/$$p"; \
 	done
 
-deps: local/lib/libtommath.a
-
-build:
-	mkdir -p $(top_builddir)/build
-	cp -a $(srcdir)/build_template/* $(top_builddir)/build/
-
-TOMMATH_CFLAGS = @TOMMATH_CFLAGS@
-
-local/lib/libtommath.a: build
-	+make -C $(top_builddir)/build/libtommath --include-dir=$(abspath $(srcdir)/deps/libtommath) CFLAGS="-fPIC -g -DMP_MALLOC=tommath_malloc -DMP_REALLOC=tommath_realloc -DMP_CALLOC=tommath_calloc -DMP_FREE=tommath_free $(TOMMATH_CFLAGS)" DESTDIR="$(abspath $(top_builddir))" PREFIX=/local SRCDIR=$(abspath $(srcdir)) custom_install
-
 .PHONY: all binaries clean depend distclean doc install libraries test
-.PHONY: shell gdb valgrind valgrindshell deps-clean deps
+.PHONY: shell gdb valgrind valgrindshell deps-clean
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
