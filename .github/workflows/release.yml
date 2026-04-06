@@ -118,7 +118,7 @@ jobs:
       run: |
         pkg_dir="rl_json-${{ steps.version.outputs.version }}"
         mkdir -p "/tmp/win/${pkg_dir}"
-        cp buildwin/teabase/librl_json.dll "/tmp/win/${pkg_dir}/"
+        cp buildwin/teabase/*rl_json.dll "/tmp/win/${pkg_dir}/"
         cp buildwin/teabase/pkgIndex.tcl "/tmp/win/${pkg_dir}/"
         if [ -f buildwin/doc/rl_json.html ]; then
           cp buildwin/doc/rl_json.html "/tmp/win/${pkg_dir}/"
