@@ -1,7 +1,7 @@
 ---
 author:
 - Cyan Ogilvie
-title: json(n) 0.15.7 \| rl_json Tcl JSON Package
+title: json(n) 0.16 \| rl_json Tcl JSON Package
 ---
 
 # NAME
@@ -10,7 +10,7 @@ json - Parse, manipulate and produce JSON documents
 
 ## SYNOPSIS
 
-**package require rl_json** ?**0.15.7**?
+**package require rl_json** ?**0.16**?
 
 **json get** ?**-default** *defaultValue*? *jsonValue* ?*key …*?  
 **json extract** ?**-default** *defaultValue*? *jsonValue* ?*key …*?  
