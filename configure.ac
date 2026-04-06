@@ -79,7 +79,7 @@ ENABLE_UNLOAD
 # and PKG_TCL_SOURCES.
 #-----------------------------------------------------------------------
 
-TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c names.c rl_jsonBuildInfo.c])
+TEA_ADD_SOURCES([parser.c rl_json.c json_types.c dedup.c api.c rl_jsonStubInit.c teabase/names.c rl_jsonBuildInfo.c])
 TEA_ADD_HEADERS([generic/rl_jsonDecls.h generic/rl_json.h])
 TEA_ADD_INCLUDES([-Igeneric -Iteabase])
 TEA_ADD_LIBS([-lm])

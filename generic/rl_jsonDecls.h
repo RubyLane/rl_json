@@ -56,14 +56,17 @@ EXTERN int		JSON_SetJArrayObj(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Size objc, Tcl_Obj*objv[]);
 /* 16 */
 EXTERN int		JSON_JArrayObjGetElements(Tcl_Interp*interp,
-				Tcl_Obj*arrayObj, Tcl_Size*objc, Tcl_Obj***objv);
+				Tcl_Obj*arrayObj, Tcl_Size*objc,
+				Tcl_Obj***objv);
 /* 17 */
 EXTERN int		JSON_JArrayObjIndex(Tcl_Interp*interp,
-				Tcl_Obj*arrayObj, Tcl_Size index, Tcl_Obj**elem);
+				Tcl_Obj*arrayObj, Tcl_Size index,
+				Tcl_Obj**elem);
 /* 18 */
 EXTERN int		JSON_JArrayObjReplace(Tcl_Interp*interp,
 				Tcl_Obj*arrayObj, Tcl_Size first,
-				Tcl_Size count, Tcl_Size objc, Tcl_Obj*objv[]);
+				Tcl_Size count, Tcl_Size objc,
+				Tcl_Obj*objv[]);
 /* 19 */
 EXTERN int		JSON_Get(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Obj* path /* can be NULL */,
@@ -100,7 +103,8 @@ EXTERN int		JSON_Type(Tcl_Interp*interp, Tcl_Obj*obj,
 				enum json_types*type);
 /* 29 */
 EXTERN int		JSON_Length(Tcl_Interp*interp, Tcl_Obj*obj,
-				Tcl_Obj* path /* can be NULL */, Tcl_Size*length);
+				Tcl_Obj* path /* can be NULL */,
+				Tcl_Size*length);
 /* 30 */
 EXTERN int		JSON_Keys(Tcl_Interp*interp, Tcl_Obj*obj,
 				Tcl_Obj* path /* can be NULL */,

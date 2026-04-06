@@ -316,7 +316,7 @@ $(PKG_STUB_LIB_FILE): $(PKG_STUB_OBJECTS)
 # As necessary, add $(srcdir):$(srcdir)/compat:....
 #========================================================================
 
-VPATH = $(srcdir):$(srcdir)/generic:$(srcdir)/unix:$(srcdir)/win:$(srcdir)/macosx
+VPATH = $(srcdir):$(srcdir)/generic:$(srcdir)/teabase:$(srcdir)/unix:$(srcdir)/win:$(srcdir)/macosx
 
 %.@OBJEXT@: %.c generic/rl_jsonDecls.h $(srcdir)/generic/rl_jsonInt.h $(srcdir)/generic/rl_json.h
 	$(COMPILE) -c `@CYGPATH@ $<` -o $@
