@@ -38,7 +38,12 @@ subdir('teabase/init')
 # Feature detection (must come after teabase/init which provides tcl_dep) <<<
 conf.set10('HAVE___BUILTIN_FFSLL',      cc.has_function('__builtin_ffsll'))
 conf.set10('HAVE_FFSLL',                cc.has_function('ffsll', prefix: '#include <strings.h>'))
-conf.set10('HAVE_TCL_GETNUMBERFROMOBJ', cc.has_function('Tcl_GetNumberFromObj', dependencies: tcl_dep))
+if tcl_dep.type_name() == 'internal'
+  # Internal subproject is Tcl 9 — all features present
+  conf.set10('HAVE_TCL_GETNUMBERFROMOBJ', true)
+else
+  conf.set10('HAVE_TCL_GETNUMBERFROMOBJ', cc.has_function('Tcl_GetNumberFromObj', dependencies: tcl_dep))
+endif
 conf.set10('HAVE_UNISTD_H',             cc.has_header('unistd.h'))
 # Feature detection >>>
 
