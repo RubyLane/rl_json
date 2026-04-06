@@ -13,6 +13,7 @@ endif
 
 add_project_arguments('-Wno-missing-field-initializers', language: 'c')
 add_project_arguments('-DHAVE_CONFIG_H', language: 'c')
+add_project_arguments('-DBUILD_rl_json', language: 'c')
 
 pkg_sources = []
 conf = configuration_data()        # For C code (config.h)

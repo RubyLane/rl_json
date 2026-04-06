@@ -3739,14 +3739,14 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_LEAK_OBJ:	Tcl_NewObj(); break;
 		case M_LEAK_INFO:
 			{
-				unsigned long	addr;
+				Tcl_WideInt		addr;
 				Tcl_Obj*		obj = NULL;
 				const char*		s;
 				Tcl_Size		len;
 
 				CHECK_ARGS(2, "addr");
-				TEST_OK(Tcl_GetLongFromObj(interp, objv[2], (long*)&addr));
-				obj = (Tcl_Obj*)addr;
+				TEST_OK(Tcl_GetWideIntFromObj(interp, objv[2], &addr));
+				obj = (Tcl_Obj*)(intptr_t)addr;
 				s = Tcl_GetStringFromObj(obj, &len);
 				fprintf(stderr, "\tLeaked obj: %p[%" TCL_SIZE_MODIFIER "d] len %" TCL_SIZE_MODIFIER "d: \"%s\"\n", (void*)obj, obj->refCount, len, len < 256 ? s : "<too long>");
 
