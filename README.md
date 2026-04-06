@@ -1,9 +1,3 @@
----
-author:
-- Cyan Ogilvie
-title: json(n) 0.16 \| rl_json Tcl JSON Package
----
-
 # NAME
 
 json - Parse, manipulate and produce JSON documents
@@ -731,6 +725,73 @@ Replacements are:
 - `?length` - use **json length** *json_val* ?*key …*?
 - `?size` - use **json length** *json_val* ?*key …*?
 - `?keys` - use **json keys** *json_val* ?*key …*?
+
+## BUILDING
+
+The primary build system is `meson`. Use the `PKG_CONFIG_PATH`
+environment variable to point meson to Tcl if it is installed in a
+nonstandard location. The legacy autotools build system is also
+maintained.
+
+Tcl 8.6 and Tcl 9.0 are both supported.
+
+### From a Release Tarball
+
+Download and extract [the
+release](https://github.com/RubyLane/rl_json/releases), then build:
+
+``` sh
+# meson (recommended)
+meson setup builddir --buildtype=release
+meson test -C builddir
+meson install -C builddir
+
+# autotools
+./configure
+make
+make test
+sudo make install
+```
+
+### From the Git Sources
+
+Fetch [the code](https://github.com/RubyLane/rl_json) and submodules
+recursively, then build:
+
+``` sh
+git clone --recurse-submodules https://github.com/RubyLane/rl_json
+cd rl_json
+
+# meson (recommended)
+meson setup builddir --buildtype=release
+meson test -C builddir
+meson install -C builddir
+
+# autotools
+autoconf
+./configure
+make
+make test
+sudo make install
+```
+
+### In a Docker Build
+
+Build from a specified release version, minimising image size:
+
+``` dockerfile
+WORKDIR /tmp/rl_json
+RUN wget https://github.com/RubyLane/rl_json/releases/download/v0.16/rl_json-v0.16.tar.gz -O - | tar xz --strip-components=1 && \
+    meson setup builddir --buildtype=release && \
+    meson install -C builddir && \
+    strip /usr/local/lib/lib*rl_json*.so && \
+    cd .. && rm -rf rl_json
+```
+
+For any of the build methods you may need to set
+`PKG_CONFIG_PATH=/path/to/tcl/lib/pkgconfig` (meson) or pass
+`--with-tcl /path/to/tcl/lib` to `configure` (autotools) if your Tcl
+install is somewhere nonstandard.
 
 ## KEYWORDS
 

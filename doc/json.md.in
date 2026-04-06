@@ -734,6 +734,71 @@ Version 0.10.0 deprecates various subcommands and features, which will be remove
     - `?size` - use **json length** *json_val* ?*key ...*?
     - `?keys` - use **json keys** *json_val* ?*key ...*?
 
+## BUILDING
+
+The primary build system is `meson`.  Use the `PKG_CONFIG_PATH` environment
+variable to point meson to Tcl if it is installed in a nonstandard location.
+The legacy autotools build system is also maintained.
+
+Tcl 8.6 and Tcl 9.0 are both supported.
+
+### From a Release Tarball
+
+Download and extract [the release](https://github.com/RubyLane/@PACKAGE_NAME@/releases), then build:
+
+```sh
+# meson (recommended)
+meson setup builddir --buildtype=release
+meson test -C builddir
+meson install -C builddir
+
+# autotools
+./configure
+make
+make test
+sudo make install
+```
+
+### From the Git Sources
+
+Fetch [the code](https://github.com/RubyLane/@PACKAGE_NAME@) and submodules
+recursively, then build:
+
+```sh
+git clone --recurse-submodules https://github.com/RubyLane/@PACKAGE_NAME@
+cd @PACKAGE_NAME@
+
+# meson (recommended)
+meson setup builddir --buildtype=release
+meson test -C builddir
+meson install -C builddir
+
+# autotools
+autoconf
+./configure
+make
+make test
+sudo make install
+```
+
+### In a Docker Build
+
+Build from a specified release version, minimising image size:
+
+```dockerfile
+WORKDIR /tmp/@PACKAGE_NAME@
+RUN wget https://github.com/RubyLane/@PACKAGE_NAME@/releases/download/v@PACKAGE_VERSION@/@PACKAGE_NAME@-v@PACKAGE_VERSION@.tar.gz -O - | tar xz --strip-components=1 && \
+    meson setup builddir --buildtype=release && \
+    meson install -C builddir && \
+    strip /usr/local/lib/lib*@PACKAGE_NAME@*.so && \
+    cd .. && rm -rf @PACKAGE_NAME@
+```
+
+For any of the build methods you may need to set
+`PKG_CONFIG_PATH=/path/to/tcl/lib/pkgconfig` (meson) or pass
+`--with-tcl /path/to/tcl/lib` to `configure` (autotools) if your Tcl
+install is somewhere nonstandard.
+
 ## KEYWORDS
 
 json, parsing, formatting

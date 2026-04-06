@@ -101,16 +101,15 @@ jobs:
     - name: Create source tarball
       run: |
         project="${{ steps.version.outputs.project }}"
-        meson compile -C build readme
-        cp build/doc/README.md README.md
-        cp -aL . "/tmp/${project}"
-        find "/tmp/${project}" -name '.git' -exec rm -rf {} +
-        rm -rf "/tmp/${project}/.github"
-        rm -rf "/tmp/${project}/build" "/tmp/${project}/builddir" "/tmp/${project}/buildwin"
-        rm -rf "/tmp/${project}/subprojects/packagecache"
-        rm -rf "/tmp/${project}/subprojects/tcl"
-        rm -rf "/tmp/${project}/subprojects/libtommath-"*
-        rm -rf "/tmp/${project}/subprojects/.wraplock"
+        # Build docs so the dist script can bake README.md and manpage
+        meson compile -C build doc
+        # meson dist creates a clean tarball from git-tracked files,
+        # then runs tools/dist_fixup.sh to copy README, remove .github,
+        # and replace symlinks with copies (for Windows users)
+        meson dist -C build --no-tests --allow-dirty --formats xztar
+        # Repack as .tar.gz and create a zip for the release
+        tar xf build/meson-dist/rl_json-*.tar.xz -C /tmp
+        mv "/tmp/rl_json-${{ steps.version.outputs.version }}" "/tmp/${project}"
         tar czf "/tmp/${project}.tar.gz" -C /tmp "${project}"
         cd /tmp && zip -rq "${project}-source.zip" "${project}"
 

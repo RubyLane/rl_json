@@ -142,4 +142,6 @@ configure_file(
 
 subdir('doc')
 
+meson.add_dist_script('tools/dist_fixup.sh')
+
 # vim: foldmethod=marker foldmarker=<<<,>>> shiftwidth=2 expandtab
