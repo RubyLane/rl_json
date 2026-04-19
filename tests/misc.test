@@ -120,6 +120,35 @@ test misc-4.1 {dedup cache returning obj as its own parsed inner must not create
 	unset -nocomplain e so script rc errmsg o
 } -result 0
 #>>>
+test misc-5.1 {release_instances strategy switch: both variants complete cleanly} -constraints {tcl9 testmode unload} -body { #<<<
+	set lib	[info loaded {} Rl_json]
+	if {$lib eq ""} {
+		error "Rl_json not loaded"
+	}
+	set dir	[file dirname $lib]
+	set results	{}
+	foreach strategy {0 1} {
+		# Populate g_instances with a structure that has both top-level
+		# and child values registered, so both release paths have to
+		# handle real work.
+		set big	"\[1,2,{\"a\":\[3,4,\"s\"\]},true,null,\"x\"\]"
+		namespace import -force ::rl_json::json
+		json normalize $big
+		set ::rl_json::unload_strategy $strategy
+		unload $lib Rl_json
+		load $lib Rl_json
+		namespace import -force ::rl_json::json
+		# Sanity-check that the freshly-reloaded package still works.
+		lappend results $strategy [json get {["hello"]} 0]
+	}
+	set results
+} -cleanup {
+	if {[info exists ::rl_json::unload_strategy]} {
+		set ::rl_json::unload_strategy 1
+	}
+	unset -nocomplain lib dir big strategy results
+} -result {0 hello 1 hello} -match glob
+#>>>
 
 }
 # Local Variables:

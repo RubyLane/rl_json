@@ -204,6 +204,14 @@ void append_to_cx(struct parse_context *cx, Tcl_Obj *val);
 int serialize(Tcl_Interp* interp, struct serialize_context* scx, Tcl_Obj* obj);
 void release_instances(void);
 int init_types(Tcl_Interp* interp);
+
+// Unload strategies for release_instances(). Exposed here so rl_json.c can
+// bind the knob to a Tcl variable under TESTMODE.
+#define UNLOAD_STRATEGY_ONE_PASS   0
+#define UNLOAD_STRATEGY_TWO_PASS   1
+#if UNLOAD
+extern int g_unload_strategy;
+#endif
 Tcl_Obj* new_stringobj_dedup(struct interp_cx *l, const char *bytes, int length);
 int lookup_type(Tcl_Interp* interp, Tcl_Obj* typeobj, int* type);
 int is_template(const char* s, int len);

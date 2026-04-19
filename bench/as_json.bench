@@ -113,7 +113,7 @@ bench as_json-3.2 {[json string] vs implicit} -setup { #<<<
 } -cleanup {
 	unset -nocomplain doc i
 } -result {["false0","false1","false2","false3","false4","false5","false6","false7","false8","false9"]}
-
+#>>>
 }
 
 main

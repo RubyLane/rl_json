@@ -1,0 +1,222 @@
+set ::unload_bench_here	[file normalize [file dirname [info script]]]
+if {$::unload_bench_here ni [tcl::tm::path list]} {tcl::tm::path add $::unload_bench_here}
+package require rl_json
+
+namespace import ::rl_json::json
+
+proc readfile fn { #<<<
+	set h	[open $fn r]
+	try {
+		chan configure $h -encoding utf-8
+		read $h
+	} finally {
+		close $h
+	}
+}
+
+#>>>
+proc build_nested {n} { #<<<
+	# Build a json document that, when parsed, leaves a large population of
+	# our typed Tcl_Objs in g_instances — the workload release_instances()
+	# has to chew through at unload time. Each element is itself a small
+	# nested object, so we get parent/child relationships (which is where
+	# the one-pass thrashing surfaces).
+	set parts	{}
+	for {set i 0} {$i < $n} {incr i} {
+		lappend parts "{\"k$i\":$i,\"nested\":{\"a\":$i,\"b\":\[0,1,$i\],\"c\":\"val$i\"}}"
+	}
+	return "\[[join $parts ,]\]"
+}
+
+#>>>
+proc ensure_loaded {} { #<<<
+	global lib dir
+	if {[info loaded {} Rl_json] eq ""} {
+		load $lib Rl_json
+		namespace import ::rl_json::json
+	}
+}
+
+#>>>
+
+proc main {} {
+	global lib dir
+	set here	$::unload_bench_here
+
+	# Only Tcl 9 supports `info loaded {} <pkg>` (the 3-arg form we use to
+	# find our own .so). On earlier Tcls, skip the entire file.
+	if {![package vsatisfies [package provide Tcl] 9.0-]} {
+		teabase_bench::output notice "unload.bench: skipping, requires Tcl 9"
+		return
+	}
+
+	if {![rl_json::build-info unload]} {
+		teabase_bench::output notice "unload.bench: skipping, Rl_json not built with unload support"
+		return
+	}
+	set lib	[info loaded {} Rl_json]
+	if {$lib eq ""} {
+		teabase_bench::output notice "unload.bench: skipping, Rl_json not dynamically loaded"
+		return
+	}
+	set dir	[file dirname $lib]
+
+	# TESTMODE exposes ::rl_json::unload_strategy for switching between
+	# variants. Without it we can still benchmark the default variant,
+	# but not compare them — skip in that case.
+	if {![info exists ::rl_json::unload_strategy]} {
+		teabase_bench::output notice "unload.bench: skipping, ::rl_json::unload_strategy not exposed (needs TESTMODE build)"
+		return
+	}
+
+	# The overhead scripts run a full "load + build" without the `unload`
+	# we want to measure. Subtracted from the compare timing this leaves
+	# the release_instances() + Rl_json_Init cost — both variants incur
+	# the same Init cost, so the delta between variants is pure
+	# release_instances() work.
+
+	# unload-1.1 <<<
+	# Flat workload: mostly-cascading free. Children aren't referenced
+	# externally so Tcl_FreeInternalRep on the top-level cascades through
+	# the tree in a single sweep. Exercises the hash-walk overhead more
+	# than per-obj free work.
+	bench unload-1.1 {Unload: 500 nested docs, no external refs} -batch 1 -min_it 20 -max_time 10 -setup {
+		set big	[build_nested 500]
+		json normalize $big
+	} -overhead {
+		* {
+			ensure_loaded
+			set big	[build_nested 500]
+			json normalize $big
+		}
+	} -compare {
+		one_pass {
+			set ::rl_json::unload_strategy 0
+			unload $lib Rl_json
+			load $lib Rl_json
+			namespace import ::rl_json::json
+			set big	[build_nested 500]
+			json normalize $big
+		}
+
+		two_pass {
+			set ::rl_json::unload_strategy 1
+			unload $lib Rl_json
+			load $lib Rl_json
+			namespace import ::rl_json::json
+			set big	[build_nested 500]
+			json normalize $big
+		}
+	} -cleanup {
+		ensure_loaded
+		if {[info exists ::rl_json::unload_strategy]} {
+			set ::rl_json::unload_strategy 1
+		}
+		unset -nocomplain big
+	} -match glob -result *
+
+	#>>>
+	# unload-1.2 <<<
+	# Keep external refs to every element + its extracted nested child.
+	# The cascade free can no longer clean up the whole tree in one step,
+	# so release_instances() has to walk and individually drop intreps on
+	# each survivor. This is the scenario where the per-variant cost of
+	# the hash walk + per-obj work differs.
+	bench unload-1.2 {Unload: 500 nested docs, external refs pinned} -batch 1 -min_it 20 -max_time 10 -setup {
+		set big	[build_nested 500]
+		json normalize $big
+		set ::_kept	{}
+		json foreach e $big {
+			lappend ::_kept $e [json extract $e nested]
+		}
+	} -overhead {
+		* {
+			ensure_loaded
+			set big	[build_nested 500]
+			json normalize $big
+			set ::_kept	{}
+			json foreach e $big {
+				lappend ::_kept $e [json extract $e nested]
+			}
+		}
+	} -compare {
+		one_pass {
+			set ::rl_json::unload_strategy 0
+			unload $lib Rl_json
+			load $lib Rl_json
+			namespace import ::rl_json::json
+			set big	[build_nested 500]
+			json normalize $big
+			set ::_kept	{}
+			json foreach e $big {
+				lappend ::_kept $e [json extract $e nested]
+			}
+		}
+
+		two_pass {
+			set ::rl_json::unload_strategy 1
+			unload $lib Rl_json
+			load $lib Rl_json
+			namespace import ::rl_json::json
+			set big	[build_nested 500]
+			json normalize $big
+			set ::_kept	{}
+			json foreach e $big {
+				lappend ::_kept $e [json extract $e nested]
+			}
+		}
+	} -cleanup {
+		unset -nocomplain ::_kept big
+		ensure_loaded
+		if {[info exists ::rl_json::unload_strategy]} {
+			set ::rl_json::unload_strategy 1
+		}
+	} -match glob -result *
+
+	#>>>
+	# unload-1.3 <<<
+	# A real-world nested doc (if available) for cross-checking against a
+	# workload that wasn't crafted for this benchmark.
+	set sample_json	[file join $here sample.json]
+	if {[file readable $sample_json]} {
+		bench unload-1.3 {Unload after parsing sample.json} -batch 1 -min_it 10 -max_time 10 -setup {
+			set big	[readfile $sample_json]
+			json normalize $big
+		} -overhead {
+			* {
+				ensure_loaded
+				set big	[readfile $sample_json]
+				json normalize $big
+			}
+		} -compare {
+			one_pass {
+				set ::rl_json::unload_strategy 0
+				unload $lib Rl_json
+				load $lib Rl_json
+				namespace import ::rl_json::json
+				set big	[readfile $sample_json]
+				json normalize $big
+			}
+
+			two_pass {
+				set ::rl_json::unload_strategy 1
+				unload $lib Rl_json
+				load $lib Rl_json
+				namespace import ::rl_json::json
+				set big	[readfile $sample_json]
+				json normalize $big
+			}
+		} -cleanup {
+			ensure_loaded
+			if {[info exists ::rl_json::unload_strategy]} {
+				set ::rl_json::unload_strategy 1
+			}
+			unset -nocomplain big
+		} -match glob -result *
+	}
+
+	#>>>
+}
+main
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

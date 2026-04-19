@@ -4250,6 +4250,15 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, NS "::checkmem", checkmem, l, NULL);
 	}
 
+#if TESTMODE && UNLOAD
+	// Expose the unload-strategy knob so tests and benchmarks can cover
+	// each variant of release_instances(). The linked var persists across
+	// unload/reload cycles only at the C level — the Tcl-side variable is
+	// torn down with the namespace, so each reload starts at the C default.
+	TEST_OK(Tcl_LinkVar(interp, NS "::unload_strategy",
+			(char*)&g_unload_strategy, TCL_LINK_INT));
+#endif
+
 	Tcl_CreateObjCommand(interp, NS "::build-info",	BuildInfoObjCmd, NULL, NULL);
 
 	if (TCL_OK != _setdir(interp)) return TCL_ERROR;
@@ -4276,6 +4285,10 @@ DLLEXPORT int Rl_json_Unload(Tcl_Interp* interp, int flags) //{{{
 {
 	(void)flags;
 	Tcl_Namespace*		ns;
+
+#if TESTMODE && UNLOAD
+	Tcl_UnlinkVar(interp, NS "::unload_strategy");
+#endif
 
 	release_instances();
 

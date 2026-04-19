@@ -19,6 +19,16 @@ proc runtests script {
 			testConstraint underscore_separators	[string is integer -strict 1_000_000]
 			testConstraint decimal_literals			[string is integer -strict 0d11]
 			testConstraint binary_literals			[string is integer -strict 0b11]
+
+			# Tcl version constraint for tests that depend on Tcl 9-only
+			# syntax like the 3-argument form of `info loaded`.
+			testConstraint tcl9						[tclver 9.0-]
+
+			# TESTMODE builds expose extra knobs (e.g.
+			# ::rl_json::unload_strategy) used by the test suite to
+			# cover alternative internal code paths.
+			testConstraint testmode					[::rl_json::build-info testmode]
+			testConstraint unload					[::rl_json::build-info unload]
 		}
 		namespace eval $ns [list source [file join [file dirname [info script]] helpers.tcl]]
 		namespace eval $ns $script

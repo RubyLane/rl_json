@@ -6,6 +6,14 @@ TCL_DECLARE_MUTEX(g_instances_mutex)
 Tcl_HashTable	g_instances;
 int				g_instances_refcount = 0;
 
+// Unload-strategy selection for release_instances(). Two-pass is the default
+// because the legacy one-pass variant thrashes on deeply-nested values: a
+// child freed in step N is re-parsed (re-registering itself in g_instances)
+// when a yet-to-be-freed parent generates its string rep in step N+k.
+// In TESTMODE this is exposed to Tcl as ::rl_json::unload_strategy so the
+// benchmarks and tests can cover each variant.
+int g_unload_strategy = UNLOAD_STRATEGY_TWO_PASS;
+
 static void record_instance(Tcl_Obj* obj) //{{{
 {
 #pragma GCC diagnostic push
@@ -36,25 +44,68 @@ static void release_instance(Tcl_Obj* obj) //{{{
 }
 
 //}}}
-void release_instances(void) // transmute all remaining json objtypes to pure strings {{{
+static void release_instances_one_pass(void) //{{{
 {
 	Tcl_HashEntry*	he = NULL;
 	Tcl_HashSearch	search;
 
+	// Have to re-start the search each time because freeing an intrep
+	// could cascade to freeing other instances, which we would then
+	// walk into with Tcl_NextHashEntry.
+	while ((he = Tcl_FirstHashEntry(&g_instances, &search))) {
+		Tcl_Obj* obj = (Tcl_Obj*)Tcl_GetHashKey(&g_instances, he);
+		if (!Tcl_HasStringRep(obj)) Tcl_GetString(obj);
+		Tcl_FreeInternalRep(obj);
+	}
+}
+
+//}}}
+static void release_instances_two_pass(void) //{{{
+{
+	Tcl_HashEntry*	he = NULL;
+	Tcl_HashSearch	search;
+
+	// Pass 1: ensure every registered obj has a valid string rep. The hash
+	// table is not mutated here (we never free intreps in this pass), so a
+	// single stable walk is both safe and the whole point — a restart
+	// would uselessly re-visit entries we've already stringified.
+	// Because children still have our intrep, a parent's update_string_rep
+	// can serialize them directly without re-parsing and so doesn't add
+	// any new entries to the hash.
+	for (he = Tcl_FirstHashEntry(&g_instances, &search); he != NULL;
+			he = Tcl_NextHashEntry(&search)) {
+		Tcl_Obj* obj = (Tcl_Obj*)Tcl_GetHashKey(&g_instances, he);
+		if (!Tcl_HasStringRep(obj)) Tcl_GetString(obj);
+	}
+
+	// Pass 2: drop our intreps. Tcl_FreeInternalRep mutates the hash (via
+	// release_instance) and may cascade-free peers, so restart the walk
+	// each step. No parent will re-parse any value here because every obj
+	// now has a string rep.
+	while ((he = Tcl_FirstHashEntry(&g_instances, &search))) {
+		Tcl_Obj* obj = (Tcl_Obj*)Tcl_GetHashKey(&g_instances, he);
+		Tcl_FreeInternalRep(obj);
+	}
+}
+
+//}}}
+void release_instances(void) // transmute all remaining json objtypes to pure strings {{{
+{
 	Tcl_MutexLock(&g_instances_mutex);
 	if (--g_instances_refcount <= 0) {
 		const char*	hashstats = Tcl_HashStats(&g_instances);
 		//DBG("------> orphan all remaining instances\n");
 		//DBG("g_instances stats:\n%s\n", hashstats);
 		ckfree((char*)hashstats);
-		// Have to re-start the search each time because freeing an intrep
-		// could cascade to freeing other instances, which we would then
-		// walk into in with Tcl_NextHashEntry
-		while ((he = Tcl_FirstHashEntry(&g_instances, &search))) {
-			Tcl_Obj* obj = (Tcl_Obj*)Tcl_GetHashKey(&g_instances, he);
-			//DBG("Orphan %-25s refCount %d, stringrep? %d >%s<\n", name(obj), obj->refCount, Tcl_HasStringRep(obj), Tcl_GetString(obj));
-			if (!Tcl_HasStringRep(obj)) Tcl_GetString(obj);	// Ensure obj has a valid stringrep
-			Tcl_FreeInternalRep(obj);
+
+		switch (g_unload_strategy) {
+			case UNLOAD_STRATEGY_ONE_PASS:
+				release_instances_one_pass();
+				break;
+			case UNLOAD_STRATEGY_TWO_PASS:
+			default:
+				release_instances_two_pass();
+				break;
 		}
 		//DBG("<------ orphan all remaining instances\n");
 		Tcl_DeleteHashTable(&g_instances);

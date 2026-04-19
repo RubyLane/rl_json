@@ -68,6 +68,12 @@ static const char *buildData =
 #ifdef STATIC_BUILD
 			    ".static"
 #endif
+#if TESTMODE
+				".testmode"
+#endif
+#if UNLOAD
+				".unload"
+#endif
     ;
 
 
