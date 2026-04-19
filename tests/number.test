@@ -30,9 +30,12 @@ test number-1.4.1 {Create a json number: scientific notation, native double} -bo
 } -result {1e6 1e6}
 #>>>
 test number-1.4.2 {Create a json number: scientific notation, string} -body { #<<<
+	# JSON-grammar-valid stringreps (like "1e6") are used as-is — the
+	# eager expr eval that Tcl 8.6 used to canonicalize "1e6" to
+	# "1000000.0" is skipped, so the output now matches Tcl 8.7+/9.
 	set n	[string trim " 1e6"]
 	list [json number $n] $n
-} -result [if {[tclver 8.7-]} {list 1e6 1e6} {list 1000000.0 1e6}]
+} -result {1e6 1e6}
 #>>>
 test number-1.5 {Create a max 32 bit signed int} -body { #<<<
 	json number [expr {2**31-1}]

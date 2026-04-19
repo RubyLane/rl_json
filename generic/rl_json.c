@@ -213,6 +213,291 @@ Tcl_Obj* as_json(Tcl_Interp* interp, Tcl_Obj* from) //{{{
 
 //}}}
 
+int stringrep_is_json_number(const char* s, Tcl_Size len) //{{{
+{
+	// Minimal RFC 8259 number grammar:
+	//     number = [ "-" ] int [ frac ] [ exp ]
+	//     int    = "0" | digit1-9 *digit
+	//     frac   = "." 1*digit
+	//     exp    = ("e" | "E") [ "+" | "-" ] 1*digit
+	// Everything Tcl accepts that isn't in this grammar ("+42", "0x10",
+	// "1_000", ".5", "12.", "Inf", "NaN") must return 0.
+	Tcl_Size	i = 0;
+
+	if (len <= 0) return 0;
+	if (s[i] == '-') i++;
+	if (i >= len) return 0;
+	if (s[i] == '0') {
+		i++;
+	} else if (s[i] >= '1' && s[i] <= '9') {
+		while (i < len && s[i] >= '0' && s[i] <= '9') i++;
+	} else {
+		return 0;
+	}
+	if (i < len && s[i] == '.') {
+		i++;
+		if (i >= len || s[i] < '0' || s[i] > '9') return 0;
+		while (i < len && s[i] >= '0' && s[i] <= '9') i++;
+	}
+	if (i < len && (s[i] == 'e' || s[i] == 'E')) {
+		i++;
+		if (i < len && (s[i] == '+' || s[i] == '-')) i++;
+		if (i >= len || s[i] < '0' || s[i] > '9') return 0;
+		while (i < len && s[i] >= '0' && s[i] <= '9') i++;
+	}
+	return i == len;
+}
+
+//}}}
+#if !HAVE_TCL_GETNUMBERFROMOBJ
+static int stringrep_matches_token(const char* p, Tcl_Size rem, const char* tok, Tcl_Size toklen) //{{{
+{
+	if (rem != toklen) return 0;
+	for (Tcl_Size k = 0; k < toklen; k++) {
+		char c = p[k];
+		if (c >= 'A' && c <= 'Z') c = (char)(c + ('a' - 'A'));
+		if (c != tok[k]) return 0;
+	}
+	return 1;
+}
+
+//}}}
+static int stringrep_is_nonfinite_token(const char* s, Tcl_Size len) //{{{
+{
+	// Case-insensitive match against Tcl's accepted non-finite spellings:
+	// "Inf", "Infinity", "NaN", with optional leading sign.  Tcl's expr
+	// accepts these; JSON grammar doesn't.  Used on Tcl 8.6 where a
+	// fresh string (no numeric intrep yet) wouldn't otherwise classify
+	// as non-finite — Tcl 9's Tcl_GetNumberFromObj handles it directly.
+	Tcl_Size	skip = 0;
+
+	if (len >= 1 && (s[0] == '+' || s[0] == '-')) skip = 1;
+	return stringrep_matches_token(s + skip, len - skip, "inf",      3)
+	    || stringrep_matches_token(s + skip, len - skip, "infinity", 8)
+	    || stringrep_matches_token(s + skip, len - skip, "nan",      3);
+}
+#endif
+
+//}}}
+enum json_num_class classify_json_number(struct interp_cx* l, Tcl_Obj* obj) //{{{
+{
+	int	nonfinite_value = 0;
+
+	// Check the stringrep first — a JSON-grammar-valid stringrep is
+	// always usable, regardless of what Tcl makes of the value.  This
+	// covers literals like "1e909090" which overflow Tcl's double to
+	// Inf but round-trip correctly as their original string.
+	if (Tcl_HasStringRep(obj)) {
+		Tcl_Size	len;
+		const char*	s = Tcl_GetStringFromObj(obj, &len);
+		if (stringrep_is_json_number(s, len))
+			return JSON_NUM_CANONICAL;
+	}
+
+#if HAVE_TCL_GETNUMBERFROMOBJ
+	// Tcl 9: authoritative and cheap — Tcl_GetNumberFromObj tells us
+	// whether Tcl sees obj as a number and, if so, what kind.  Catches
+	// the "NaN" / "Inf" / "Infinity" strings, a typeDouble whose
+	// stringrep has been dropped, and a fresh overflow from
+	// [expr {1e500}].
+	{
+		void*	clientData;
+		int		type;
+
+		(void)l;
+		if (Tcl_GetNumberFromObj(NULL, obj, &clientData, &type) != TCL_OK)
+			return JSON_NUM_NOT_NUMBER;
+
+		nonfinite_value = (type == TCL_NUMBER_NAN) ||
+		                  (type == TCL_NUMBER_DOUBLE && !isfinite(*(double*)clientData));
+	}
+#else
+	// Tcl 8.6: intrep sniffing plus Tcl_GetDoubleFromObj for the double
+	// branch.  Simpler, at the cost of some perf.  We only reach here
+	// if the stringrep didn't already pass JSON grammar, so a "fresh
+	// string" like "Inf" with no numeric intrep falls through to
+	// JSON_NUM_NOT_NUMBER — force_json_number's post-eval check covers
+	// the case where `::tcl::mathop::+ 0` then converts it to a
+	// non-finite result.
+	if (!l) return JSON_NUM_NOT_NUMBER;
+
+	if (l->typeDouble && Tcl_FetchInternalRep(obj, l->typeDouble) != NULL) {
+		double d;
+		if (Tcl_GetDoubleFromObj(NULL, obj, &d) == TCL_OK) {
+			nonfinite_value = !isfinite(d);
+		} else {
+			// Tcl 8.6 rejects NaN in Tcl_GetDoubleFromObj; if we're
+			// here with a non-number-yielding typeDouble obj, treat
+			// conservatively as non-finite.
+			nonfinite_value = 1;
+		}
+	} else if (
+		(l->typeInt    && Tcl_FetchInternalRep(obj, l->typeInt)    != NULL) ||
+		(l->typeBignum && Tcl_FetchInternalRep(obj, l->typeBignum) != NULL)
+	) {
+		// Finite int/bignum — nonfinite_value stays 0
+	} else {
+		// No numeric intrep.  On Tcl 8.6 a fresh string like "Inf" or
+		// "NaN" never gets a typeDouble intrep without an explicit
+		// conversion, so we can't learn the value here.  Check the
+		// stringrep for the usual non-finite spellings so we still
+		// reject them up front (Tcl 9's Tcl_GetNumberFromObj catches
+		// this in the branch above).
+		if (Tcl_HasStringRep(obj)) {
+			Tcl_Size	len;
+			const char*	s = Tcl_GetStringFromObj(obj, &len);
+			if (stringrep_is_nonfinite_token(s, len))
+				return JSON_NUM_NONFINITE;
+		}
+		return JSON_NUM_NOT_NUMBER;
+	}
+#endif
+
+	if (!Tcl_HasStringRep(obj))
+		return nonfinite_value ? JSON_NUM_NONFINITE : JSON_NUM_CANONICAL;
+
+	// Has a stringrep, but it didn't pass the JSON grammar check above
+	// (e.g. "+42", "0x10", "1_000", "Inf", "NaN").  For finite values
+	// force_json_number can canonicalize by duplicating and invalidating
+	// the stringrep; for non-finite values there is no usable fallback.
+	return nonfinite_value ? JSON_NUM_NONFINITE : JSON_NUM_NONCANONICAL;
+}
+
+//}}}
+int report_nonfinite_number(Tcl_Interp* interp, Tcl_Obj* obj) //{{{
+{
+	if (interp) {
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+			"Non-finite floating-point value is not representable in JSON: \"%s\"",
+			Tcl_GetString(obj)));
+		Tcl_SetErrorCode(interp, "RL", "JSON", "NUMBER", "NONFINITE", NULL);
+	}
+	return TCL_ERROR;
+}
+
+//}}}
+
+// Process-scope; set via `json quirk non-finite-doubles`.  Reads of
+// this variable are always racy against a concurrent quirk change,
+// which is accepted: the quirk is documented to take effect only for
+// values encoded after it is set.
+int g_quirk_nonfinite = QUIRK_NONFINITE_REJECT;
+
+Tcl_Obj* stringify_nonfinite(Tcl_Obj* obj) //{{{
+{
+	// AWS SDK v2 / JSON5 spellings: "NaN", "Infinity", "-Infinity"
+	// (positive infinity has no "+" prefix).  Detect the kind of
+	// non-finite from the intrep where possible, falling back to the
+	// stringrep for the NaN vs. Inf distinction on Tcl 8.6 fresh
+	// strings.
+#if HAVE_TCL_GETNUMBERFROMOBJ
+	{
+		void*	cd;
+		int		type;
+		if (Tcl_GetNumberFromObj(NULL, obj, &cd, &type) == TCL_OK) {
+			if (type == TCL_NUMBER_NAN)    return Tcl_NewStringObj("NaN", 3);
+			if (type == TCL_NUMBER_DOUBLE) return Tcl_NewStringObj(
+				(*(double*)cd) < 0 ? "-Infinity" : "Infinity",
+				(*(double*)cd) < 0 ? 9 : 8);
+		}
+	}
+#endif
+
+	{
+		Tcl_Size	len;
+		const char*	s = Tcl_GetStringFromObj(obj, &len);
+		Tcl_Size	i = 0;
+
+		if (len >= 1 && (s[0] == '+' || s[0] == '-')) i++;
+		// NaN (any capitalisation) → "NaN"
+		if (len - i == 3) {
+			char c0 = s[i+0], c1 = s[i+1], c2 = s[i+2];
+			if ((c0 == 'n' || c0 == 'N') && (c1 == 'a' || c1 == 'A') && (c2 == 'n' || c2 == 'N'))
+				return Tcl_NewStringObj("NaN", 3);
+		}
+		// Anything else non-finite is an Inf / Infinity; sign comes from the first char
+		if (len >= 1 && s[0] == '-') return Tcl_NewStringObj("-Infinity", 9);
+		return Tcl_NewStringObj("Infinity", 8);
+	}
+}
+
+//}}}
+int apply_nonfinite_quirk(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* out_type, Tcl_Obj** out_val) //{{{
+{
+	switch (g_quirk_nonfinite) {
+		case QUIRK_NONFINITE_REJECT:
+			return report_nonfinite_number(interp, obj);
+
+		case QUIRK_NONFINITE_NULL:
+			*out_type = JSON_NULL;
+			replace_tclobj(out_val, NULL);
+			return TCL_OK;
+
+		case QUIRK_NONFINITE_STRINGIFY:
+			*out_type = JSON_STRING;
+			replace_tclobj(out_val, stringify_nonfinite(obj));
+			return TCL_OK;
+	}
+	// Unknown quirk value — treat as REJECT.
+	return report_nonfinite_number(interp, obj);
+}
+
+//}}}
+int resolve_json_number(Tcl_Interp* interp, struct interp_cx* l, Tcl_Obj* obj, enum json_types* out_type, Tcl_Obj** out_val) //{{{
+{
+	Tcl_Obj*	forced = NULL;
+	int			res;
+
+	// Pre-check classify so we can quirk-transmute before running the
+	// expr eval fallback inside force_json_number.
+	if (classify_json_number(l, obj) == JSON_NUM_NONFINITE)
+		return apply_nonfinite_quirk(interp, obj, out_type, out_val);
+
+	res = force_json_number(interp, l, obj, &forced);
+	if (res == TCL_OK) {
+		*out_type = JSON_NUMBER;
+		replace_tclobj(out_val, forced);
+		release_tclobj(&forced);
+		return TCL_OK;
+	}
+
+	// force_json_number's post-eval check can still detect non-finite
+	// for edge cases the pre-classify didn't catch (e.g. some obscure
+	// Tcl numeric literals that overflow).  Re-dispatch through the
+	// quirk if the error was nonfinite-flavoured.
+	if (g_quirk_nonfinite != QUIRK_NONFINITE_REJECT) {
+		Tcl_Obj*	options = NULL;
+		Tcl_Obj*	ec_key = NULL;
+		Tcl_Obj*	ec = NULL;
+		int			is_nonfinite = 0;
+
+		replace_tclobj(&options, Tcl_GetReturnOptions(interp, res));
+		replace_tclobj(&ec_key, Tcl_NewStringObj("-errorcode", -1));
+		if (Tcl_DictObjGet(NULL, options, ec_key, &ec) == TCL_OK && ec != NULL) {
+			Tcl_Size	n = 0;
+			if (Tcl_ListObjLength(NULL, ec, &n) == TCL_OK && n == 4) {
+				static const char* const expected[] = {"RL", "JSON", "NUMBER", "NONFINITE"};
+				is_nonfinite = 1;
+				for (Tcl_Size i = 0; i < 4 && is_nonfinite; i++) {
+					Tcl_Obj*	elem = NULL;
+					if (Tcl_ListObjIndex(NULL, ec, i, &elem) != TCL_OK || elem == NULL) { is_nonfinite = 0; break; }
+					if (strcmp(Tcl_GetString(elem), expected[i]) != 0) is_nonfinite = 0;
+				}
+			}
+		}
+		release_tclobj(&options);
+		release_tclobj(&ec_key);
+
+		if (is_nonfinite) {
+			Tcl_ResetResult(interp);
+			return apply_nonfinite_quirk(interp, obj, out_type, out_val);
+		}
+	}
+
+	return res;
+}
+
+//}}}
 int force_json_number(Tcl_Interp* interp, struct interp_cx* l, Tcl_Obj* obj, Tcl_Obj** forced) //{{{
 {
 	int	res = TCL_OK;
@@ -223,73 +508,31 @@ int force_json_number(Tcl_Interp* interp, struct interp_cx* l, Tcl_Obj* obj, Tcl
 display *obj
 	 */
 	if (l) {
-#if HAVE_TCL_GETNUMBERFROMOBJ
-		// Tcl 9+ path: use Tcl_GetNumberFromObj to check if it's a number type
-		void*	clientData;
-		int		type;
+		switch (classify_json_number(l, obj)) {
+			case JSON_NUM_NONFINITE:
+				return report_nonfinite_number(interp, obj);
 
-		if (TCL_OK == Tcl_GetNumberFromObj(NULL, obj, &clientData, &type))
-#else
-		// Pre-Tcl 9 path: snoop on the intrep to verify that it is one of the numeric types
-		if (
-			obj->typePtr && (
-				(l->typeInt    && Tcl_FetchInternalRep(obj, l->typeInt) != NULL) ||
-				(l->typeDouble && Tcl_FetchInternalRep(obj, l->typeDouble) != NULL) ||
-				(l->typeBignum && Tcl_FetchInternalRep(obj, l->typeBignum) != NULL)
-		   )
-		)
-#endif
-		{
-			// It's a known number type, we can safely use it directly
-			//fprintf(stderr, "force_json_number fastpath, verified obj to be a number type\n");
-			if (forced == NULL) return TCL_OK;
-
-			if (Tcl_HasStringRep(obj)) { // Has a string rep already, make sure it's not hex or octal, and not padded with whitespace
-				const char* s;
-				Tcl_Size	len, start=0;
-
-				s = Tcl_GetStringFromObj(obj, &len);
-				if (len >= 1 && s[0] == '-')
-					start++;
-
-				if (unlikely(
-					strchr(s, '_') != NULL || // Underscore separators (Tcl 9+)
-					(len+start >= 1 && (
-						(s[start] == '0' && len+start >= 2 && s[start+1] != '.') || // Octal or hex, or double with leading zero not immediately followed by .)
-						s[start] == ' '  ||
-						s[start] == '\n' ||
-						s[start] == '\t' ||
-						s[start] == '\v' ||
-						s[start] == '\r' ||
-						s[start] == '\f'
-					)) ||
-					(len-start >= 2 && (
-						s[len-1] == ' '  ||
-						s[len-1] == '\n' ||
-						s[len-1] == '\t' ||
-						s[len-1] == '\v' ||
-						s[len-1] == '\r' ||
-						s[len-1] == '\f'
-					))
-				)) {
-					// The existing string rep is one of the cases
-					// (octal / hex / whitespace padded / underscores) that is not a
-					// valid JSON number.  Duplicate the obj and
-					// invalidate the string rep
-					Tcl_IncrRefCount(*forced = Tcl_DuplicateObj(obj));
-					Tcl_InvalidateStringRep(*forced);
-				} else {
-					// String rep is safe as a JSON number
-					Tcl_IncrRefCount(*forced = obj);
-					//fprintf(stderr, "force_json_number obj stringrep is safe json number: (%s), intrep: (%s)\n", Tcl_GetString(obj), obj->typePtr->name);
-				}
-			} else {
-				// Pure number - no string rep
+			case JSON_NUM_CANONICAL:
+				// Stringrep is JSON grammar (or absent, and intrep
+				// will canonicalize).  Use obj directly.
+				if (forced == NULL) return TCL_OK;
 				Tcl_IncrRefCount(*forced = obj);
-			}
+				return TCL_OK;
 
-			return TCL_OK;
+			case JSON_NUM_NONCANONICAL:
+				// Tcl recognises it as a finite number, but the
+				// stringrep (e.g. "+42", "0x10", "1_000", ".5", "12.")
+				// isn't valid JSON grammar.  Duplicate and invalidate
+				// the stringrep so Tcl regenerates it canonically.
+				if (forced == NULL) return TCL_OK;
+				Tcl_IncrRefCount(*forced = Tcl_DuplicateObj(obj));
+				Tcl_InvalidateStringRep(*forced);
+				return TCL_OK;
+
+			case JSON_NUM_NOT_NUMBER:
+				break;
 		}
+
 		// Fall through: Could be a string that is a valid number representation, or
 		// something that will convert to a valid number.  Add 0 to it to
 		// check (all valid numbers succeed at this, and are unchanged by
@@ -313,10 +556,19 @@ display *obj
 	}
 
 	if (res == TCL_OK) {
-		if (forced != NULL)
-			Tcl_IncrRefCount(*forced = Tcl_GetObjResult(interp));
+		Tcl_Obj*	result = Tcl_GetObjResult(interp);
 
-		Tcl_ResetResult(interp);
+		// The eval may have converted a fresh string like "Inf" or
+		// "1e500" into a non-finite double (with no stringrep).  Guard
+		// here — same contract as the classify path above.
+		if (classify_json_number(l, result) == JSON_NUM_NONFINITE) {
+			res = report_nonfinite_number(interp, obj);
+		} else if (forced != NULL) {
+			Tcl_IncrRefCount(*forced = result);
+			Tcl_ResetResult(interp);
+		} else {
+			Tcl_ResetResult(interp);
+		}
 	}
 
 	return res;
@@ -559,11 +811,25 @@ static int serialize_json_val(Tcl_Interp* interp, struct serialize_context* scx,
 					res = JSON_GetJvalFromObj(interp, subst_val, &subst_type, &borrowed);
 					replace_tclobj(&subst_val, borrowed);
 				} else if (subst_type == JSON_NUMBER) {
-					if ((res = force_json_number(interp, scx->l, subst_val, &forced)) == TCL_OK)
+					// Non-finite values are quirk-dispatched (reject, stringify,
+					// null); for REJECT we wrap the error with template context
+					// so the user sees which substitution failed.
+					if (classify_json_number(scx->l, subst_val) == JSON_NUM_NONFINITE) {
+						if (g_quirk_nonfinite == QUIRK_NONFINITE_REJECT) {
+							Tcl_SetErrorCode(interp, "RL", "JSON", "NUMBER", "NONFINITE", NULL);
+							THROW_PRINTF_LABEL(subst_dyn_finally, res, "Error substituting value from \"%s\" into template: non-finite floating-point value is not representable in JSON: \"%s\"", Tcl_GetString(val), Tcl_GetString(subst_val));
+						}
+						// Transmute to JSON_STRING / JSON_NULL
+						res = apply_nonfinite_quirk(interp, subst_val, &subst_type, &forced);
+						if (res != TCL_OK) goto subst_dyn_finally;
 						replace_tclobj(&subst_val, forced);
+					} else {
+						if ((res = force_json_number(interp, scx->l, subst_val, &forced)) == TCL_OK)
+							replace_tclobj(&subst_val, forced);
 
-					if (res != TCL_OK)
-						THROW_PRINTF_LABEL(subst_dyn_finally, res, "Error substituting value from \"%s\" into template, not a number: \"%s\"", Tcl_GetString(val), Tcl_GetString(subst_val));
+						if (res != TCL_OK)
+							THROW_PRINTF_LABEL(subst_dyn_finally, res, "Error substituting value from \"%s\" into template, not a number: \"%s\"", Tcl_GetString(val), Tcl_GetString(subst_val));
+					}
 				}
 
 				if (subst_type == JSON_NULL && !scx->allow_null)
@@ -2230,7 +2496,23 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					fill_slot(slots, slot, l->json_null);
 				} else {
 					Tcl_Obj* forced = NULL;
-					
+
+					if (unlikely(classify_json_number(l, subst_val) == JSON_NUM_NONFINITE)) {
+						enum json_types	transmuted_type;
+
+						if (g_quirk_nonfinite == QUIRK_NONFINITE_REJECT) {
+							Tcl_SetErrorCode(interp, "RL", "JSON", "NUMBER", "NONFINITE", NULL);
+							Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error substituting value from \"%s\" into template: non-finite floating-point value is not representable in JSON: \"%s\"", Tcl_GetString(key), Tcl_GetString(subst_val)));
+							retcode = TCL_ERROR;
+							goto finally;
+						}
+						retcode = apply_nonfinite_quirk(interp, subst_val, &transmuted_type, &forced);
+						if (retcode != TCL_OK) goto finally;
+						fill_slot(slots, slot, JSON_NewJvalObj(transmuted_type, forced));
+						release_tclobj(&forced);
+						break;
+					}
+
 					if (likely((retcode = force_json_number(interp, l, subst_val, &forced)) == TCL_OK))
 						fill_slot(slots, slot, JSON_NewJvalObj(JSON_NUMBER, forced));
 
@@ -2937,18 +3219,23 @@ finally:
 //}}}
 static int jsonNumber(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	Tcl_Obj*			forced = NULL;
+	Tcl_Obj*			resolved = NULL;
+	enum json_types		resolved_type;
 	struct interp_cx*	l = (struct interp_cx*)cdata;
 	int					retval = TCL_OK;
 
 	enum {A_cmd, A_VAL, A_objc};
 	CHECK_ARGS_LABEL(finally, retval, "value");
 
-	TEST_OK_LABEL(finally, retval, force_json_number(interp, l, objv[A_VAL], &forced));
-	Tcl_SetObjResult(interp, JSON_NewJvalObj(JSON_NUMBER, forced));
+	// Under the non-finite quirk, `json number NaN` may return a
+	// JSON_STRING or JSON_NULL rather than a JSON_NUMBER.  The type
+	// mismatch vs. the command name is deliberate — the user opted into
+	// the quirk.
+	TEST_OK_LABEL(finally, retval, resolve_json_number(interp, l, objv[A_VAL], &resolved_type, &resolved));
+	Tcl_SetObjResult(interp, JSON_NewJvalObj(resolved_type, resolved));
 
 finally:
-	release_tclobj(&forced);
+	release_tclobj(&resolved);
 	return retval;
 }
 
@@ -3210,6 +3497,67 @@ finally:
 static int jsonNop(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
 	(void)cdata; (void)interp; (void)objc; (void)objv;
+	return TCL_OK;
+}
+
+//}}}
+static int jsonQuirk(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
+{
+	(void)cdata;
+
+	// Process-scope quirks are not available to safe interpreters —
+	// they would let an unprivileged interp change encoding behaviour
+	// for the whole process.
+	if (Tcl_IsSafe(interp)) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("permission denied: quirk state is process-scope, not available in safe interps", -1));
+		Tcl_SetErrorCode(interp, "RL", "JSON", "QUIRK", "SAFE", NULL);
+		return TCL_ERROR;
+	}
+
+	enum {A_cmd, A_QUIRK, A_args, A_VALUE=A_args, A_objc};
+	CHECK_RANGE_ARGS("quirk ?value?");
+
+	static const char* const quirks[] = {
+		"non-finite-doubles",
+		(char*)NULL
+	};
+	enum { Q_NONFINITE } quirk;
+
+	int quirk_id;
+	TEST_OK(Tcl_GetIndexFromObj(interp, objv[A_QUIRK], quirks, "quirk", TCL_EXACT, &quirk_id));
+	quirk = quirk_id;
+
+	switch (quirk) {
+		case Q_NONFINITE: {
+			static const char* const values[] = {
+				"reject",
+				"stringify",
+				"null",
+				(char*)NULL
+			};
+			// Array aligned with the quirk_nonfinite enum values.
+			static const int value_to_enum[] = {
+				QUIRK_NONFINITE_REJECT,
+				QUIRK_NONFINITE_STRINGIFY,
+				QUIRK_NONFINITE_NULL
+			};
+
+			if (objc > A_VALUE) {
+				int value_id;
+				TEST_OK(Tcl_GetIndexFromObj(interp, objv[A_VALUE], values, "value", TCL_EXACT, &value_id));
+				g_quirk_nonfinite = value_to_enum[value_id];
+			}
+			// Report current value.
+			for (int i = 0; i < (int)(sizeof(value_to_enum)/sizeof(value_to_enum[0])); i++) {
+				if (value_to_enum[i] == g_quirk_nonfinite) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj(values[i], -1));
+					return TCL_OK;
+				}
+			}
+			// Shouldn't be reachable — out-of-range quirk value.
+			THROW_PRINTF("Invalid value for current non-finite-doubles quirk: %d", g_quirk_nonfinite);
+		}
+	}
 	return TCL_OK;
 }
 
@@ -3613,7 +3961,6 @@ collect_interp_result:
 //}}}
 static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *const objv[]) //{{{
 {
-	int subcommand;
 	static const char *subcommands[] = {
 		"parse",		// DEPRECATED
 		"normalize",
@@ -3647,6 +3994,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		"array",
 
 		"decode",
+		"quirk",
 
 		// Debugging
 		"free_cache",
@@ -3687,6 +4035,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		M_OBJECT,
 		M_ARRAY,
 		M_DECODE,
+		M_QUIRK,
 		// Debugging
 		M_FREE_CACHE,
 		M_NOP,
@@ -3694,14 +4043,16 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		M_LEAK_INFO,
 		M_TEMPLATE_ACTIONS,
 		M_TEST_STRING
-	};
+	} subcommand;
 
 	if (objc < 2) {
 		Tcl_WrongNumArgs(interp, 1, objv, "subcommand ?arg ...?");
 		return TCL_ERROR;
 	}
 
-	TEST_OK(Tcl_GetIndexFromObj(interp, objv[1], subcommands, "subcommand", TCL_EXACT, &subcommand));
+	int subcommand_idx;
+	TEST_OK(Tcl_GetIndexFromObj(interp, objv[1], subcommands, "subcommand", TCL_EXACT, &subcommand_idx));
+	subcommand = subcommand_idx;
 
 	switch (subcommand) {
 		case M_PARSE:		return jsonParse(cdata, interp, objc-1, objv+1);
@@ -3722,6 +4073,7 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 		case M_OBJECT:		return jsonObject(cdata, interp, objc-1, objv+1);
 		case M_ARRAY:		return jsonArray(cdata, interp, objc-1, objv+1);
 		case M_DECODE:		return jsonDecode(cdata, interp, objc-1, objv+1);
+		case M_QUIRK:		return jsonQuirk(cdata, interp, objc-1, objv+1);
 		case M_ISNULL:		return jsonIsNull(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE:	return jsonTemplate(cdata, interp, objc-1, objv+1);
 		case M_TEMPLATE_STRING:	return jsonTemplateString(cdata, interp, objc-1, objv+1);
@@ -4194,6 +4546,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("array",      -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("decode",     -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("isnull",     -1));
+			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("quirk",      -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("template",   -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("_template",  -1));
 			Tcl_ListObjAppendElement(NULL, subcommands, Tcl_NewStringObj("foreach",    -1));
@@ -4230,6 +4583,7 @@ DLLEXPORT int Rl_json_Init(Tcl_Interp* interp) //{{{
 		Tcl_CreateObjCommand(interp, ENS "array",      jsonArray, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "decode",     jsonDecode, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "isnull",     jsonIsNull, l, NULL);
+		Tcl_CreateObjCommand(interp, ENS "quirk",      jsonQuirk, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "template",   jsonTemplate, l, NULL);
 		Tcl_CreateObjCommand(interp, ENS "template_string", jsonTemplateString, l, NULL);
 		Tcl_NRCreateCommand(interp,  ENS "foreach",    jsonForeach, jsonNRForeach, l, NULL);

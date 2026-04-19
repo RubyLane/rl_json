@@ -654,31 +654,65 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 	if (interp)
 		l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
-#if 1
-	// Snoop on the intrep for clues on optimized conversions {{{
+	// Fast path: if Tcl already sees obj as a finite number AND the
+	// stringrep is (or will be) valid JSON grammar, skip the parser and
+	// install a JSON_NUMBER intrep that copies obj.  Non-canonical Tcl
+	// numbers like "+42" / "0x10" / ".5" / "12." fall through to the
+	// parser so it can report a grammar error the same way it always
+	// has.  Non-finite values with no usable stringrep are rejected up
+	// front — otherwise we'd cache a stringrep like "Inf" / "NaN" and
+	// our contract ("string rep is always valid JSON") would break.
 	{
-		if (
-			l && (
-				(l->typeInt    && Tcl_FetchInternalRep(obj, l->typeInt)    != NULL) ||
-				(l->typeDouble && Tcl_FetchInternalRep(obj, l->typeDouble) != NULL) ||
-				(l->typeBignum && Tcl_FetchInternalRep(obj, l->typeBignum) != NULL)
-			)
-		) {
-			Tcl_ObjInternalRep		ir = {.twoPtrValue = {0}};
+		switch (classify_json_number(l, obj)) {
+			case JSON_NUM_NONFINITE: {
+				// Quirk dispatch: REJECT errors, STRINGIFY/NULL install a
+				// JSON_STRING / JSON_NULL intrep on obj so it behaves as
+				// the transmuted type from this point on.
+				Tcl_Obj*				transmuted = NULL;
+				enum json_types			transmuted_type;
+				Tcl_ObjInternalRep		ir = {.twoPtrValue = {0}};
 
-			// Must dup because obj will soon be us, creating a circular ref
-			replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_DuplicateObj(obj));
-			release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
+				if (apply_nonfinite_quirk(interp, obj, &transmuted_type, &transmuted) != TCL_OK) {
+					release_tclobj(&transmuted);
+					return TCL_ERROR;
+				}
+				if (transmuted_type == JSON_NULL) {
+					// JSON_NULL payload is never consulted by the
+					// serializer; use a lightweight marker.
+					replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_NewStringObj("null", 4));
+				} else {
+					// JSON_STRING payload carries the AWS spelling.
+					replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, transmuted);
+				}
+				release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
+				release_tclobj(&transmuted);
 
-			*out_type = JSON_NUMBER;
-			*objtype = g_objtype_for_type[JSON_NUMBER];
+				*out_type = transmuted_type;
+				*objtype = g_objtype_for_type[transmuted_type];
 
-			Tcl_StoreInternalRep(obj, *objtype, &ir); record_instance(obj);
-			return TCL_OK;
+				Tcl_StoreInternalRep(obj, *objtype, &ir); record_instance(obj);
+				return TCL_OK;
+			}
+
+			case JSON_NUM_CANONICAL: {
+				Tcl_ObjInternalRep		ir = {.twoPtrValue = {0}};
+
+				// Must dup because obj will soon be us, creating a circular ref
+				replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_DuplicateObj(obj));
+				release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
+
+				*out_type = JSON_NUMBER;
+				*objtype = g_objtype_for_type[JSON_NUMBER];
+
+				Tcl_StoreInternalRep(obj, *objtype, &ir); record_instance(obj);
+				return TCL_OK;
+			}
+
+			case JSON_NUM_NONCANONICAL:
+			case JSON_NUM_NOT_NUMBER:
+				break;
 		}
 	}
-	// Snoop on the intrep for clues on optimized conversions }}}
-#endif
 
 	cx[0].prev = NULL;
 	cx[0].last = cx;

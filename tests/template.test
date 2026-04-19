@@ -437,6 +437,52 @@ test template-2.2.4.6 {Atomic: literal} -body { #<<<
 	unset -nocomplain template
 } -result {{"num"} {ALLOCATE 0 2 DECLARE_LITERAL num {} STORE_STRING {} 1 REPLACE_ATOM {} 1}}
 #>>>
+
+# Non-finite floating-point values (NaN, ±Inf, ±Infinity) have no
+# representation in the JSON grammar (RFC 8259 only admits decimal
+# numbers), so ~N: substitution must refuse to produce them.  We error
+# at template-substitute time rather than silently emitting Inf / NaN
+# tokens or corrupting the serialized document.
+test template-2.2.5.1 {Atomic number: NaN substitution is rejected} -constraints tcl9 -body { #<<<
+	json template {"~N:x"} {x NaN}
+} -returnCodes error -result {Error substituting value from "x" into template: non-finite floating-point value is not representable in JSON: "NaN"} -errorCode {RL JSON NUMBER NONFINITE}
+#>>>
+test template-2.2.5.2 {Atomic number: Inf substitution is rejected} -body { #<<<
+	json template {"~N:x"} {x Inf}
+} -returnCodes error -result {Error substituting value from "x" into template: non-finite floating-point value is not representable in JSON: "Inf"} -errorCode {RL JSON NUMBER NONFINITE}
+#>>>
+test template-2.2.5.3 {Atomic number: -Inf substitution is rejected} -body { #<<<
+	json template {"~N:x"} {x -Inf}
+} -returnCodes error -result {Error substituting value from "x" into template: non-finite floating-point value is not representable in JSON: "-Inf"} -errorCode {RL JSON NUMBER NONFINITE}
+#>>>
+test template-2.2.5.4 {Atomic number: Infinity substitution is rejected} -constraints tcl9 -body { #<<<
+	json template {"~N:x"} {x Infinity}
+} -returnCodes error -result {Error substituting value from "x" into template: non-finite floating-point value is not representable in JSON: "Infinity"} -errorCode {RL JSON NUMBER NONFINITE}
+#>>>
+test template-2.2.5.5 {Atomic number: -Infinity substitution is rejected} -constraints tcl9 -body { #<<<
+	json template {"~N:x"} {x -Infinity}
+} -returnCodes error -result {Error substituting value from "x" into template: non-finite floating-point value is not representable in JSON: "-Infinity"} -errorCode {RL JSON NUMBER NONFINITE}
+#>>>
+# Pure-double intrep path: [expr {1e500}] overflows to Inf with no
+# stringrep.  classify_json_number sees TCL_NUMBER_DOUBLE + !isfinite
+# and returns JSON_NUM_NONFINITE — same rejection as the string forms.
+test template-2.2.5.6 {Atomic number: pure-double overflow Inf substitution is rejected} -body { #<<<
+	set inf	[expr {1e500}]
+	catch {json template {"~N:x"} [list x $inf]} result opts
+	list [dict get $opts -errorcode] $result
+} -cleanup {
+	unset -nocomplain inf result opts
+} -result {{RL JSON NUMBER NONFINITE} {Error substituting value from "x" into template: non-finite floating-point value is not representable in JSON: "Inf"}}
+#>>>
+# "1e909090" overflows Tcl's double to Inf, but as a JSON literal it's
+# still grammar-valid — we emit the user-supplied stringrep, never the
+# Tcl canonical "Inf".  Accepting this keeps parity with `json normalize
+# 1e909090`, which has always been a no-op round-trip.
+test template-2.2.5.8 {Atomic number: grammar-valid overflow literal is accepted} -body { #<<<
+	json template {"~N:x"} {x 1e909090}
+} -result 1e909090
+#>>>
+
 test template-3.1 {Non-string key subst: number} -body { #<<<
 	list [catch {
 		json template { {"~N:v":"bar"} } {v 1}

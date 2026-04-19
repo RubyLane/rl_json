@@ -1,0 +1,372 @@
+source [file join [file dirname [info script]] common.tcl]; runtests {
+
+# `json quirk non-finite-doubles` is a process-scope switch (see the
+# reuri::quirk analogue) that changes how NaN / ±Infinity inputs are
+# resolved when we'd otherwise refuse to serialize them.  Every test
+# here restores the default ("reject") on cleanup so the rest of the
+# suite isn't affected.
+#
+# Important: the quirk state affects only values *encoded after* it is
+# set.  Tcl_Objs that were already converted under a previous quirk
+# keep their cached intrep.  The tests below deliberately build each
+# input via `string range $x 0 end` so each run exercises a fresh
+# Tcl_Obj — otherwise literal-caching between tests would leak
+# resolved intreps across quirk changes and produce spurious results.
+
+proc fresh s {string range $s 0 end}
+
+test quirk-1.1 {Default quirk state is reject} -body { #<<<
+	json quirk non-finite-doubles
+} -result reject
+#>>>
+test quirk-1.2 {Set and query quirk value} -body { #<<<
+	set r1	[json quirk non-finite-doubles stringify]
+	set r2	[json quirk non-finite-doubles]
+	list $r1 $r2
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain r1 r2
+} -result {stringify stringify}
+#>>>
+test quirk-1.3 {Bad quirk name} -body { #<<<
+	json quirk bogus
+} -returnCodes error -result {bad quirk "bogus": must be non-finite-doubles}
+#>>>
+test quirk-1.4 {Bad quirk value} -body { #<<<
+	json quirk non-finite-doubles bogus
+} -returnCodes error -result {bad value "bogus": must be reject, stringify, or null}
+#>>>
+test quirk-1.5 {Wrong number of args} -body { #<<<
+	list [catch {json quirk} r] $r [catch {json quirk a b c} r] $r
+} -cleanup {
+	unset -nocomplain r
+} -match glob -result {1 {wrong # args: should be "*quirk ?value?"} 1 {wrong # args: should be "*quirk ?value?"}}
+#>>>
+
+# STRINGIFY: AWS / JSON5 spellings — "NaN", "Infinity", "-Infinity"
+# (positive infinity has no "+" prefix, per the SDK v2 convention).
+test quirk-stringify-new-number-1.1 {json number NaN -> "NaN"} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json number [fresh NaN]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"NaN"}
+#>>>
+test quirk-stringify-new-number-1.2 {json number Inf -> "Infinity"} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json number [fresh Inf]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"Infinity"}
+#>>>
+test quirk-stringify-new-number-1.3 {json number -Inf -> "-Infinity"} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json number [fresh -Inf]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"-Infinity"}
+#>>>
+test quirk-stringify-new-number-1.4 {json number Infinity -> "Infinity"} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json number [fresh Infinity]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"Infinity"}
+#>>>
+test quirk-stringify-new-number-1.5 {json number -Infinity -> "-Infinity"} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json number [fresh -Infinity]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"-Infinity"}
+#>>>
+test quirk-stringify-new-number-1.6 {json number on pure-double Inf -> "Infinity"} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json number [expr {1e500}]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"Infinity"}
+#>>>
+test quirk-stringify-new-number-1.7 {Finite values still produce numbers under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	list [json number 1.5] [json number 42] [json number 1e500] [json type [json number 1.5]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {1.5 42 1e500 number}
+#>>>
+test quirk-stringify-new-number-1.8 {json type on stringified NaN reports string} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json type [json number [fresh NaN]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result string
+#>>>
+
+test quirk-stringify-template-1.1 {~N: NaN substitution under stringify} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json template {"~N:x"} [list x [fresh NaN]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"NaN"}
+#>>>
+test quirk-stringify-template-1.2 {~N: Inf substitution under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json template {"~N:x"} [list x [fresh Inf]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"Infinity"}
+#>>>
+test quirk-stringify-template-1.3 {~N: -Infinity substitution under stringify} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json template {"~N:x"} [list x [fresh -Infinity]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {"-Infinity"}
+#>>>
+test quirk-stringify-template-1.4 {Compound template with non-finite under stringify} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	json template {
+		{
+			"nan":      "~N:a",
+			"inf":      "~N:b",
+			"neg_inf":  "~N:c",
+			"normal":   "~N:d"
+		}
+	} [list a [fresh NaN] b [fresh Inf] c [fresh -Inf] d 3.14]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {{"nan":"NaN","inf":"Infinity","neg_inf":"-Infinity","normal":3.14}}
+#>>>
+test quirk-stringify-template-1.5 {Pure-double Inf through template under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	set v	[expr {1e500}]
+	json template {"~N:x"} [list x $v]
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain v
+} -result {"Infinity"}
+#>>>
+
+test quirk-stringify-set-1.1 {json set type-inference NaN under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	set doc	{[0]}
+	json set doc 0 [fresh NaN]
+	set doc
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {["NaN"]}
+#>>>
+test quirk-stringify-set-1.2 {json set type-inference Inf under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	set doc	{[0]}
+	json set doc 0 [fresh Inf]
+	set doc
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {["Infinity"]}
+#>>>
+test quirk-stringify-set-1.3 {json set type-inference -Inf under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	set doc	{[0]}
+	json set doc 0 [fresh -Inf]
+	set doc
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {["-Infinity"]}
+#>>>
+test quirk-stringify-set-1.4 {json set type-inference pure-double Inf under stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	set doc	{[0]}
+	json set doc 0 [expr {1e500}]
+	set doc
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {["Infinity"]}
+#>>>
+
+# NULL: matches JavaScript's JSON.stringify — all non-finite values
+# become JSON null, which is always valid JSON but silently drops the
+# sign / magnitude.
+test quirk-null-new-number-1.1 {json number NaN -> null} -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	json number [fresh NaN]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result null
+#>>>
+test quirk-null-new-number-1.2 {json number Inf -> null} -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	json number [fresh Inf]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result null
+#>>>
+test quirk-null-new-number-1.3 {json type on null-transmuted NaN reports null} -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	json type [json number [fresh NaN]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result null
+#>>>
+test quirk-null-template-1.1 {~N: NaN substitution under null} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	json template {"~N:x"} [list x [fresh NaN]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result null
+#>>>
+test quirk-null-template-1.2 {Compound template with non-finite under null} -constraints tcl9 -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	json template {{"a":"~N:v","b":42}} [list v [fresh Inf]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+} -result {{"a":null,"b":42}}
+#>>>
+test quirk-null-set-1.1 {json set type-inference NaN under null} -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	set doc	{[0]}
+	json set doc 0 [fresh NaN]
+	set doc
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {[null]}
+#>>>
+test quirk-null-set-1.2 {json set type-inference pure-double Inf under null} -setup { #<<<
+	json quirk non-finite-doubles null
+} -body {
+	set doc	{[0]}
+	json set doc 0 [expr {1e500}]
+	set doc
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {[null]}
+#>>>
+
+# REJECT (default): still errors with the same RL JSON NUMBER NONFINITE
+# errorcode after switching back from a non-default mode.
+test quirk-reject-1.1 {Switch back to reject after stringify} -setup { #<<<
+	json quirk non-finite-doubles stringify
+	json quirk non-finite-doubles reject
+} -body {
+	list [json quirk non-finite-doubles] [catch {json number [fresh NaN]} r o] \
+		[expr {[dict exists $o -errorcode] ? [dict get $o -errorcode] : ""}]
+} -cleanup {
+	unset -nocomplain r o
+} -result {reject 1 {RL JSON NUMBER NONFINITE}}
+#>>>
+
+# Cached-intrep semantics: the quirk decides *at resolution time* what
+# JSON type a non-finite value becomes.  Paths that store the resolved
+# intrep on the input Tcl_Obj (json set / as_json implicit type
+# inference) keep that resolution even if the quirk is later changed —
+# this matches the reuri::quirk guidance to set the quirk first and
+# *then* do the encoding.  Paths that construct a fresh output Tcl_Obj
+# (json number, json template ~N:) always see the current quirk.
+test quirk-sticky-1.1 {json number re-resolves on every call (no mutation of input)} -body { #<<<
+	set val	[fresh NaN]
+	json quirk non-finite-doubles stringify
+	set r1	[json number $val]
+	json quirk non-finite-doubles null
+	set r2	[json number $val]
+	list $r1 $r2
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain val r1 r2
+} -result {{"NaN"} null}
+#>>>
+test quirk-sticky-1.2 {as_json caches intrep on input — later quirk change ignored} -body { #<<<
+	# First json set mutates the input Tcl_Obj with a JSON_STRING intrep
+	# carrying "NaN".  Subsequent uses of the same Tcl_Obj see that
+	# intrep and skip classify_json_number entirely — so flipping the
+	# quirk afterwards has no effect on that specific Tcl_Obj.
+	set val	[fresh NaN]
+	json quirk non-finite-doubles stringify
+	set doc1	{[0]}
+	json set doc1 0 $val
+	json quirk non-finite-doubles null
+	set doc2	{[0]}
+	json set doc2 0 $val
+	list $doc1 $doc2
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain val doc1 doc2
+} -result {{["NaN"]} {["NaN"]}}
+#>>>
+test quirk-sticky-1.3 {Fresh input each time picks up the current quirk} -body { #<<<
+	json quirk non-finite-doubles stringify
+	set doc1	{[0]}
+	json set doc1 0 [fresh NaN]
+	json quirk non-finite-doubles null
+	set doc2	{[0]}
+	json set doc2 0 [fresh NaN]
+	list $doc1 $doc2
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc1 doc2
+} -result {{["NaN"]} {[null]}}
+#>>>
+
+# json valid: the quirk is about what we'd *serialize*, not what we'd
+# accept as input.  A bare "NaN" string isn't valid JSON under any
+# -extensions setting, and the quirk never changes that.  Only the
+# transmuted output (a JSON string "NaN" or JSON null) would validate.
+test quirk-valid-1.1 {json valid non-finite input is 0 regardless of quirk} -body { #<<<
+	set states	{}
+	foreach mode {reject stringify null} {
+		json quirk non-finite-doubles $mode
+		lappend states $mode [json valid -extensions {} [fresh NaN]] [json valid -extensions {} [fresh Inf]]
+	}
+	set states
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain states mode
+} -result {reject 0 0 stringify 0 0 null 0 0}
+#>>>
+test quirk-valid-1.2 {Transmuted output is itself valid JSON} -setup { #<<<
+	json quirk non-finite-doubles stringify
+} -body {
+	# The JSON_STRING result from `json number NaN` under stringify
+	# serializes to \"NaN\"; pass the string form through json valid.
+	set doc	[json number [fresh NaN]]
+	list $doc [json valid -extensions {} [string range $doc 0 end]]
+} -cleanup {
+	json quirk non-finite-doubles reject
+	unset -nocomplain doc
+} -result {{"NaN"} 1}
+#>>>
+
+}
+# Local Variables:
+# mode: tcl
+# tab-width: 4
+# End:
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

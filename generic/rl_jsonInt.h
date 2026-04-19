@@ -245,6 +245,63 @@ int JSON_GetIntrepFromObj(Tcl_Interp* interp, Tcl_Obj* obj, enum json_types* typ
 int JSON_GetJvalFromObj(Tcl_Interp *interp, Tcl_Obj *obj, enum json_types *type, Tcl_Obj **val);
 int JSON_IsJSON(Tcl_Obj* obj, enum json_types* type, Tcl_ObjInternalRep** ir);
 int type_is_dynamic(const enum json_types type);
+
+// Classify a Tcl_Obj as a numeric value for JSON purposes.  Tcl 9 path
+// uses Tcl_GetNumberFromObj; Tcl 8.6 falls back to intrep sniffing plus
+// Tcl_GetDoubleFromObj for the (finite vs. Inf) distinction (simpler,
+// at the cost of some perf).
+//
+// The stringrep is considered: a stringrep that matches the JSON number
+// grammar is always usable as-is (so "1e909090" — which overflows Tcl's
+// double to Inf — is still JSON_NUM_CANONICAL because we would emit the
+// user-supplied string, never "Inf").  A stringrep that Tcl accepts but
+// JSON doesn't ("+42", "0x10", "1_000", ".5", "12.") is NONCANONICAL —
+// force_json_number will duplicate and invalidate to let Tcl regenerate
+// a canonical form; set_from_any and JSON_Valid fall through to the
+// parser (which will reject it with a grammar error).
+enum json_num_class {
+	JSON_NUM_NOT_NUMBER,		// Tcl does not see obj as a number
+	JSON_NUM_CANONICAL,		// Finite; stringrep is JSON grammar or absent (will canonicalize cleanly)
+	JSON_NUM_NONCANONICAL,		// Finite; stringrep is non-JSON (e.g. "+42", "0x10") — needs regeneration
+	JSON_NUM_NONFINITE		// NaN or ±Infinity with no usable stringrep — cannot be serialized
+};
+enum json_num_class classify_json_number(struct interp_cx* l, Tcl_Obj* obj);
+int stringrep_is_json_number(const char* s, Tcl_Size len);
+int report_nonfinite_number(Tcl_Interp* interp, Tcl_Obj* obj);
+
+// Process-scope quirk for non-finite doubles.  Default is REJECT —
+// refuse to install a non-finite value as JSON.  STRINGIFY substitutes
+// the AWS/JSON5 spellings "NaN", "Infinity", "-Infinity" as a JSON
+// string; NULL substitutes JSON null (matches JavaScript's
+// JSON.stringify).  Set via the `json quirk non-finite-doubles` command.
+enum quirk_nonfinite {
+	QUIRK_NONFINITE_REJECT    = 0,
+	QUIRK_NONFINITE_STRINGIFY = 1,
+	QUIRK_NONFINITE_NULL      = 2
+};
+extern int g_quirk_nonfinite;
+
+// Produce a Tcl_Obj whose stringrep is the AWS/JSON5 spelling for the
+// non-finite value represented by obj: "NaN" / "Infinity" / "-Infinity".
+// Returns a fresh Tcl_Obj with refcount 0.
+Tcl_Obj* stringify_nonfinite(Tcl_Obj* obj);
+
+// Apply the current non-finite quirk.  On REJECT, sets interp result /
+// errorcode and returns TCL_ERROR.  On STRINGIFY, sets *out_type =
+// JSON_STRING and *out_val = a fresh Tcl_Obj with the AWS spelling.  On
+// NULL, sets *out_type = JSON_NULL and *out_val = NULL.
+int apply_nonfinite_quirk(Tcl_Interp* interp, Tcl_Obj* obj,
+        enum json_types* out_type, Tcl_Obj** out_val);
+
+// Convenience: resolve a Tcl value to a JSON type + payload for paths
+// that would otherwise call force_json_number directly.  Handles the
+// non-finite quirk (stringify / null transmutation) internally.  On
+// TCL_OK, *out_type is one of JSON_NUMBER / JSON_STRING / JSON_NULL and
+// *out_val is either a refcount-incremented Tcl_Obj or NULL (for
+// JSON_NULL).
+int resolve_json_number(Tcl_Interp* interp, struct interp_cx* l,
+        Tcl_Obj* obj, enum json_types* out_type, Tcl_Obj** out_val);
+
 int force_json_number(Tcl_Interp* interp, struct interp_cx* l, Tcl_Obj* obj, Tcl_Obj** forced);
 Tcl_Obj* as_json(Tcl_Interp* interp, Tcl_Obj* from);
 const char* get_dyn_prefix(enum json_types type);

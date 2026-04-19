@@ -1416,22 +1416,25 @@ int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions ex
 	if (interp)
 		l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
-#if 1
-	// Snoop on the intrep for clues on optimized conversions {{{
+	// Fast path for already-numeric Tcl values: accept only those whose
+	// stringrep is (or will be) a valid JSON number literal.  Non-finite
+	// values with no usable stringrep are definitively invalid.  Numbers
+	// Tcl accepts but JSON's grammar rejects ("+42", "0x10", "1_000")
+	// fall through to the parser, which will return the same invalid
+	// verdict with a precise parse error.
 	{
-		if (
-			l && (
-				(l->typeInt    && Tcl_FetchInternalRep(json, l->typeInt)    != NULL) ||
-				(l->typeDouble && Tcl_FetchInternalRep(json, l->typeDouble) != NULL) ||
-				(l->typeBignum && Tcl_FetchInternalRep(json, l->typeBignum) != NULL)
-			)
-		) {
-			*valid = 1;
-			return TCL_OK;
+		switch (classify_json_number(l, json)) {
+			case JSON_NUM_CANONICAL:
+				*valid = 1;
+				return TCL_OK;
+			case JSON_NUM_NONFINITE:
+				*valid = 0;
+				return TCL_OK;
+			case JSON_NUM_NONCANONICAL:
+			case JSON_NUM_NOT_NUMBER:
+				break;
 		}
 	}
-	// Snoop on the intrep for clues on optimized conversions }}}
-#endif
 
 	cx[0].prev = NULL;
 	cx[0].last = cx;
