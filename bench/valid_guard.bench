@@ -1,0 +1,170 @@
+package require rl_json
+
+namespace import ::rl_json::json
+
+# A guarded access pattern commonly looks like:
+#     if {[json valid $val] && [json get $val bar]} { json get $val baz 2 }
+#
+# `json valid` is documented as parsing its argument, which raises the worry
+# that wrapping an already-parsed value in such a guard pays a full re-parse
+# per call, plus the cost of materialising a string rep if one hasn't been
+# built yet.  JSON_Valid() has a fast path that skips re-parsing when the
+# Tcl_Obj already carries our JSON intrep (generic/api.c near line 1402), so
+# this bench exercises three states of `val` — native+stringrep, native
+# without stringrep, and pure string — against guarded vs unguarded
+# variants, to make the fast path's effect visible.
+
+proc main {} {
+	# valid_guard-1.1 <<<
+	# Native JSON value with a cached string rep.  This is the common state
+	# after a value has been inspected or serialised at least once — both
+	# intrep and stringrep present.  The guarded variant should hit the
+	# JSON_IsJSON fast path and be essentially free relative to unguarded.
+	bench valid_guard-1.1 {Guard on native JSON value (intrep + stringrep cached)} -setup {
+		set val	[json template {
+			{
+				"foo":  123,
+				"bar":  true,
+				"baz":  ["a", "b", "c", "d", "e", "f"],
+				"quux": {
+					"one":  "Longer string than just a single word",
+					"two":  "Another one"
+				}
+			}
+		}]
+		# Force the string rep to be materialised so we measure the "both
+		# reps present" steady state.
+		string length $val
+	} -compare {
+		guarded {
+			if {[json valid $val] && [json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+
+		unguarded {
+			if {[json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+	} -cleanup {
+		unset -nocomplain val
+	} -result c
+
+	#>>>
+	# valid_guard-1.2 <<<
+	# Native JSON value, string rep invalidated by `json normalize`.  If the
+	# fast path didn't exist, the guarded variant would pay for a full
+	# string rep generation on the first call and then match 1.1 from the
+	# second iteration onward — i.e. a one-shot cost that gets amortised
+	# out across the batch.  With the fast path it never materialises the
+	# string rep at all, so the variant should look like 1.1's guarded
+	# timing regardless of batch size.
+	bench valid_guard-1.2 {Guard on native JSON value (intrep only, no stringrep)} -setup {
+		set val	[json template {
+			{
+				"foo":  123,
+				"bar":  true,
+				"baz":  ["a", "b", "c", "d", "e", "f"],
+				"quux": {
+					"one":  "Longer string than just a single word",
+					"two":  "Another one"
+				}
+			}
+		}]
+		set val	[json normalize $val]
+	} -compare {
+		guarded {
+			if {[json valid $val] && [json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+
+		unguarded {
+			if {[json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+	} -cleanup {
+		unset -nocomplain val
+	} -result c
+
+	#>>>
+	# valid_guard-1.3 <<<
+	# Pure string input with no JSON intrep at each iteration.  `string
+	# range $x 0 end` returns a fresh string-only Tcl_Obj (verified — unlike
+	# `string cat` or `format %s`, which return the source obj unchanged),
+	# so every call pays a full parse and exercises the slow path.  This
+	# is the worst case for the guard.
+	bench valid_guard-1.3 {Guard on pure-string JSON (no intrep)} -setup {
+		set val_src	[json normalize [json template {
+			{
+				"foo":  123,
+				"bar":  true,
+				"baz":  ["a", "b", "c", "d", "e", "f"],
+				"quux": {
+					"one":  "Longer string than just a single word",
+					"two":  "Another one"
+				}
+			}
+		}]]
+	} -compare {
+		guarded {
+			set val	[string range $val_src 0 end]
+			if {[json valid $val] && [json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+
+		unguarded {
+			set val	[string range $val_src 0 end]
+			if {[json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+	} -overhead {
+		* {set val [string range $val_src 0 end]}
+	} -cleanup {
+		unset -nocomplain val val_src
+	} -result c
+
+	#>>>
+	# valid_guard-1.4 <<<
+	# No string rep, json valid has to generate it first
+	bench valid_guard-1.4 {Guard on pure-JSON value (no stringrep)} -setup {
+		set val_src	[json template {
+			{
+				"foo":  123,
+				"bar":  true,
+				"baz":  ["a", "b", "c", "d", "e", "f"],
+				"quux": {
+					"one":  "Longer string than just a single word",
+					"two":  "Another one"
+				}
+			}
+		}]
+	} -compare {
+		guarded {
+			set val	[json normalize $val_src]
+			if {[json valid $val] && [json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+
+		unguarded {
+			set val	[json normalize $val_src]
+			if {[json get $val bar]} {
+				json get $val baz 2
+			}
+		}
+	} -overhead {
+		* {set val [json normalize $val_src]}
+	} -cleanup {
+		unset -nocomplain val val_src
+	} -result c
+
+	#>>>
+}
+main
+
+# vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

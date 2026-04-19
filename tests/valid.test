@@ -1375,6 +1375,113 @@ test valid/whitespace-9.6.1 {Commented object key} -body { #<<<
 	} char_ofs 8]]
 #>>>
 
+# Native-intrep fast path for [json valid].  Once we have a JSON intrep
+# parsed out of a string with comments, the string rep still contains
+# them — strict validation has to notice that and re-parse rather than
+# trusting the intrep blindly.  Conversely, if the string rep has been
+# invalidated (by [json normalize] or a mutation), we know the next
+# serialization will be strict JSON, so the fast path can short-circuit.
+test valid/native-intrep-1.1 {Default accepts when intrep exists and stringrep has comments} -setup { #<<<
+	set val {
+		{
+			// First key
+			"key1": "value1",
+			/* This is also a comment */
+			"key2": "value2"
+		}
+	}
+	# Force creation of our intrep while leaving the original string rep
+	# alone, so the fast path has something to find.
+	json get $val key2
+} -body {
+	json valid $val
+} -cleanup {
+	unset -nocomplain val
+} -result 1
+#>>>
+test valid/native-intrep-1.2 {Strict rejects when stringrep still has comments} -setup { #<<<
+	set val {
+		{
+			// First key
+			"key1": "value1",
+			/* This is also a comment */
+			"key2": "value2"
+		}
+	}
+	json get $val key2
+} -body {
+	json valid -extensions {} $val
+} -cleanup {
+	unset -nocomplain val
+} -result 0
+#>>>
+test valid/native-intrep-1.3 {Explicit -extensions comments accepts} -setup { #<<<
+	set val {
+		{
+			// First key
+			"key1": "value1",
+			/* This is also a comment */
+			"key2": "value2"
+		}
+	}
+	json get $val key2
+} -body {
+	json valid -extensions comments $val
+} -cleanup {
+	unset -nocomplain val
+} -result 1
+#>>>
+test valid/native-intrep-1.4 {Strict accepts after json normalize invalidates stringrep} -setup { #<<<
+	set val {
+		{
+			// First key
+			"key1": "value1",
+			/* This is also a comment */
+			"key2": "value2"
+		}
+	}
+	json get $val key2	;# $val now has our intrep
+} -body {
+	json valid -extensions {} [json normalize $val]
+} -cleanup {
+	unset -nocomplain val
+} -result 1
+#>>>
+test valid/native-intrep-1.5 {Strict accepts after a mutation invalidates stringrep} -setup { #<<<
+	set val {
+		{
+			// First key
+			"key1": "value1",
+			/* This is also a comment */
+			"key2": "value2"
+		}
+	}
+	json set val key3 {"New entry"}
+} -body {
+	json valid -extensions {} $val
+} -cleanup {
+	unset -nocomplain val
+} -result 1
+#>>>
+test valid/native-intrep-1.6 {Strict accepts a freshly-built native value with no stringrep} -setup { #<<<
+	# json template produces a native JSON value with no string rep, so
+	# every [json valid] call on it should trust the intrep.
+	set val	[json template {
+		{
+			"key1": "~S:x",
+			"key2": "~S:y"
+		}
+	} {x value1 y value2}]
+} -body {
+	list \
+		[json valid $val] \
+		[json valid -extensions {} $val] \
+		[json valid -extensions comments $val]
+} -cleanup {
+	unset -nocomplain val
+} -result {1 1 1}
+#>>>
+
 }
 # Local Variables:
 # mode: tcl

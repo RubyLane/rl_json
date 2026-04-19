@@ -1396,6 +1396,23 @@ int JSON_Valid(Tcl_Interp* interp, Tcl_Obj* json, int* valid, enum extensions ex
 	Tcl_Size				len;
 	struct parse_context	cx[CX_STACK_SIZE];
 
+	{
+		Tcl_ObjInternalRep*	ir = NULL;
+		if (
+				JSON_IsJSON(json, &type, &ir) &&
+				(extensions == EXT_COMMENTS || !Tcl_HasStringRep(json))
+		) {
+			// If we already have a native JSON value parsed, and either
+			// we're using the default extensions (so re-parsing the
+			// string rep would accept it) or there is no string rep yet
+			// (we'll always generate valid JSON when asked to serialize),
+			// then skip re-parsing.  details is only ever written on
+			// error paths, so leaving it untouched here is safe.
+			*valid = 1;
+			return TCL_OK;
+		}
+	}
+
 	if (interp)
 		l = Tcl_GetAssocData(interp, "rl_json", NULL);
 
