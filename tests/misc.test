@@ -37,21 +37,88 @@ test misc-2.6 {isnull, path, out of array bounds} -body { #<<<
 } -result 1
 #>>>
 test misc-3.1 {interp free} -body { #<<<
-	set slave [interp create]
-	$slave eval {load {} Rl_json; rl_json::json get {["hello","slave"]}}
+	set child [interp create]
+	$child eval {load {} Rl_json; rl_json::json get {["hello","child"]}}
 } -cleanup {
-	interp delete $slave
-	unset -nocomplain slave
-} -result {hello slave}
+	interp delete $child
+	unset -nocomplain child
+} -result {hello child}
 #>>>
 test misc-3.2 {interp free, safe interp} -body { #<<<
-	set slave [interp create -safe]
-	$slave invokehidden load {} Rl_json
-	$slave eval {rl_json::json get {["hello","slave"]}}
+	set child [interp create -safe]
+	$child invokehidden load {} Rl_json
+	$child eval {rl_json::json get {["hello","child"]}}
 } -cleanup {
-	interp delete $slave
-	unset -nocomplain slave
-} -result {hello slave}
+	interp delete $child
+	unset -nocomplain child
+} -result {hello child}
+#>>>
+test misc-4.1 {dedup cache returning obj as its own parsed inner must not create a self-referential intrep} -body { #<<<
+	# Regression test for a double-free on interp finalization.  The
+	# pattern is: a JSON template with a number literal; a `json get` of
+	# that number (which returns the dedup-cached inner Tcl_Obj); a
+	# `json template ... ~J:...` substitution that forces the same Tcl_Obj
+	# back through set_from_any's parser-tail path.  The parser calls
+	# get_string(), the dedup cache returns that same Tcl_Obj, and before
+	# the fix that obj ended up with ir.ptr1 == obj itself.  At process
+	# finalization release_instances() calls Tcl_FreeInternalRep() on the
+	# live (refcount-1, only self-ref) obj, the self-decref re-enters the
+	# freeIntRepProc, and the double Tcl_DeleteHashEntry on g_instances
+	# panics / double-frees.
+	#
+	# The allocator-pressure step (foreach over many distinct objects) is
+	# needed to surface the latent bug as a reproducible crash at exit;
+	# without it the self-ref still exists but the free order happens to
+	# avoid the re-entry on this box.  The threshold on the reporter's
+	# machine was ~150; 500 is well above that.
+	#
+	# Run in a subprocess so interp-finalization is actually exercised
+	# (the parent tclsh keeps the package loaded, so release_instances
+	# wouldn't fire here).
+	# Directly load the same .so we're using in this interp
+	# so the child loads the build we're testing rather than any
+	# system-installed rl_json that might be on auto_path.
+	foreach e [info loaded {}] {
+		if {[lindex $e 1] eq "Rl_json"} {
+			set so	[lindex $e 0]
+			break
+		}
+	}
+	if {![info exists so]} {
+		error "Rl_json not loaded in parent interp"
+	}
+	set script [string map [list %load% [list $so]] {
+		set dir	[file dirname %load%]	;# init expects this var to be set to the pkgdir
+		load %load% Rl_json
+		namespace import rl_json::*
+		set case [json template {{"params":{"Float":1234.5}}}]
+		json template {{"Float":"~J:_tx_float"}} \
+			[list _tx_float [json get $case params Float]]
+		set big {[}
+		for {set i 0} {$i < 500} {incr i} {
+			if {$i > 0} {append big ,}
+			append big "\{\"description\":\"d$i\"\}"
+		}
+		append big {]}
+		json foreach e $big {set _ [json get $e description]}
+		#unload %load%
+		exit 0
+	}]
+	try {
+		exec [info nameofexecutable] << $script
+		set rc 0
+	} trap CHILDSTATUS {- o} {
+		set rc [lindex [dict get $o -errorcode] 2]
+	} trap CHILDKILLED {- o} {
+		# Tcl_Panic → abort() arrives as CHILDKILLED with SIG...
+		set rc [lindex [dict get $o -errorcode] 3]
+	} on error errmsg {
+		set rc $errmsg
+	}
+	set rc
+} -cleanup {
+	unset -nocomplain e so script rc errmsg o
+} -result 0
 #>>>
 
 }

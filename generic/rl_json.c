@@ -3478,7 +3478,8 @@ static int jsonMerge(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 
 	THROW_ERROR("merge method is not functional yet, sorry");
 
-	if (objc < 1) CHECK_ARGS(0, "?flag ...? ?json_val ...?");
+	enum {A_cmd, A_args};
+	CHECK_MIN_ARGS("?flag ...? ?json_val ...?");
 
 	while (i < objc) {
 		patch = objv[i++];
@@ -3744,8 +3745,9 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 				const char*		s;
 				Tcl_Size		len;
 
-				CHECK_ARGS(2, "addr");
-				TEST_OK(Tcl_GetWideIntFromObj(interp, objv[2], &addr));
+				enum {A_cmd, A_ADDR, A_objc};
+				CHECK_ARGS("addr");
+				TEST_OK(Tcl_GetWideIntFromObj(interp, objv[A_ADDR], &addr));
 				obj = (Tcl_Obj*)(intptr_t)addr;
 				s = Tcl_GetStringFromObj(obj, &len);
 				fprintf(stderr, "\tLeaked obj: %p[%" TCL_SIZE_MODIFIER "d] len %" TCL_SIZE_MODIFIER "d: \"%s\"\n", (void*)obj, obj->refCount, len, len < 256 ? s : "<too long>");
@@ -3771,9 +3773,10 @@ static int jsonNRObj(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *co
 				};
 				int idx;
 
-				CHECK_ARGS(2, "key");
+				enum {A_cmd, A_KEY, A_objc};
+				CHECK_ARGS("key");
 
-				TEST_OK(Tcl_GetIndexFromObjStruct(interp, objv[2], tstr, sizeof(struct teststring), "key", TCL_EXACT, &idx));
+				TEST_OK(Tcl_GetIndexFromObjStruct(interp, objv[A_KEY], tstr, sizeof(struct teststring), "key", TCL_EXACT, &idx));
 				if (!tstr[idx].len) tstr[idx].len = strlen(tstr[idx].str);
 				Tcl_Obj*	newstr = Tcl_NewStringObj(tstr[idx].str, tstr[idx].len);
 				Tcl_SetObjResult(interp, newstr);
@@ -3854,7 +3857,8 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	struct interp_cx*	l = (struct interp_cx*)cdata;
 #endif
 
-	CHECK_ARGS(2, "cmd newactive");
+	enum {A_cmd, A_CMD, A_NEWACTIVE, A_objc};
+	CHECK_ARGS("cmd newactive");
 
 
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
@@ -3873,8 +3877,8 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 
 	Tcl_IncrRefCount(objv[2]);
 	intptr_t wrap_fd = fd;
-	Tcl_NRAddCallback(interp, NRcheckmem_bottom, NULL, (ClientData)wrap_fd, h_before, objv[2]);
-	return Tcl_NREvalObj(interp, objv[1], 0);
+	Tcl_NRAddCallback(interp, NRcheckmem_bottom, NULL, (ClientData)wrap_fd, h_before, objv[A_NEWACTIVE]);
+	return Tcl_NREvalObj(interp, objv[A_CMD], 0);
 finally:
 	return retcode;
 }

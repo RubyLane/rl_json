@@ -821,12 +821,21 @@ after_value:	// Yeah, goto.  But the alternative abusing loops was worse
 		Tcl_ObjType*		top_objtype = g_objtype_for_type[cx[0].container];
 		Tcl_ObjInternalRep*	top_ir = Tcl_FetchInternalRep(cx[0].val, top_objtype);
 		Tcl_ObjInternalRep	ir = {.twoPtrValue = {0}};
+		Tcl_Obj*			inner = NULL;
 
 		if (unlikely(top_ir == NULL))
 			Tcl_Panic("Can't get intrep for the top container");
 
-		// We're transferring the ref from cx[0].val to our intrep
-		replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, top_ir->twoPtrValue.ptr1);
+		// The parser calls get_string, which may dedup to a cached Tcl_Obj.
+		// If obj is itself that cached entry, top_ir->ptr1 == obj and storing
+		// it as our intrep would create a self-reference (the freeIntRepProc
+		// would then re-enter on the same obj during free, causing a double
+		// free).  Break the cycle by duplicating.
+		inner = (Tcl_Obj*)top_ir->twoPtrValue.ptr1;
+		if (unlikely(inner == obj))
+			inner = Tcl_DuplicateObj(obj);
+
+		replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, inner);
 		release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
 		release_tclobj(&cx[0].val);
 
