@@ -2508,7 +2508,9 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 						}
 						retcode = apply_nonfinite_quirk(interp, subst_val, &transmuted_type, &forced);
 						if (retcode != TCL_OK) goto finally;
-						fill_slot(slots, slot, JSON_NewJvalObj(transmuted_type, forced));
+						fill_slot(slots, slot, transmuted_type == JSON_NULL
+								? l->json_null
+								: JSON_NewJvalObj(transmuted_type, forced));
 						release_tclobj(&forced);
 						break;
 					}
@@ -3232,7 +3234,9 @@ static int jsonNumber(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *c
 	// mismatch vs. the command name is deliberate — the user opted into
 	// the quirk.
 	TEST_OK_LABEL(finally, retval, resolve_json_number(interp, l, objv[A_VAL], &resolved_type, &resolved));
-	Tcl_SetObjResult(interp, JSON_NewJvalObj(resolved_type, resolved));
+	Tcl_SetObjResult(interp, resolved_type == JSON_NULL
+			? l->json_null
+			: JSON_NewJvalObj(resolved_type, resolved));
 
 finally:
 	release_tclobj(&resolved);

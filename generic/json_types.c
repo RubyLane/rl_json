@@ -667,7 +667,10 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 			case JSON_NUM_NONFINITE: {
 				// Quirk dispatch: REJECT errors, STRINGIFY/NULL install a
 				// JSON_STRING / JSON_NULL intrep on obj so it behaves as
-				// the transmuted type from this point on.
+				// the transmuted type from this point on.  (We can't swap
+				// obj for l->json_null here — obj's identity is pinned by
+				// the caller — but the intrep uses the same ptr1 == NULL
+				// convention as the shared null.)
 				Tcl_Obj*				transmuted = NULL;
 				enum json_types			transmuted_type;
 				Tcl_ObjInternalRep		ir = {.twoPtrValue = {0}};
@@ -676,12 +679,10 @@ static int set_from_any(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_ObjType** objtype,
 					release_tclobj(&transmuted);
 					return TCL_ERROR;
 				}
-				if (transmuted_type == JSON_NULL) {
-					// JSON_NULL payload is never consulted by the
-					// serializer; use a lightweight marker.
-					replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, Tcl_NewStringObj("null", 4));
-				} else {
+				if (transmuted_type != JSON_NULL) {
 					// JSON_STRING payload carries the AWS spelling.
+					// JSON_NULL uses ptr1 == NULL (convention, avoids
+					// allocator churn) — leave ir.twoPtrValue.ptr1 as {0}.
 					replace_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr1, transmuted);
 				}
 				release_tclobj((Tcl_Obj**)&ir.twoPtrValue.ptr2);
