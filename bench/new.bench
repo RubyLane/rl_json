@@ -24,7 +24,7 @@ proc main {} {
 		}
 		unset -nocomplain k v
 	} -deps {
-		yajl - yajl_dict	{package require yajl}
+		yajl - yajl_dict	{package require yajltcl}
 	} -compare {
 		old_json_fmt {
 			json_old fmt obj [list \

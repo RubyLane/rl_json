@@ -31,6 +31,10 @@ tea_want_shims = [
   'Tcl_GetBytesFromObj',
 ]
 
+# Optional dependency to compare our performance against yajl-tcl's in the benchmarks
+yajl_tcl_sub = subproject('yajl-tcl', required: false)
+tea_bench_deps = yajl_tcl_sub.found() ? [yajl_tcl_sub.get_variable('yajltcl_mod')] : []
+
 deps = []
 inc = []
 

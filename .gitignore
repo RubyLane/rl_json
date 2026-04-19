@@ -40,5 +40,7 @@ generic/rl_jsonStubInit.c
 subprojects/tcl
 subprojects/libtommath-*
 subprojects/hedley-*
+subprojects/yajl-*
 subprojects/packagecache
 subprojects/.wraplock
+subprojects/wrapdb.json

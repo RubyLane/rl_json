@@ -1,5 +1,4 @@
 package require rl_json
-#package require yajltcl
 
 namespace import ::rl_json::json
 
