@@ -105,7 +105,7 @@ test misc-4.1 {dedup cache returning obj as its own parsed inner must not create
 		exit 0
 	}]
 	try {
-		exec [info nameofexecutable] << $script
+		exec -ignorestderr -- [info nameofexecutable] << $script
 		set rc 0
 	} trap CHILDSTATUS {- o} {
 		set rc [lindex [dict get $o -errorcode] 2]
