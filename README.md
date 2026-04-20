@@ -4,7 +4,7 @@ json - Parse, manipulate and produce JSON documents
 
 ## SYNOPSIS
 
-**package require rl_json** ?**0.16**?
+**package require rl_json** ?**0.17**?
 
 **json get** ?**-default** *defaultValue*? *jsonValue* ?*key …*?  
 **json extract** ?**-default** *defaultValue*? *jsonValue* ?*key …*?  
@@ -31,7 +31,8 @@ json - Parse, manipulate and produce JSON documents
 **json keys** *jsonValue* ?*key …*?  
 **json decode** *bytes* ?*encoding*?  
 **json valid** ?**-extensions** *extensionlist*? ?**-details**
-*detailsvar*? *jsonValue*
+*detailsvar*? *jsonValue*  
+**json quirk** *quirk* ?*value*?
 
 ## DESCRIPTION
 
@@ -285,6 +286,43 @@ The document that failed validation
 
 **char_ofs**  
 The character offset into **doc** that caused validation to fail.
+
+**json quirk** *quirk* ?*value*?  
+Control or query process-scope encoding quirks used to work around
+mismatches between strict JSON and specific third-party consumers. If
+*value* is provided, set the quirk to that value. Returns the current
+state of the quirk. Currently supported quirks:
+
+**non-finite-doubles** (reject \| stringify \| null) — Control how
+non-finite floating-point values (NaN, ±Infinity) are handled when they
+would otherwise be installed as JSON numbers (via **json number**,
+**~N:** template substitutions, or **json set** type inference).
+
+: **reject** (default) — raise a Tcl error with errorcode **RL JSON
+NUMBER NONFINITE**. The JSON grammar has no representation for
+non-finite numbers, so the safe stance is to refuse rather than silently
+emit something invalid.
+
+: **stringify** — transmute to a JSON string using the AWS SDK v2 /
+JSON5 spellings **“NaN”**, **“Infinity”**, **“-Infinity”** (positive
+infinity has no leading “+”). Useful when interfacing with APIs that
+accept these as strings (e.g. several AWS services).
+
+: **null** — transmute to JSON **null**, matching JavaScript’s
+**JSON.stringify()**. Always produces valid JSON but silently drops the
+sign and magnitude of the value.
+
+The quirk state only affects values resolved *after* it is set —
+Tcl_Objs that already carry a cached JSON intrep keep their resolution.
+Set the required quirk before encoding any non-finite values if you want
+consistent output.
+
+**json valid** is unaffected by this quirk: the bare string “NaN” /
+“Inf” / … is never valid JSON under any **-extensions** setting, whether
+or not the quirk would later transmute it.
+
+Since this command changes state for all interpreters in the process, it
+is not available in safe interpreters.
 
 ## PATHS
 
@@ -781,7 +819,7 @@ Build from a specified release version, minimising image size:
 
 ``` dockerfile
 WORKDIR /tmp/rl_json
-RUN wget https://github.com/RubyLane/rl_json/releases/download/v0.16/rl_json-v0.16.tar.gz -O - | tar xz --strip-components=1 && \
+RUN wget https://github.com/RubyLane/rl_json/releases/download/v0.17/rl_json-v0.17.tar.gz -O - | tar xz --strip-components=1 && \
     meson setup builddir --buildtype=release && \
     meson install -C builddir && \
     strip /usr/local/lib/lib*rl_json*.so && \
