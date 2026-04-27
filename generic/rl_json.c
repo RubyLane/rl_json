@@ -2420,12 +2420,14 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 
 		TEST_OK_LABEL(finally, retcode, Tcl_GetIndexFromObj(interp, actionv[i], action_opcode_str, "opcode", TCL_EXACT, &tmp));
 		opcode = tmp;
+		if (i==0 && opcode != ALLOCATE) THROW_ERROR_LABEL(finally, retcode, "First action must be ALLOCATE");
 		//fprintf(stderr, "%s (%s) (%s)\n", Tcl_GetString(actionv[i]), Tcl_GetString(a), Tcl_GetString(b));
 		switch (opcode) {
 			case ALLOCATE: //{{{
 				{
 					// slots is in b, stack is in a
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slotslen));
+					if (slotslen <= 0) THROW_ERROR_LABEL(finally, retcode, "apply_template_actions ALLOCATE: slot count must be strictly positive");
 					if (slotslen > STATIC_SLOTS) {
 						slots = ckalloc(sizeof(Tcl_Obj*) * slotslen);
 					} else {
@@ -2435,6 +2437,7 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 						memset(slots, 0, sizeof(Tcl_Obj*) * slotslen);
 
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, a, &stacklevels));
+					if (stacklevels < 0) THROW_ERROR_LABEL(finally, retcode, "apply_template_actions ALLOCATE: stacklevels must not be negative");
 					if (stacklevels > STATIC_STACK) {
 						stack = ckalloc(sizeof(struct Tcl_Obj*) * stacklevels);
 					} else {
@@ -2580,8 +2583,7 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					break;
 				}
 				//}}}
-
-			case PUSH_TARGET:
+			case PUSH_TARGET: //{{{
 				if (target) Tcl_IncrRefCount(stack[stacklevel++] = target);
 				/*
 				if (Tcl_IsShared(a))
@@ -2591,8 +2593,8 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					*/
 				replace_tclobj(&target, Tcl_DuplicateObj(a));
 				break;
-
-			case POP_TARGET:	// save target to slot[0] and pop the parent target off the stack
+				//}}}
+			case POP_TARGET:	// save target to slot[0] and pop the parent target off the stack {{{
 				fill_slot(slots, 0, target);
 				if (stacklevel > 0) {
 					Tcl_Obj*	popped = stack[--stacklevel];
@@ -2603,19 +2605,21 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					release_tclobj(&target);
 				}
 				break;
-
-			case REPLACE_ARR:
+				//}}}
+			case REPLACE_ARR: //{{{
 				{
 					int					slot, idx;
 					Tcl_ObjInternalRep*	ir = NULL;
 					Tcl_Obj*			ir_obj = NULL;
 
+					if (!target) THROW_ERROR_LABEL(finally, retcode, "REPLACE_ARR without active target");
+
 					// a is idx, b is slot
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slot));
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, a, &idx));
-					if (Tcl_IsShared(target)) {
+					if (Tcl_IsShared(target))
 						THROW_ERROR_LABEL(finally, retcode, "target is shared for REPLACE_ARR");
-					}
+
 					ir = Tcl_FetchInternalRep(target, g_objtype_for_type[JSON_ARRAY]);
 					if (ir == NULL) {
 						Tcl_SetObjResult(interp, Tcl_ObjPrintf("Could not fetch array intrep for target array %s", Tcl_GetString(target)));
@@ -2628,12 +2632,14 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
 				}
 				break;
-
-			case REPLACE_VAL:
+				//}}}
+			case REPLACE_VAL: //{{{
 				{
 					int					slot;
 					Tcl_ObjInternalRep*	ir = NULL;
 					Tcl_Obj*			ir_obj = NULL;
+
+					if (!target) THROW_ERROR_LABEL(finally, retcode, "REPLACE_VAL without active target");
 
 					// a is key, b is slot
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slot));
@@ -2649,8 +2655,8 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
 				}
 				break;
-
-			case REPLACE_ATOM:
+				//}}}
+			case REPLACE_ATOM: //{{{
 				{
 					int		slot;
 
@@ -2659,12 +2665,14 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					replace_tclobj(&target, slots[slot]);
 				}
 				break;
-
-			case REPLACE_KEY:
+				//}}}
+			case REPLACE_KEY: //{{{
 				{
 					int					slot;
 					Tcl_ObjInternalRep*	ir = NULL;
 					Tcl_Obj*			ir_obj = NULL;
+
+					if (!target) THROW_ERROR_LABEL(finally, retcode, "REPLACE_KEY without active target");
 
 					// a is key, b is slot (which holds the new key name)
 					TEST_OK_LABEL(finally, retcode, Tcl_GetIntFromObj(interp, b, &slot));
@@ -2715,11 +2723,12 @@ int apply_template_actions(Tcl_Interp* interp, Tcl_Obj* template, Tcl_Obj* actio
 					release_tclobj((Tcl_Obj**)&ir->twoPtrValue.ptr2);
 				}
 				break;
-
-			default:
+				//}}}
+			default: //{{{
 				Tcl_SetObjResult(interp, Tcl_ObjPrintf("Unhandled opcode: %s", Tcl_GetString(actionv[i])));
 				retcode = TCL_ERROR;
 				goto finally;
+				//}}}
 		}
 	}
 
@@ -4208,7 +4217,7 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 	FILE*				h_before = NULL;
 #define TEMP_TEMPLATE	"/tmp/rl_json_XXXXXX"
 	char				temp[sizeof(TEMP_TEMPLATE)];
-	int					fd;
+	int					fd = -1;
 #if DEDUP
 	struct interp_cx*	l = (struct interp_cx*)cdata;
 #endif
@@ -4218,8 +4227,9 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 
 
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
-	fd = mkstemp(temp);
-	h_before = fdopen(fd, "r");
+	if (-1 == (fd = mkstemp(temp))) THROW_POSIX_LABEL(finally, retcode, "mkstemp");
+	if (NULL == (h_before = fdopen(fd, "r"))) THROW_POSIX_LABEL(finally, retcode, "fdopen");
+	fd = -1;
 
 #if DEDUP
 	free_cache(l);
@@ -4231,18 +4241,21 @@ static int checkmem(ClientData cdata, Tcl_Interp* interp, int objc, Tcl_Obj *con
 		goto finally;
 	}
 
-	Tcl_IncrRefCount(objv[2]);
-	intptr_t wrap_fd = fd;
-	Tcl_NRAddCallback(interp, NRcheckmem_bottom, NULL, (ClientData)wrap_fd, h_before, objv[A_NEWACTIVE]);
+	Tcl_IncrRefCount(objv[A_NEWACTIVE]);
+	Tcl_NRAddCallback(interp, NRcheckmem_bottom, NULL, NULL, h_before, objv[A_NEWACTIVE]);
+	h_before = NULL;
 	return Tcl_NREvalObj(interp, objv[A_CMD], 0);
+
 finally:
+	if (fd != -1) {close(fd); SUPPRESS_DEADSTORE fd=-1;}
+	if (h_before) {fclose(h_before); h_before=NULL;}
 	return retcode;
 }
 
 static int NRcheckmem_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode)
 {
 	char				temp[sizeof(TEMP_TEMPLATE)];
-	int					fd = (int)(intptr_t)cdata[1];
+	int					fd;
 	FILE*				h_before = (FILE*)cdata[2];
 	Tcl_Obj*			varname = (Tcl_Obj*)cdata[3];
 	FILE*				h_after = NULL;
@@ -4258,8 +4271,10 @@ static int NRcheckmem_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode
 	free_cache(l);
 #endif
 	memcpy(temp, TEMP_TEMPLATE, sizeof(TEMP_TEMPLATE));
-	fd = mkstemp(temp);
+	if (-1 == (fd = mkstemp(temp))) THROW_POSIX("mkstemp");
 	h_after = fdopen(fd, "r");
+	if (!h_after) THROW_POSIX_LABEL(finally, retcode, "fdopen");
+	fd = -1;
 	Tcl_DumpActiveMemory(temp);
 	if (unlink(temp) != 0) {
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf("Error removing after tmp file: %s", Tcl_ErrnoMsg(Tcl_GetErrno())));
@@ -4268,11 +4283,10 @@ static int NRcheckmem_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode
 	}
 
 	Tcl_InitHashTable(&seen, TCL_STRING_KEYS);
-	while (!feof(h_before)) {
+	while ((line = fgets(linebuf, 1024, h_before)) != NULL) {
 		int		new, len;
 
-		line = fgets(linebuf, 1024, h_before);
-		if (line == NULL || strstr(line, " @ ./") == NULL) continue;
+		if (strstr(line, " @ ./") == NULL) continue;
 		len = strnlen(line, 1024);
 		if (line[len-1] == '\n') len--;
 		Tcl_CreateHashEntry(&seen, line, &new);
@@ -4281,11 +4295,10 @@ static int NRcheckmem_bottom(ClientData cdata[], Tcl_Interp* interp, int retcode
 
 	replace_tclobj(&res, Tcl_NewListObj(0, NULL));
 
-	while (!feof(h_after)) {
+	while ((line = fgets(linebuf, 1024, h_after)) != NULL) {
 		int		new, len;
 
-		line = fgets(linebuf, 1024, h_after);
-		if (line == NULL || strstr(line, " @ ./") == NULL) continue;
+		if (strstr(line, " @ ./") == NULL) continue;
 		len = strnlen(line, 1024);
 		if (line[len-1] == '\n') len--;
 		Tcl_CreateHashEntry(&seen, line, &new);
@@ -4305,6 +4318,7 @@ finally:
 	release_tclobj(&varname);
 	if (h_before) {fclose(h_before); h_before = NULL;}
 	if (h_after)  {fclose(h_after);  h_after = NULL;}
+	if (fd != -1) {close(fd); SUPPRESS_DEADSTORE fd = -1;}
 	Tcl_DeleteHashTable(&seen);
 
 	return retcode;

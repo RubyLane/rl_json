@@ -16,15 +16,11 @@ int g_unload_strategy = UNLOAD_STRATEGY_TWO_PASS;
 
 static void record_instance(Tcl_Obj* obj) //{{{
 {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-	Tcl_HashEntry*	he;
-#pragma GCC diagnostic pop
 	int				isnew;
 
 	//DBG("Recording instance %s: %p\n", name(obj), obj);
 	Tcl_MutexLock(&g_instances_mutex);
-	he = Tcl_CreateHashEntry(&g_instances, obj, &isnew);
+	(void)Tcl_CreateHashEntry(&g_instances, obj, &isnew);
 	if (!isnew) Tcl_Panic("Obj %p already registered", (void*)obj);
 	Tcl_MutexUnlock(&g_instances_mutex);
 }

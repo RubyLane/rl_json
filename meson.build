@@ -1,5 +1,5 @@
 project('rl_json', 'c',
-  version:            '0.17',
+  version:            '0.17.1',
   default_options:    ['c_std=c23,c2x,c17,c11','warning_level=3','werror=true'],
   meson_version:      '>=1.3.0',
 )
@@ -143,6 +143,20 @@ configure_file(
   install_dir:    tcl_dep.get_variable('libdir') / 'pkgconfig',
   install:        true,
 )
+
+# Override-dependency for meson subproject consumers. Mirrors the
+# tcl_pkg_path variable shipped in the .pc file so that a downstream
+# `dependency('rl_json', fallback: ['rl_json', 'rl_json_dep']).get_variable('tcl_pkg_path')`
+# returns the right directory regardless of whether rl_json was found
+# via pkg-config or rebuilt from source as a subproject.
+fs = import('fs')
+rl_json_dep = declare_dependency(
+  variables: {
+    'tcl_pkg_path': fs.parent(pkg_so.full_path()),
+    'version':      meson.project_version(),
+  },
+)
+meson.override_dependency(meson.project_name(), rl_json_dep)
 
 subdir('doc')
 

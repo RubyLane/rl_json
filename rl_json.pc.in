@@ -1,4 +1,9 @@
 pkg_dir=${pcfiledir}/../@PKG_DIR_BASENAME@
+# tcl_pkg_path: the directory a Tcl interpreter should add to auto_path
+# so that `package require @PACKAGE_NAME@` resolves to this install.
+# Same as pkg_dir but exposed under a standardised name so consumers
+# don't have to guess the per-package convention.
+tcl_pkg_path=${pkg_dir}
 
 Name: @PACKAGE_NAME@
 Description: Tcl extension for high-performance JSON parsing and manipulation
