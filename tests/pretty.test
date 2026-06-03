@@ -44,7 +44,7 @@ test pretty-1.2 {Basic pretty-print, different indent} -body { #<<<
 #>>>
 test pretty-2.1 {too few args} -body { #<<<
 	json pretty
-} -returnCodes error -result {wrong # args: should be "pretty pretty ?-indent indent? json_val ?key ...?"}
+} -returnCodes error -result {wrong # args: should be "pretty pretty ?-indent indent? ?-compact? ?-nopadding? ?-arrays inline|multiline? json_val ?key ...?"}
 #>>>
 test pretty-3.1 {path} -body { #<<<
 	json pretty {{"foo":null,"empty":{},"emptyarr":[],"hello, world":"bar","This is a much longer key":["str",123,123.4,true,false,null,{"inner": "obj"}]}} {This is a much longer key}
@@ -89,9 +89,94 @@ test debug-1.1 {Basic debug pretty-print} -body { #<<<
 # Coverage golf
 test pretty-jsonPretty-1.1 {} -body {json pretty -indent} -returnCodes error -result {missing argument to "-indent"} -errorCode {TCL ARGUMENT MISSING}
 test pretty-jsonPretty-2.1 {} -body {json pretty -- 1} -result 1
-test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -result {wrong # args: should be "pretty ?-default defaultValue? json_val ?key ...?"} -errorCode {TCL WRONGARGS}
+test pretty-jsonPretty-3.1 {} -body {json pretty -indent {  }} -returnCodes error -match glob -result {wrong # args: should be "pretty ?-indent indent? *json_val*"} -errorCode {TCL WRONGARGS}
 test pretty-jsonPretty-4.1 {} -body {json pretty bad} -returnCodes error -result {Error parsing JSON value: Illegal character at offset 0} -errorCode {RL JSON PARSE {Illegal character} bad 0}
 test pretty-jsonPretty-5.1 {} -body {json pretty -bad} -returnCodes error -result {bad option "-bad": must be *} -errorCode {TCL LOOKUP INDEX option -bad} -match glob
+test pretty-jsonPretty-6.1 {} -body {json pretty -arrays} -returnCodes error -result {missing argument to "-arrays"} -errorCode {TCL ARGUMENT MISSING}
+test pretty-jsonPretty-7.1 {} -body {json pretty -arrays bad {1}} -returnCodes error -result {bad array mode "bad": must be inline or multiline} -errorCode {TCL LOOKUP INDEX {array mode} bad}
+
+# -compact option
+test pretty-compact-1.1 {-compact produces single-line JSON} -body { #<<<
+	json pretty -compact {{"foo":"bar","arr":[1,2,3]}}
+} -result {{"foo":"bar","arr":[1,2,3]}}
+#>>>
+test pretty-compact-1.2 {-compact with nested structure} -body { #<<<
+	json pretty -compact {{"a":{"b":{"c":1}}}}
+} -result {{"a":{"b":{"c":1}}}}
+#>>>
+test pretty-compact-1.3 {-compact with array} -body { #<<<
+	json pretty -compact {[1,2,3,4,5]}
+} -result {[1,2,3,4,5]}
+#>>>
+
+# -nopadding option
+test pretty-nopadding-1.1 {-nopadding suppresses key alignment} -body { #<<<
+	json pretty -nopadding {{"foo":1,"x":2,"longerkey":3}}
+} -result {{
+    "foo": 1,
+    "x": 2,
+    "longerkey": 3
+}}
+#>>>
+test pretty-nopadding-1.2 {default (no -nopadding) aligns keys} -body { #<<<
+	json pretty {{"foo":1,"x":2}}
+} -result {{
+    "foo": 1,
+    "x":   2
+}}
+#>>>
+
+# -arrays option
+test pretty-arrays-1.1 {-arrays inline forces all arrays on one line} -body { #<<<
+	json pretty -arrays inline {[1,2,3,4,5]}
+} -result {[1,2,3,4,5]}
+#>>>
+test pretty-arrays-1.2 {-arrays multiline forces each element on its own line} -body { #<<<
+	json pretty -arrays multiline {[1,2,3]}
+} -result {[
+    1,
+    2,
+    3
+]}
+#>>>
+test pretty-arrays-1.3 {default auto: ≤3 elements inline} -body { #<<<
+	json pretty {[1,2,3]}
+} -result {[1,2,3]}
+#>>>
+test pretty-arrays-1.4 {default auto: >3 elements multiline} -body { #<<<
+	json pretty {[1,2,3,4]}
+} -result {[
+    1,
+    2,
+    3,
+    4
+]}
+#>>>
+test pretty-arrays-1.5 {-arrays inline with object containing arrays} -body { #<<<
+	json pretty -arrays inline {{"arr":[1,2,3,4,5],"short":[1,2]}}
+} -result {{
+    "arr":   [1,2,3,4,5],
+    "short": [1,2]
+}}
+#>>>
+test pretty-arrays-1.6 {-arrays multiline with object} -body { #<<<
+	json pretty -arrays multiline {{"arr":[1,2]}}
+} -result {{
+    "arr": [
+        1,
+        2
+    ]
+}}
+#>>>
+
+# Combined options
+test pretty-combined-1.1 {-nopadding -arrays inline} -body { #<<<
+	json pretty -nopadding -arrays inline {{"foo":1,"arr":[1,2,3,4]}}
+} -result {{
+    "foo": 1,
+    "arr": [1,2,3,4]
+}}
+#>>>
 
 json free_cache
 

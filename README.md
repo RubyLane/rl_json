@@ -21,9 +21,11 @@ json - Parse, manipulate and produce JSON documents
 **json boolean** *value*  
 **json object** ?*key value* ?*key value …*??  
 **json array** *elem …*  
+**json autoarray** ?*value …*?  
+**json autoobject** ?*key value …*?  
 **json bool** *value*  
 **json normalize** *jsonValue*  
-**json pretty** ?**-indent** *indent*? *jsonValue* ?*key …*?  
+**json pretty** ?**-indent** *indent*? ?**-compact**? ?**-nopadding**? ?**-arrays** **inline**|**multiline**? *jsonValue* ?*key …*?  
 **json template** *jsonValue* ?*dictionary*?  
 **json isnull** *jsonValue* ?*key …*?  
 **json type** *jsonValue* ?*key …*?  
@@ -160,6 +162,49 @@ Return a JSON array containing each of the elements given. *elem* is a
 list of two elements, the first being the type {string, number, boolean,
 null, object, array, json}, and the second being the value.
 
+**json autoarray** ?*value …*?  
+Return a JSON array built from the supplied *value* arguments, with JSON
+type detected automatically for each one:
+
+- Exact string `true` (case-sensitive) → JSON boolean `true`
+- Exact string `false` (case-sensitive) → JSON boolean `false`
+- Any value that Tcl can interpret as a number → JSON number (Tcl formats
+  such as `0x1F`, `007`, `0b1010` are converted to their canonical decimal
+  equivalents)
+- Everything else → JSON string
+
+This is a convenient shorthand for `json array` that avoids having to
+specify a type for every element:
+
+``` tcl
+json autoarray 1 2.5 true false "hello" 42
+# → [1,2.5,true,false,"hello",42]
+
+json autoarray 0x1F 007
+# → [31,7]
+
+json autoarray True FALSE
+# → ["True","FALSE"]  (case mismatch → strings)
+```
+
+**json autoobject** ?*key value …*?  
+Return a JSON object built from the supplied *key*–*value* pairs, with
+JSON type detected automatically for each value (using the same rules as
+**json autoarray**). Keys are always treated as strings.
+
+An odd number of arguments is an error. Duplicate keys are allowed; the
+last value for a given key wins.
+
+``` tcl
+json autoobject name "Alice" age 30 active true score 95.5
+# → {"name":"Alice","age":30,"active":true,"score":95.5}
+
+json autoobject 123 "numeric key"
+# → {"123":"numeric key"}
+
+json autoobject key        ;# error: wrong # args
+```
+
 **json foreach** *varList1 jsonValue1* ?*varList2 jsonValue2 …*? *script*  
 Evaluate *script* in a loop in a similar way to the **foreach** command.
 In each iteration, the values stored in the iterator variables in each
@@ -212,11 +257,52 @@ path of *key*s.
 Return a “normalized” version of the input *jsonValue*, i.e., with all
 optional whitespace trimmed.
 
-**json pretty** ?**-indent** *indent*? *jsonValue* ?*key …*?  
+**json pretty** ?**-indent** *indent*? ?**-compact**? ?**-nopadding**? ?**-arrays** **inline**|**multiline**? *jsonValue* ?*key …*?  
 Returns a pretty-printed string representation of *jsonValue*, found by
 following the path of *key*s. Useful for debugging or inspecting the
-structure of JSON data. If **-indent** is supplied, use *indent* for
-each level of indent, otherwise default to four spaces.
+structure of JSON data.
+
+Options:
+
+**-indent** *indent*  
+Use *indent* for each level of indentation. Defaults to four spaces.
+
+**-compact**  
+Return a compact, single-line representation with all optional whitespace
+removed (equivalent to **json normalize**). All other formatting options
+are ignored when **-compact** is set.
+
+**-nopadding**  
+Suppress the automatic alignment of object keys. By default, short keys
+in an object are right-padded with spaces so that all values line up
+(up to a cap of 20 characters). **-nopadding** disables this alignment.
+
+**-arrays** **inline**|**multiline**  
+Control how arrays are formatted:
+
+- `inline` — always render arrays on a single line: `[1,2,3]`
+- `multiline` — always render each array element on its own line
+- *(default)* — arrays with three or fewer elements are rendered inline;
+  larger arrays are rendered multiline
+
+``` tcl
+json pretty {{"foo":null,"arr":[1,2,3]}}
+# →
+# {
+#     "foo": null,
+#     "arr": [1,2,3]
+# }
+
+json pretty -compact {{"foo":"bar","arr":[1,2,3]}}
+# → {"foo":"bar","arr":[1,2,3]}
+
+json pretty -nopadding -arrays multiline {{"foo":1,"longkey":2}}
+# →
+# {
+#     "foo": 1,
+#     "longkey": 2
+# }
+```
 
 **json decode** *bytes* ?*encoding*?  
 Rl_json operates on characters, as returned from Tcl’s
