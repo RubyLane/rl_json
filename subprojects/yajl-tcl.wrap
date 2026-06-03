@@ -1,0 +1,11 @@
+[wrap-git]
+directory = yajl-tcl
+url = https://github.com/mxmanghi/yajl-tcl
+revision = 631a6ebd1b464b965a7e81e8bd49454de0cacaed
+depth = 1
+clone-recursive = true
+patch_directory = yajl-tcl
+wrap_version = 1.8.1
+
+[provide]
+yajl-tcl = yajl_tcl_dep

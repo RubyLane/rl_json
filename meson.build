@@ -1,5 +1,5 @@
 project('rl_json', 'c',
-  version:            '0.17.4',
+  version:            '0.17.5',
   default_options:    ['c_std=c23,c2x,c17,c11','warning_level=3','werror=true'],
   meson_version:      '>=1.3.0',
 )
@@ -33,6 +33,8 @@ tea_want_shims = [
 
 deps = []
 inc = []
+
+tea_genstubs = files('generic/rl_json.decls', 'generic/rl_jsonStubLib.c')
 
 subdir('teabase/init')
 
@@ -70,22 +72,6 @@ conf.set_quoted('RL_JSON_LIB_SPEC',             '-L' + pkg_dir)
 conf.set_quoted('RL_JSON_BUILD_LIB_SPEC',       '-L' + meson.project_build_root() / 'teabase')
 conf.set_quoted('RL_JSON_STUB_LIB_SPEC',        '-L' + pkg_dir)
 conf.set_quoted('RL_JSON_BUILD_STUB_LIB_SPEC',  '-L' + meson.project_build_root() / 'teabase')
-
-# Stubs generation
-deps += declare_dependency(
-  sources: custom_target('genstubs',
-    output: ['rl_jsonStubInit.c', 'rl_jsonDecls.h'],
-    command: [
-      build_tclsh,
-      meson.project_source_root() / 'teabase/tools/genStubs.tcl',
-      meson.project_build_root(),
-      meson.project_source_root() / 'generic/rl_json.decls',
-    ],
-    install:     true,
-    install_dir: [false, pkg_dir],
-    install_tag: [false, meson.is_subproject() ? 'deps' : 'runtime'],
-  ),
-)
 
 subdir('generic')
 
@@ -128,16 +114,6 @@ install_data(
 # teabase builds the shared module and generates config.h
 subdir('teabase')
 
-# Build and install stubs library for dependent extensions (after config.h)
-stubs_lib = static_library(meson.project_name() + 'stub',
-  'generic/rl_jsonStubLib.c',
-  dependencies:         deps,
-  include_directories:  inc,
-  install:              true,
-  install_dir:          pkg_dir,
-  install_tag:          meson.is_subproject() ? 'deps' : 'runtime',
-)
-
 # Generate relocatable pkg-config file for stub library
 pc_conf = configuration_data()
 pc_conf.set('PACKAGE_NAME',     meson.project_name())
@@ -159,6 +135,10 @@ configure_file(
 # returns the right directory regardless of whether rl_json was found
 # via pkg-config or rebuilt from source as a subproject.
 rl_json_dep = declare_dependency(
+  link_with:            stubs_lib,
+  sources:              genstubs[1],
+  include_directories:  inc,
+  compile_args:         '-DUSE_RL_JSON_STUBS=1',
   variables: {
     'tcl_pkg_path': fs.parent(pkg_so.full_path()),
     'version':      meson.project_version(),

@@ -89,10 +89,10 @@ void release_instances(void) // transmute all remaining json objtypes to pure st
 {
 	Tcl_MutexLock(&g_instances_mutex);
 	if (--g_instances_refcount <= 0) {
-		const char*	hashstats = Tcl_HashStats(&g_instances);
+		//const char*	hashstats = Tcl_HashStats(&g_instances);
 		//DBG("------> orphan all remaining instances\n");
 		//DBG("g_instances stats:\n%s\n", hashstats);
-		ckfree((char*)hashstats);
+		//ckfree((char*)hashstats);
 
 		switch (g_unload_strategy) {
 			case UNLOAD_STRATEGY_ONE_PASS:
