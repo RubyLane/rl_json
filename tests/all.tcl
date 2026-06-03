@@ -14,7 +14,15 @@ package prefer latest
 package require tcltest 2.5
 namespace import ::tcltest::*
 
-configure -testdir [file normalize [file dirname [info script]]] {*}$argv
+# On Windows, tcltest's subprocess mode (default) spawns fresh tclsh processes
+# that inherit the system encoding (cp1252) rather than the utf-8 encoding set
+# below.  Force single-process mode on non-utf-8 systems so that test files are
+# sourced in-process after the encoding is switched.
+set _singleproc_for_encoding [expr {[encoding system] ne "utf-8"}]
+configure -testdir [file normalize [file dirname [info script]]] \
+    {*}[expr {$_singleproc_for_encoding ? {-singleproc 1} : {}}] \
+    {*}$argv
+unset _singleproc_for_encoding
 
 if {[singleProcess]} {
     interp debug {} -frame 1
@@ -235,6 +243,16 @@ if {$checkmem && [llength [info commands memory]] == 1} {
 	}
 } else {
 	proc memtest args {tailcall ::tcltest::test {*}$args}
+}
+
+# On Windows, tclsh defaults to the system encoding (e.g. cp1252).
+# Test files are UTF-8; force UTF-8 before runAllTests sources them so
+# non-ASCII literals (Japanese characters etc.) are read correctly.
+# The old all.tcl achieved this via explicit "source -encoding utf-8".
+if {[encoding system] ne "utf-8"} {
+    encoding system utf-8
+    fconfigure stdout -encoding utf-8
+    fconfigure stderr -encoding utf-8
 }
 
 set ErrorOnFailures [info exists env(ERROR_ON_FAILURES)]
