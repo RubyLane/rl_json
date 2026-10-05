@@ -63,7 +63,9 @@ conf.set10('HAVE_UNISTD_H',             cc.has_header('unistd.h'))
 conf.set_quoted('RL_JSON_INCLUDE_PATH_INSTALL', pkg_dir)
 conf.set_quoted('RL_JSON_LIBRARY_PATH_INSTALL', pkg_dir)
 conf.set_quoted('RL_JSON_PACKAGE_PATH_INSTALL', pkg_dir)
-conf.set_quoted('RL_JSON_LIBRARY',              meson.project_name())
+# The shared library's name: TEA builds name it tcl9<pkg> for Tcl 9
+conf.set_quoted('RL_JSON_LIBRARY',
+  (tcl_dep.version().split('.')[0].to_int() >= 9 ? 'tcl9' : '') + meson.project_name())
 conf.set_quoted('RL_JSON_STUBLIB',              meson.project_name() + 'stub')
 conf.set_quoted('RL_JSON_HEADER',               'rl_json.h')
 conf.set_quoted('RL_JSON_INCLUDE_SPEC',         '-I' + pkg_dir)
