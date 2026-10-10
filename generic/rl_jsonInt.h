@@ -3,7 +3,7 @@
 #define _POSIX_C_SOURCE	200809L
 #define _DEFAULT_SOURCE
 
-#if defined(__has_c_attribute)
+#if defined(__clang__) && defined(__has_c_attribute)
 #	if __has_c_attribute(clang::suppress)
 #		define SUPPRESS_DEADSTORE [[clang::suppress]]
 #	endif

@@ -218,7 +218,7 @@ doc: doc/json.n README.md
 doc/.build/json.md: $(srcdir)/doc/json.md.in $(top_builddir)/config.status
 	cd $(top_builddir) \
 	  && mkdir -p doc/.build \
-	  && ln -sf ../json.md.in doc/.build/json.md.in \
+	  && ln -sf $(srcdir)/../../doc/json.md.in doc/.build/json.md.in \
 	  && CONFIG_FILES=$@ CONFIG_HEADERS= $(SHELL) ./config.status
 
 doc/json.n: doc/.build/json.md
@@ -252,7 +252,7 @@ install-libraries: libraries
 install-doc: doc
 	@$(INSTALL_DATA_DIR) "$(DESTDIR)$(mandir)/mann"
 	@echo "Installing documentation in $(DESTDIR)$(mandir)"
-	@list='$(srcdir)/doc/*.n'; for i in $$list; do \
+	@list='$(top_builddir)/doc/*.n'; for i in $$list; do \
 	    echo "Installing $$i"; \
 	    $(INSTALL_DATA) $$i "$(DESTDIR)$(mandir)/mann" ; \
 	done

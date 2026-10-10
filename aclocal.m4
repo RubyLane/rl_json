@@ -89,6 +89,25 @@ AC_DEFUN([CHECK_TCL_GETNUMBERFROMOBJ], [
 	])
 ])
 
+AC_DEFUN([CHECK_TCL_GETBYTESFROMOBJ], [
+	AC_MSG_CHECKING([whether we need to polyfill Tcl_GetBytesFromObj])
+	saved_CFLAGS="$CFLAGS"
+	saved_LIBS="$LIBS"
+	CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
+	LIBS="$LIBS $TCL_STUB_LIB_SPEC"
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <tcl.h>]], [[Tcl_GetBytesFromObj(NULL, NULL, NULL);]])],[have_getbytes=yes],[have_getbytes=no])
+	CFLAGS="$saved_CFLAGS"
+	LIBS="$saved_LIBS"
+
+	if test "$have_getbytes" = yes; then
+		AC_DEFINE(GETBYTES_SHIM, 0, [Do we need to polyfill Tcl_GetBytesFromObj?])
+		AC_MSG_RESULT([no])
+	else
+		AC_DEFINE(GETBYTES_SHIM, 1, [Do we need to polyfill Tcl_GetBytesFromObj?])
+		AC_MSG_RESULT([yes])
+	fi
+])
+
 AC_DEFUN([TEAX_CONFIG_INCLUDE_LINE], [
 	eval "$1=\"-I[]CygPath($2)\""
 	AC_SUBST($1)

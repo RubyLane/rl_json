@@ -39,3 +39,13 @@ rundata
 /subprojects/packagecache
 /subprojects/.wraplock
 /subprojects/wrapdb.json
+
+generic/rl_jsonDecls.h
+generic/rl_jsonStubInit.c
+vs/
+gid/do_configure.sh
+linux-macos/Makefile
+linux-macos-arm64/Makefile
+doc/json.html
+doc/rl_json-paper.pdf
+

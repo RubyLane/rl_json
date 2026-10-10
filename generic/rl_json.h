@@ -6,6 +6,8 @@
 #endif
 
 #include <tcl.h>
+#include "tcl_compatibility_8_9.h"
+
 #include <stdint.h>		// Stubs API uses stdint types
 
 /* Tcl 8.6 has no Tcl_Size (TIP 660): provide it as Tcl 8.7's tcl.h does.  The

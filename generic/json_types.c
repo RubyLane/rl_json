@@ -354,7 +354,7 @@ int JSON_SetIntRep(Tcl_Obj* target, enum json_types type, Tcl_Obj* replacement) 
 		TEMPLATE_TYPE(str, len, template_type);
 
 		if (template_type != type) {
-			replace_tclobj(&rep, Tcl_NewStringObj(str, strend - str));	// TODO: dedup?
+			replace_tclobj(&rep, Tcl_NewStringObj(str, (Tcl_Size)(strend - str)));	// TODO: dedup?
 			type = template_type;
 		}
 	}

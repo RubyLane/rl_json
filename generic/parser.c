@@ -263,7 +263,7 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 			p++;	// Advance past the " to the first byte of the string
 			{
 				const unsigned char*		chunk;
-				size_t						len;
+				Tcl_Size						len;
 				char						mapped;
 				enum json_types				stype = JSON_STRING;
 				enum char_advance_status	status = CHAR_ADVANCE_OK;
@@ -280,7 +280,7 @@ int value_type(struct interp_cx* l, const unsigned char* doc, const unsigned cha
 
 					if (unlikely(p >= e)) goto err;
 
-					len = p-chunk;
+					len =(Tcl_Size)(p-chunk);
 
 					if (likely(out == NULL)) {
 						replace_tclobj(&out, get_string(l, (const char*)chunk, len));
@@ -364,7 +364,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 									acc = 0xFFFD;
 								}
 								//const unsigned char* utfend = output_utf8(acc, utfbuf);
-								const int len = Tcl_UniCharToUtf(acc, utfbuf);
+								const Tcl_Size len = Tcl_UniCharToUtf(acc, utfbuf);
 								Tcl_AppendToObj(out, utfbuf, len);
 							}
 							break;
@@ -461,7 +461,7 @@ append_mapped:				Tcl_AppendToObj(out, &mapped, 1);		// Weird, but arranged this
 
 				*type = JSON_NUMBER;
 				if (val)
-					replace_tclobj(val, get_string(l, (const char*)start, p-start));
+					replace_tclobj(val, get_string(l, (const char*)start, (Tcl_Size)(p-start)));
 			}
 	}
 

@@ -9,7 +9,11 @@
  */
 
 #include "rl_jsonInt.h"
+#ifdef _WIN32
+//#include "rl_jsonUuid.h"
+#else 
 #include "rl_jsonUuid.h"
+#endif
 #include <string.h>
 
 #undef STRINGIFY

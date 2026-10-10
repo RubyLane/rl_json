@@ -503,7 +503,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 				{
 					Tcl_Size	ac, index_str_len;
 					int			ok=1;
-					long		index;
+					Tcl_Size 	index;
 					const char*	index_str;
 					char*		end;
 					Tcl_Obj**	av;
@@ -511,7 +511,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 					TEST_OK_LABEL(finally, code, Tcl_ListObjGetElements(interp, val, &ac, &av));
 					//fprintf(stderr, "descending into array of length %d\n", ac);
 
-					if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
+					if (Tcl_GetSizeIntFromObj(NULL, step, &index) != TCL_OK) {
 						// Index isn't an integer, check for end(+/-int)?
 						index_str = Tcl_GetStringFromObj(step, &index_str_len);
 						if (index_str_len < 3 || strncmp("end", index_str, 3) != 0)
@@ -549,7 +549,7 @@ int JSON_Set(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path, Tcl_Obj* replaceme
 						i++;
 						goto followed_path;
 					} else if (index >= ac) {
-						int			new_i;
+					        Tcl_Size new_i;
 						for (new_i=ac; new_i<index; new_i++) {
 							TEST_OK_LABEL(finally, code, Tcl_ListObjAppendElement(interp, val,
 										JSON_NewJvalObj(JSON_NULL, NULL)));
@@ -717,7 +717,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 				{
 					Tcl_Size	ac, index_str_len;
 					int			ok=1;
-					long		index;
+					Tcl_Size 	index;
 					const char*	index_str;
 					char*		end;
 					Tcl_Obj**	av;
@@ -725,7 +725,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 					TEST_OK_LABEL(finally, retval, Tcl_ListObjGetElements(interp, val, &ac, &av));
 					//fprintf(stderr, "descending into array of length %d\n", ac);
 
-					if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
+					if (Tcl_GetSizeIntFromObj(NULL, step, &index) != TCL_OK) {
 						// Index isn't an integer, check for end(+/-int)?
 						index_str = Tcl_GetStringFromObj(step, &index_str_len);
 						if (index_str_len < 3 || strncmp("end", index_str, 3) != 0)
@@ -816,7 +816,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 			{
 				Tcl_Size	ac, index_str_len;
 				int			ok=1;
-				long		index;
+				Tcl_Size 	index;
 				const char*	index_str;
 				char*		end;
 				Tcl_Obj**	av;
@@ -824,7 +824,7 @@ int JSON_Unset(Tcl_Interp* interp, Tcl_Obj* obj, Tcl_Obj *path) //{{{
 				TEST_OK_LABEL(finally, retval, Tcl_ListObjGetElements(interp, val, &ac, &av));
 				//fprintf(stderr, "descending into array of length %d\n", ac);
 
-				if (Tcl_GetLongFromObj(NULL, step, &index) != TCL_OK) {
+				if (Tcl_GetSizeIntFromObj(NULL, step, &index) != TCL_OK) {
 					// Index isn't an integer, check for end(+/-int)?
 					index_str = Tcl_GetStringFromObj(step, &index_str_len);
 					if (index_str_len < 3 || strncmp("end", index_str, 3) != 0)
